@@ -184,6 +184,12 @@ func _goal_reached() -> bool:
 				if p.get_meta("part_id") == "cheese" and p.eaten:
 					return true
 			return false
+		"pop":
+			# Any balloon popped (fixed or player-placed).
+			for p in parts:
+				if p.get_meta("part_id") == "balloon" and p.popped:
+					return true
+			return false
 		"state":
 			# {"type":"state","index":i,"key":"popped","value":true}
 			var i := int(g.get("index", -1))

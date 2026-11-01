@@ -1,0 +1,79 @@
+{
+  "id": "c008",
+  "world": 1,
+  "number": 8,
+  "title": "Switched off",
+  "hint": "That fan is off. Something has to step on the switch.",
+  "teaches": "sequences",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 5,
+      "y": 30,
+      "rot": 1
+    },
+    {
+      "part": "ball",
+      "x": 5,
+      "y": 28,
+      "rot": 0
+    },
+    {
+      "part": "fan",
+      "x": 10,
+      "y": 46,
+      "rot": 0,
+      "state": {
+        "on": false
+      }
+    },
+    {
+      "part": "ball",
+      "x": 15,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 16,
+      "y": 46,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 30,
+      "y": 50,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "switch",
+      "count": 1
+    },
+    {
+      "part": "plank",
+      "count": 1
+    }
+  ],
+  "slots": 2,
+  "reference_solution": [
+    {
+      "part": "switch",
+      "x": 12,
+      "y": 34,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 16,
+      "y": 38,
+      "rot": 2
+    }
+  ],
+  "expect": "goal"
+}

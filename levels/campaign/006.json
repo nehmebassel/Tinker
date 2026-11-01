@@ -1,0 +1,51 @@
+{
+  "id": "c006",
+  "world": 1,
+  "number": 6,
+  "title": "Pop goes the balloon",
+  "hint": "Balloons float. Steer yours into the flame.",
+  "teaches": "floating bodies, second goal type",
+  "goal": {
+    "type": "pop"
+  },
+  "fixed": [
+    {
+      "part": "candle",
+      "x": 30,
+      "y": 6,
+      "rot": 12
+    },
+    {
+      "part": "plank",
+      "x": 22,
+      "y": 20,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "balloon",
+      "count": 1
+    },
+    {
+      "part": "fan",
+      "count": 2
+    }
+  ],
+  "slots": 3,
+  "reference_solution": [
+    {
+      "part": "balloon",
+      "x": 10,
+      "y": 50,
+      "rot": 0
+    },
+    {
+      "part": "fan",
+      "x": 6,
+      "y": 44,
+      "rot": 23
+    }
+  ],
+  "expect": "goal"
+}

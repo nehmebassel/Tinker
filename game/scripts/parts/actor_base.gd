@@ -77,14 +77,19 @@ func decide() -> int:
 	return 0
 
 
+## Three rays (left foot, centre, right foot): a body hanging over a ledge edge is still supported
+## by that edge and must keep steering, otherwise it stalls there forever.
 func _grounded() -> bool:
 	var space := get_world_2d().direct_space_state
-	var from := global_position
-	var to := global_position + Vector2(0, size.y / 2.0 + 6.0)
-	var q := PhysicsRayQueryParameters2D.create(from, to)
-	q.exclude = [get_rid()]
-	q.collide_with_areas = false
-	return not space.intersect_ray(q).is_empty()
+	for fx in [-size.x * 0.4, 0.0, size.x * 0.4]:
+		var from := global_position + Vector2(fx, 0)
+		var to := from + Vector2(0, size.y / 2.0 + 6.0)
+		var q := PhysicsRayQueryParameters2D.create(from, to)
+		q.exclude = [get_rid()]
+		q.collide_with_areas = false
+		if not space.intersect_ray(q).is_empty():
+			return true
+	return false
 
 
 func _blocked_ahead() -> bool:

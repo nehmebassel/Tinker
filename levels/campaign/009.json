@@ -1,0 +1,62 @@
+{
+  "id": "c009",
+  "world": 1,
+  "number": 9,
+  "title": "Paddle",
+  "hint": "A plank on a motor spins. Use it to whack the ball across.",
+  "teaches": "combinatorial toolbox",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 6,
+      "y": 30,
+      "rot": 1
+    },
+    {
+      "part": "ball",
+      "x": 6,
+      "y": 28,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 28,
+      "y": 50,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "plank",
+      "count": 1
+    },
+    {
+      "part": "motor",
+      "count": 1
+    },
+    {
+      "part": "rope",
+      "count": 1
+    }
+  ],
+  "slots": 3,
+  "reference_solution": [
+    {
+      "part": "motor",
+      "x": 15,
+      "y": 36,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 15,
+      "y": 36,
+      "rot": 6
+    }
+  ],
+  "expect": "goal"
+}

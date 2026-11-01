@@ -46,7 +46,9 @@ func decide() -> int:
 
 
 func _on_body_entered(body: Node) -> void:
-	if running and body.has_method("catch"):
+	# A scared cat is running away, not hunting: it never catches.
+	# ...and it cannot catch what is standing on its head (a mouse crossing a pit over it).
+	if running and not scared() and body.has_method("catch") and body.global_position.y > global_position.y - size.y * 0.45:
 		body.catch()
 		awake = true
 

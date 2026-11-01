@@ -130,6 +130,13 @@ func _replay_level(level: LevelData) -> void:
 			identical = false
 			_log("  replay %d differs from replay 0:\n--- first\n%s\n--- this\n%s" % [i, first_text, sim.state_text()])
 			break
+	# A campaign level must not be solved by doing nothing.
+	if level.slots > 0 and level.expect == "goal":
+		sim.set_player_parts([])
+		sim.start()
+		var empty: Dictionary = await sim.finished
+		await process_frame
+		_check("%s: not solved with an empty tray (got %s)" % [level.id, empty["result"]], empty["result"] != "goal")
 	root.remove_child(sim)
 	sim.free()
 	_log("%s: result=%s ticks=%d (%.2fs) hash=%s" % [level.id, result, ticks, ticks / 60.0, first_hash])
