@@ -11,7 +11,7 @@ Session log at the bottom tells the next agent exactly where things stand.
 - [x] No randomness in simulation; parts created in a fixed order; run counted in ticks (`simulation.gd`)
 - [x] Run ends on goal, 30 s, or 2 s of no motion
 - [x] Determinism harness: 100 in-process replays identical (`tests/run_tests.gd`)
-- [x] Hash identical across separate processes and across frame pacings (real time, 30 fps, 144 fps)
+- [x] Hash identical across separate processes, across frame pacings (real time, 30 fps, 144 fps), and across machines (this VM vs GitHub runner, both x86_64)
 - [x] CI compares the hash against `levels/hashes.txt`
 - [ ] Hash identical on two real phones (needs devices — see "Open for Bassel")
 - [ ] Decide Godot physics vs Box2D extension after phone test (ARM/x86 float drift risk)
@@ -34,12 +34,12 @@ Session log at the bottom tells the next agent exactly where things stand.
 
 ## Milestones
 
-### M0 Repo and tooling — DONE locally, PR pending repo creation
+### M0 Repo and tooling — DONE
 - [x] Working title: **Tinker** (store + trademark check done, see Decisions)
-- [ ] GitHub repo `nehmebassel/tinker` created — BLOCKED: session credential cannot create repos; Bassel creates it, then `git push`
+- [x] GitHub repo `nehmebassel/tinker` created by Bassel (public), first commit pushed 2026-11-01
 - [x] Godot project with fixed 60 Hz step and determinism test scene
 - [x] CI workflow: headless tests, hash check, UI smoke, Android debug APK artifact (`.github/workflows/ci.yml`)
-- [ ] Green workflow run (needs the repo)
+- [x] Green workflow run #1: test 13 s, smoke 37 s, android 1m03s; artifact `tinker-debug-apk` (55.8 MB). M0 acceptance met.
 
 ### M1 Feel — code complete, awaiting phone review (kill gate)
 - [x] Ball, plank, basket parts with JSON definitions (`game/parts/*.json`)
@@ -77,11 +77,10 @@ Session log at the bottom tells the next agent exactly where things stand.
 
 ## Open for Bassel
 
-1. Create the private repo `nehmebassel/tinker` and grant this session access, then say "push".
-2. Install `build/tinker-debug.apk` (from the CI artifact once the workflow runs, or ask me to send it) on your phone. Place a plank. Feel review → go / no-go for M2.
-3. Confirm Node 22 for the backend.
-4. gcloud has no credentials in this environment; needed from M4.
+1. Install `build/tinker-debug.apk` (from the CI artifact once the workflow runs, or ask me to send it) on your phone. Place a plank. Feel review → go / no-go for M2.
+2. Confirm Node 22 for the backend.
+3. gcloud has no credentials in this environment; needed from M4.
 
 ## Session log
 
-- **2026-11-01 (session 1, autonomous)** Tooling installed; title checked; Godot project, 3 parts, simulation, determinism harness, M1 touch screen, UI smoke test, Android export, CI workflow, docs. Repo creation blocked on credentials. Everything committed locally on `main`.
+- **2026-11-01 (session 1, autonomous)** Tooling installed; title checked; Godot project, 3 parts, simulation, determinism harness, M1 touch screen, UI smoke test, Android export, CI workflow, docs. Repo created by Bassel at 06:27 local; pushed; CI green on first run. Next: Bassel's phone feel review (M1 kill gate), then M2 parts.
