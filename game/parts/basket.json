@@ -1,0 +1,11 @@
+{
+  "id": "basket",
+  "name": "Basket",
+  "group": "goal",
+  "description": "The classic target. Counts bodies that land inside.",
+  "body": "static",
+  "shape": {"type": "basket", "w": 216, "h": 150},
+  "color": "#7bd389",
+  "script": "res://scripts/parts/basket.gd",
+  "interacts_with": ["ball", "mouse", "cheese"]
+}

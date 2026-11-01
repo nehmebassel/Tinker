@@ -1,0 +1,48 @@
+; Engine configuration file.
+; Tinker — daily contraption puzzle. Godot 4.5.
+; Determinism-critical settings are commented; do not change them casually.
+
+config_version=5
+
+[application]
+
+config/name="Tinker"
+config/description="Build the machine that solves today's goal in the fewest pieces."
+run/main_scene="res://scenes/level.tscn"
+config/features=PackedStringArray("4.5", "GL Compatibility")
+config/icon="res://assets/icons/icon.svg"
+
+[display]
+
+; Portrait only at launch. 1080x1920 design resolution, canvas_items stretch, expand vertically.
+window/size/viewport_width=1080
+window/size/viewport_height=1920
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=1
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+pointing/emulate_mouse_from_touch=true
+
+[physics]
+
+; DETERMINISM: fixed 60 Hz step, no jitter fix (jitter fix makes the step size vary with wall clock).
+common/physics_ticks_per_second=60
+common/max_physics_steps_per_frame=8
+common/physics_jitter_fix=0.0
+; Interpolation smooths rendering only; it never feeds back into simulation.
+common/physics_interpolation=true
+; Fixed solver iterations so every device does identical work per step.
+2d/solver/solver_iterations=16
+2d/default_gravity=980.0
+2d/sleep_threshold_linear=2.0
+2d/sleep_threshold_angular=0.139626
+2d/time_before_sleep=0.5
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true

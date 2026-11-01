@@ -1,0 +1,20 @@
+{
+  "id": "c001",
+  "world": 1,
+  "number": 1,
+  "title": "First drop",
+  "hint": "Drag the plank under the ball. Tap it to rotate.",
+  "goal": {"type": "basket", "count": 1},
+  "fixed": [
+    {"part": "plank", "x": 8, "y": 14, "rot": 1},
+    {"part": "ball", "x": 8, "y": 12, "rot": 0},
+    {"part": "basket", "x": 27, "y": 52, "rot": 0}
+  ],
+  "tray": [
+    {"part": "plank", "count": 1}
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {"part": "plank", "x": 18, "y": 39, "rot": 4}
+  ]
+}

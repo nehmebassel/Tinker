@@ -1,0 +1,13 @@
+# Godot
+game/.godot/
+game/android/
+*.import.tmp
+# Build outputs
+build/
+# Node
+server/node_modules/
+# Local tool installs
+tools/*
+!tools/setup.sh
+# OS
+.DS_Store

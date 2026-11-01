@@ -1,0 +1,13 @@
+{
+  "id": "plank",
+  "name": "Plank",
+  "group": "body",
+  "description": "A static ramp. Rotate it to steer whatever rolls on it.",
+  "body": "static",
+  "shape": {"type": "rect", "w": 240, "h": 24},
+  "friction": 0.6,
+  "bounce": 0.0,
+  "color": "#f4b860",
+  "script": "res://scripts/parts/plank.gd",
+  "interacts_with": ["ball", "motor", "rope", "fan"]
+}

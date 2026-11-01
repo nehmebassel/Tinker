@@ -1,0 +1,120 @@
+# Tinker CI — headless tests, determinism cross-check, UI smoke test, Android debug APK.
+#
+# Jobs:
+#   test     : unit tests + 100-replay determinism harness; uploads the outcome hashes.
+#   smoke    : drives the real touch path under Xvfb (drag, snap, rotate, play, solve) with screenshots.
+#   android  : exports a signed debug APK (artifact "tinker-debug-apk").
+#   hashes   : fails if the determinism hash from `test` differs from the one recorded in
+#              levels/hashes.txt (updated deliberately when physics or a level changes).
+#
+# Store signing secrets (release keystore etc.) are NOT needed here; they come in M7.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: 4.5.1-stable
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot
+        run: |
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q godot.zip && sudo mv Godot_v${GODOT_VERSION}_linux.x86_64 /usr/local/bin/godot
+          godot --version
+      - name: Import project
+        run: godot --headless --path game --import || true
+      - name: Headless tests (100 replays)
+        run: godot --headless --fixed-fps 60 --path game -s res://tests/run_tests.gd -- --replays=100
+      - name: Determinism hash must match the recorded one
+        run: |
+          echo "recorded:"; cat levels/hashes.txt
+          echo "this run:"; cat build/determinism-hashes.txt
+          diff <(sort levels/hashes.txt) <(sort build/determinism-hashes.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: |
+            build/test-report.txt
+            build/determinism-hashes.txt
+
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot + Xvfb + Mesa
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1-mesa-dri libegl1 libasound2t64 >/dev/null
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q godot.zip && sudo mv Godot_v${GODOT_VERSION}_linux.x86_64 /usr/local/bin/godot
+      - name: Import project
+        run: godot --headless --path game --import || true
+      - name: UI smoke test (synthetic touches, screenshots)
+        run: |
+          mkdir -p build/shots
+          timeout 120 xvfb-run -a -s "-screen 0 1200x2100x24" godot --path game --rendering-driver opengl3 --resolution 540x960 --quit-after 1800 -- --smoke 2>&1 | tee build/smoke.log
+          grep -q "SMOKE PASS" build/smoke.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-screenshots
+          path: |
+            build/shots/*.png
+            build/smoke.log
+
+  android:
+    runs-on: ubuntu-24.04
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools build-tools;35.0.0 platforms;android-35"
+      - name: Install Godot + export templates
+        run: |
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q godot.zip && sudo mv Godot_v${GODOT_VERSION}_linux.x86_64 /usr/local/bin/godot
+          curl -sSL -o tpz.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          mkdir -p ~/.local/share/godot/export_templates
+          unzip -q tpz.zip -d tpz && mv tpz/templates ~/.local/share/godot/export_templates/${GODOT_VERSION/-stable/.stable}
+      - name: Point Godot at the SDK and JDK
+        run: |
+          mkdir -p ~/.config/godot
+          cat > ~/.config/godot/editor_settings-4.5.tres <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "${ANDROID_HOME}"
+          export/android/java_sdk_path = "${JAVA_HOME}"
+          EOF
+      - name: Debug keystore (throwaway, per run)
+        run: |
+          mkdir -p build
+          keytool -genkeypair -keystore build/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
+      - name: Import project
+        run: godot --headless --path game --import || true
+      - name: Export debug APK
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/build/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          godot --headless --path game --export-debug Android ../build/tinker-debug.apk
+          ls -la build/tinker-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tinker-debug-apk
+          path: build/tinker-debug.apk
