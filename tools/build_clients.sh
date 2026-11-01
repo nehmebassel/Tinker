@@ -34,8 +34,12 @@ cp android/tinker_push/build/outputs/aar/tinker_push-release.aar game/addons/tin
 
 # 3. Godot import, Android build template (Gradle), mirror + Firebase resources
 godot --headless --path game --import >/dev/null 2>&1 || true
+# Same as the editor's "Install Android Build Template" (the CLI flag only works alongside an export).
 if [ ! -f game/android/build/build.gradle ]; then
-  godot --headless --path game --install-android-build-template --quit >/dev/null 2>&1 || true
+  GV=$(godot --version | sed -E 's/^([0-9.]+\.[a-z]+).*/\1/')   # e.g. 4.5.1.stable
+  SRC=$(ls "$HOME"/.local/share/godot/export_templates/"$GV"/android_source.zip)
+  mkdir -p game/android/build && unzip -qo "$SRC" -d game/android/build
+  printf '%s' "$GV" > game/android/.build_version && touch game/android/build/.gdignore
 fi
 python3 tools/android_prepare.py "$GS"
 
