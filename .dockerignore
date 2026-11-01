@@ -1,0 +1,10 @@
+.git
+build
+tools
+game/.godot
+game/android
+server/node_modules
+docs
+*.apk
+*_SA.json
+*.key.json
