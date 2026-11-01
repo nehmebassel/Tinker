@@ -159,7 +159,7 @@ func _list_levels() -> PackedStringArray:
 		dir.list_dir_begin()
 		var f := dir.get_next()
 		while f != "":
-			if f.ends_with(".json") and f != "hashes.txt":
+			if f.ends_with(".json") and f != "index.json":
 				names.append(f)
 			f = dir.get_next()
 		names.sort()

@@ -68,8 +68,18 @@ Session log at the bottom tells the next agent exactly where things stand.
 - [x] Codex review: 6 findings over 3 rounds, all real, all fixed with regression levels (basket/plank, flame & cheese while building, switch→motor order, rope slack on pop, editor same-cell attach, rope never ties to motor); 4th pass clean
 - [ ] Bassel: merge PR #1 and play the parts on the phone (APK from the PR's CI artifact)
 
-### M3 Campaign (not started)
-- [ ] Levels 2–30, world select, progress save
+### M3 Campaign — code complete, PR open (stacked on M2)
+- [x] 30 hand-made levels in 3 worlds (`levels/campaign/make_campaign.py` → `NNN.json` + `index.json`); every level has a solver-verified reference solution AND is proven not solvable with an empty tray
+- [x] Levels 1–10 follow the brief's table (level 6 reworked: "pop the balloon on the candle across the stage", goal type `pop`, because a candle cannot be lit remotely with the 15 parts; level 7 "Wrecking ball": rope + pulley pendulum)
+- [x] World 2 = fewer slots than tray parts; world 3 = combinations with actors
+- [x] Campaign loader (`Campaign`), unlock rule (N+1 opens when N solved), progress save (`SaveData`, user://save.json: solved, best parts, best time, best solution)
+- [x] World select screen (`scenes/world_select.tscn`), level screen: back button, Next/Levels on the solved panel, "New best!"
+- [x] Campaign flow test (`--flow`): world select → tap 1 → solve through touch → Next → 2 → back → 2 unlocked, save persisted; runs in CI
+- [x] 66 levels × 100 replays identical; hashes recorded
+- [x] Solver upgrades: `--region`, `--rots`, `--with` (hold parts) for multi-part solutions
+- [ ] Reference solutions replay identically on two phones (needs devices)
+- [ ] World 3+ paid gate (M7) — everything is open for now so the campaign can be play-tested
+
 ### M4 Daily (not started)
 - [ ] Generator, `server/` Cloud Run (GET /daily, POST /score, GET /board), headless replay verifier
 ### M5 Sandbox · M6 Polish · M7 Store (not started)
@@ -87,10 +97,12 @@ Session log at the bottom tells the next agent exactly where things stand.
 ## Open for Bassel
 
 1. Install `build/tinker-debug.apk` (from the CI artifact once the workflow runs, or ask me to send it) on your phone. Place a plank. Feel review → go / no-go for M2.
-2. Confirm Node 22 for the backend.
-3. gcloud has no credentials in this environment; needed from M4.
+2. Merge PR #1 (M2) then PR #2 (M3); PR #2 is stacked on #1 and retargets to main when #1 merges.
+3. Confirm Node 22 for the backend.
+4. gcloud has no credentials in this environment; needed from M4.
 
 ## Session log
 
+- **2026-11-01 (session 1c)** M3: 30 campaign levels (all solver-verified, none pre-solved), campaign index/loader, save, world select, Next/back flow, flow test in CI. Physics/actor fixes found while designing levels (see DESIGN.md). Branch `m3-campaign` stacked on `m2-parts`; PR #2.
 - **2026-11-01 (session 1b)** M2: 13 new parts, attach pass, rope lines, goal types, 31 interaction levels, determinism fix (fresh World2D per build), conveyor/paddle workarounds. Branch `m2-parts`, PR opened.
 - **2026-11-01 (session 1, autonomous)** Tooling installed; title checked; Godot project, 3 parts, simulation, determinism harness, M1 touch screen, UI smoke test, Android export, CI workflow, docs. Repo created by Bassel at 06:27 local; pushed; CI green on first run. Next: Bassel's phone feel review (M1 kill gate), then M2 parts.

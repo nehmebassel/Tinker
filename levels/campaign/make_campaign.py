@@ -69,7 +69,7 @@ level(6, "Pop goes the balloon", "Balloons float. Steer yours into the flame.",
       goal={"type": "pop"}, teaches="floating bodies, second goal type")
 
 level(7, "Wrecking ball", "A rope ties two things together. Hang the ball from a pulley and let it swing.",
-      [P("plank", 9, 32, 1), P("ball", 12, 30), P("plank", 25, 32), P("ball", 24, 30), P("basket", 33, 47)],
+      [P("plank", 9, 32, 1), P("ball", 12, 30), P("plank", 25, 32), P("ball", 24, 30), P("basket", 31, 46)],
       [("rope", 1), ("pulley", 1)],
       [S("pulley", 20, 20), S("rope", 12, 30, 21)],
       teaches="connectors")
@@ -95,7 +95,7 @@ level(11, "Pick one", "Three parts in the tray, one slot. Choose well.",
       [("plank", 1), ("fan", 1), ("spring", 1)], [S("plank", 18, 36, 3)], slots=1, teaches="slots < tray")
 
 level(12, "Two of three", "Two slots. The ball must travel a long way right.",
-      [P("ball", 8, 10), P("plank", 8, 30, 1), P("basket", 32, 46)],
+      [P("ball", 8, 10), P("plank", 8, 30, 1), P("basket", 30, 45)],
       [("conveyor", 1), ("fan", 1), ("plank", 1)], [S("conveyor", 19, 32, 0)], slots=2, teaches="choose movers")
 
 level(13, "Headwind", "The fan blows the mouse back. Switch it off on the way.",
@@ -159,7 +159,7 @@ level(24, "High switch", "The switch has to be up where only the ball can reach 
       [("switch", 1), ("plank", 1)], [S("switch", 14, 23, 0)], slots=1, goal={"type": "cheese"}, teaches="switch placement")
 
 level(25, "Wrecking ball II", "Same trick, one slot, three parts.",
-      [P("plank", 9, 32, 1), P("ball", 12, 30), P("pulley", 20, 20), P("plank", 25, 32), P("ball", 24, 30), P("basket", 33, 47)],
+      [P("plank", 9, 32, 1), P("ball", 12, 30), P("pulley", 20, 20), P("plank", 25, 32), P("ball", 24, 30), P("basket", 31, 46)],
       [("rope", 1), ("plank", 1), ("spring", 1)], [S("rope", 12, 30, 21)], slots=1, teaches="rope with distractors")
 
 level(26, "Conveyor escape", "The belt drags the mouse toward the cat. Stop it in time.",
@@ -190,8 +190,29 @@ level(30, "Grand finale", "Everything you know. Two slots.",
       [("switch", 1), ("plank", 1), ("fan", 1), ("spring", 1), ("rope", 1)], [S("switch", 3, 26, 0)], slots=2,
       teaches="world 3 finale")
 
+# PLAY corner rule: nothing fixed may extend into x > 35.5 and y > 48 (the PLAY button).
+HALF = {"ball": (1.5, 1.5), "plank": (5, 0.5), "basket": (4.5, 3.2), "fan": (1.25, 2), "conveyor": (6, 0.75),
+        "spring": (2, 1), "motor": (0.9, 0.9), "rope": (0, 0), "pulley": (1.25, 1.25), "switch": (2, 0.5),
+        "balloon": (1.7, 1.9), "bucket": (3, 2.5), "candle": (0.75, 1.75), "cheese": (1, 0.75), "mouse": (1.1, 0.75), "cat": (1.75, 1)}
+for l in levels:
+    for f_ in l["fixed"]:
+        hx, hy = HALF[f_["part"]]
+        if f_["rot"] in (6, 18):
+            hx, hy = hy, hx
+        if f_["x"] + hx > 35.5 and f_["y"] + hy > 48:
+            raise SystemExit("level %d: %s at (%d,%d) intrudes into the PLAY corner" % (l["number"], f_["part"], f_["x"], f_["y"]))
+
 for l in levels:
     with open(os.path.join(OUT, "%03d.json" % l["number"]), "w") as f:
         json.dump(l, f, indent=2)
         f.write("\n")
-print(f"{len(levels)} campaign levels written")
+
+# index.json: what the game loads (no directory listing inside an exported PCK).
+worlds = {}
+for l in levels:
+    worlds.setdefault(l["world"], []).append({"number": l["number"], "id": l["id"], "title": l["title"], "file": "%03d.json" % l["number"]})
+index = {"worlds": [{"number": w, "name": {1: "Workshop", 2: "Tight squeeze", 3: "Menagerie"}.get(w, "World %d" % w), "levels": worlds[w]} for w in sorted(worlds)]}
+with open(os.path.join(OUT, "index.json"), "w") as f:
+    json.dump(index, f, indent=2)
+    f.write("\n")
+print(f"{len(levels)} campaign levels written, index has {len(index['worlds'])} worlds")
