@@ -290,3 +290,27 @@ test("push config and the web push glue are served", async () => {
   assert.equal(sw.status, 200);
   assert.equal(sw.headers.get("service-worker-allowed"), "/play/fcm/");
 });
+
+test("APK download is streamed chunked (Cloud Run rejects non-streamed responses over 32 MiB)", async () => {
+  const { config } = await import("../src/config.js");
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "tinker-dl-"));
+  const prev = config.downloadDir;
+  const body = Buffer.alloc(3 * 1024 * 1024, 7);
+  await writeFile(join(dir, "tinker.apk"), body);
+  config.downloadDir = dir;
+  const s5 = createApp({ fcm: fakeFcm }).listen(0);
+  const b5 = `http://127.0.0.1:${s5.address().port}`;
+  try {
+    const r = await fetch(`${b5}/download/tinker.apk`);
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get("content-length"), null);
+    assert.equal(r.headers.get("transfer-encoding"), "chunked");
+    assert.match(r.headers.get("content-type"), /android\.package-archive/);
+    assert.equal((await r.arrayBuffer()).byteLength, body.length);
+    assert.equal((await fetch(`${b5}/download/..%2Fsecret.apk`)).status, 404);
+    assert.equal((await fetch(`${b5}/download/missing.apk`)).status, 404);
+  } finally { s5.close(); config.downloadDir = prev; await rm(dir, { recursive: true, force: true }); }
+});

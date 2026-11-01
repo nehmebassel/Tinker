@@ -1,6 +1,7 @@
 import express from "express";
 import compression from "compression";
-import { existsSync } from "node:fs";
+import { existsSync, createReadStream } from "node:fs";
+import { join } from "node:path";
 import { randomBytes, createHash } from "node:crypto";
 import { config, todayUtc, addDays, dayNumber } from "./config.js";
 import { fcm as realFcm, isFcmToken, dailyMessage } from "./push.js";
@@ -64,9 +65,24 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     app.get("/", (_req, res) => res.redirect(302, "/play/"));
   }
   if (config.downloadDir && existsSync(config.downloadDir)) {
-    app.use("/download", express.static(config.downloadDir, {
-      setHeaders(res) { res.setHeader("Content-Type", "application/vnd.android.package-archive"); },
-    }));
+    // Streamed chunked, never with Content-Length: Cloud Run rejects (500) any non-streamed HTTP/1
+    // response over 32 MiB, and the APK is ~60 MB. Chunked responses have no size cap.
+    app.get("/download/:file", (req, res) => {
+      const name = req.params.file;
+      if (!/^[\w.-]+\.apk$/.test(name)) return res.status(404).end();
+      const file = join(config.downloadDir, name);
+      if (!existsSync(file)) return res.status(404).end();
+      res.set({
+        "Content-Type": "application/vnd.android.package-archive",
+        "Content-Disposition": `attachment; filename="${name}"`,
+        "Cache-Control": "no-cache",
+      });
+      if (req.method === "HEAD") return res.end();
+      res.flushHeaders();  // headers go out now, without Content-Length -> Transfer-Encoding: chunked
+      const st = createReadStream(file);
+      st.on("error", () => res.destroy());
+      st.pipe(res);
+    });
   }
 
   // ---------------------------------------------------------------- daily
