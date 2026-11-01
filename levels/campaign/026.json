@@ -1,0 +1,91 @@
+{
+  "id": "c026",
+  "world": 3,
+  "number": 26,
+  "title": "Conveyor escape",
+  "hint": "The belt drags the mouse toward the cat. Stop it in time.",
+  "teaches": "timing",
+  "goal": {
+    "type": "cheese"
+  },
+  "fixed": [
+    {
+      "part": "conveyor",
+      "x": 14,
+      "y": 40,
+      "rot": 12
+    },
+    {
+      "part": "motor",
+      "x": 14,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "mouse",
+      "x": 12,
+      "y": 38,
+      "rot": 0
+    },
+    {
+      "part": "cat",
+      "x": 4,
+      "y": 38,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 4,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 25,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 29,
+      "y": 38,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 30,
+      "y": 14,
+      "rot": 1
+    },
+    {
+      "part": "ball",
+      "x": 28,
+      "y": 12,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "switch",
+      "count": 1
+    },
+    {
+      "part": "plank",
+      "count": 1
+    },
+    {
+      "part": "candle",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "switch",
+      "x": 30,
+      "y": 38,
+      "rot": 0
+    }
+  ],
+  "expect": "goal"
+}

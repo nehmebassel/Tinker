@@ -1,0 +1,58 @@
+{
+  "id": "c021",
+  "world": 3,
+  "number": 21,
+  "title": "Double ramp",
+  "hint": "Two balls, one basket, two slots.",
+  "teaches": "two chains",
+  "goal": {
+    "type": "basket",
+    "count": 2
+  },
+  "fixed": [
+    {
+      "part": "ball",
+      "x": 4,
+      "y": 12,
+      "rot": 0
+    },
+    {
+      "part": "ball",
+      "x": 41,
+      "y": 18,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 22,
+      "y": 52,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "plank",
+      "count": 2
+    },
+    {
+      "part": "fan",
+      "count": 1
+    }
+  ],
+  "slots": 2,
+  "reference_solution": [
+    {
+      "part": "plank",
+      "x": 6,
+      "y": 32,
+      "rot": 3
+    },
+    {
+      "part": "plank",
+      "x": 38,
+      "y": 36,
+      "rot": 22
+    }
+  ],
+  "expect": "goal"
+}

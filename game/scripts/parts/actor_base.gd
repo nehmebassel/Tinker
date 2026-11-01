@@ -65,9 +65,11 @@ func _physics_process(_delta: float) -> void:
 	if dir != 0 and grounded:
 		var target := dir * speed
 		var dv := clampf(target - linear_velocity.x, -accel / 60.0, accel / 60.0)
-		linear_velocity.x += dv
+		# Impulses, never a direct velocity write: writing linear_velocity would discard impulses
+		# other parts applied this tick (a conveyor belt dragging the mouse the other way).
+		apply_central_impulse(Vector2(dv * mass, 0))
 		if _blocked_ahead() and _hop_cooldown == 0:
-			linear_velocity.y = -hop
+			apply_central_impulse(Vector2(0, (-hop - linear_velocity.y) * mass))
 			_hop_cooldown = 30
 	queue_redraw()
 

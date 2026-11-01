@@ -23,7 +23,8 @@ func decide() -> int:
 		return -sign_toward(global_position, cat.global_position, 0.0) if cat.global_position.x != global_position.x else 1
 	var cheese := nearest("cheese", sight, func(c): return not c.eaten)
 	if cheese != null:
-		return sign_toward(global_position, cheese.global_position)
+		# Stop once the cheese is within the mouse's own half-width (it is straight above or below).
+		return sign_toward(global_position, cheese.global_position, size.x / 2.0)
 	return 0
 
 

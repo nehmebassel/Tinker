@@ -138,6 +138,58 @@ level(20, "Dinner", "The belt pushes the mouse back. Stop it, then let the mouse
       [("switch", 1), ("plank", 1), ("fan", 1)], [S("switch", 31, 39, 0)], slots=2,
       goal={"type": "cheese"}, teaches="world 2 finale")
 
+# ================================================================ World 3 — combinations
+level(21, "Double ramp", "Two balls, one basket, two slots.",
+      [P("ball", 4, 12), P("ball", 41, 18), P("basket", 22, 52)],
+      [("plank", 2), ("fan", 1)], [S("plank", 6, 32, 3), S("plank", 38, 36, 22)], slots=2,
+      goal={"type": "basket", "count": 2}, teaches="two chains")
+
+level(22, "Belt and braces", "The belt is off. Ball B can switch it on.",
+      [P("conveyor", 14, 30, 0), P("motor", 14, 30, 0, on=False), P("ball", 10, 28), P("basket", 30, 44),
+       P("plank", 36, 14, 23), P("ball", 38, 12)],
+      [("switch", 1), ("plank", 1), ("fan", 1)], [S("switch", 22, 24, 0)], slots=1, teaches="switch via a second ball")
+
+level(23, "Catapult", "Feed the mouse. The seesaw can throw.",
+      [P("motor", 20, 36, 0, on=False), P("plank", 20, 36, 0), P("cheese", 16, 34), P("plank", 11, 37),
+       P("plank", 31, 22), P("plank", 39, 22), P("mouse", 35, 20), P("plank", 43, 19, 6), P("plank", 26, 19, 6)],
+      [("ball", 1), ("fan", 1)], [S("ball", 22, 2, 0)], slots=1, goal={"type": "cheese"}, teaches="see-saw + actor")
+
+level(24, "High switch", "The switch has to be up where only the ball can reach it.",
+      floor(0, 44, 4) + [P("mouse", 2, 42), P("fan", 29, 38, 12), P("cheese", 33, 42), P("plank", 14, 24), P("ball", 14, 8)],
+      [("switch", 1), ("plank", 1)], [S("switch", 14, 23, 0)], slots=1, goal={"type": "cheese"}, teaches="switch placement")
+
+level(25, "Wrecking ball II", "Same trick, one slot, three parts.",
+      [P("plank", 9, 32, 1), P("ball", 12, 30), P("pulley", 20, 20), P("plank", 25, 32), P("ball", 24, 30), P("basket", 33, 47)],
+      [("rope", 1), ("plank", 1), ("spring", 1)], [S("rope", 12, 30, 21)], slots=1, teaches="rope with distractors")
+
+level(26, "Conveyor escape", "The belt drags the mouse toward the cat. Stop it in time.",
+      [P("conveyor", 14, 40, 12), P("motor", 14, 40, 0), P("mouse", 12, 38), P("cat", 4, 38), P("plank", 4, 40),
+       P("plank", 25, 40), P("cheese", 29, 38), P("plank", 30, 14, 1), P("ball", 28, 12)],
+      [("switch", 1), ("plank", 1), ("candle", 1)], [S("switch", 30, 38, 0)], slots=1,
+      goal={"type": "cheese"}, teaches="timing")
+
+level(27, "Pop the right one", "Two balloons. Only one carries the cheese.",
+      [P("plank", 10, 12), P("plank", 22, 12), P("balloon", 10, 30), P("cheese", 10, 42), P("rope", 10, 42, 18),
+       P("balloon", 22, 30), P("ball", 22, 42), P("rope", 22, 42, 18), P("basket", 10, 50)],
+      [("candle", 1), ("fan", 1)], [S("candle", 10, 20, 12)], slots=1, goal={"type": "basket", "count": 1},
+      teaches="read the setup")
+
+level(28, "Spring board", "The cheese is up there. Mice can't climb, but they can be launched.",
+      floor(0, 44, 3) + [P("plank", 4, 30), P("mouse", 2, 28), P("plank", 24, 34), P("cheese", 27, 32), P("plank", 29, 31, 6)],
+      [("spring", 1), ("plank", 1), ("fan", 1)], [S("spring", 14, 37, 2)], slots=1, goal={"type": "cheese"},
+      teaches="spring + actor")
+
+level(29, "Ceiling switch", "Only something that floats can reach that switch.",
+      floor(0, 40, 4) + [P("mouse", 2, 38), P("fan", 29, 34, 12), P("cheese", 33, 38), P("switch", 4, 10, 12)],
+      [("balloon", 1), ("plank", 1), ("candle", 1)], [S("balloon", 4, 34, 0)], slots=1, goal={"type": "cheese"},
+      teaches="balloon + switch")
+
+level(30, "Grand finale", "Everything you know. Two slots.",
+      [P("ball", 3, 8), P("plank", 6, 30, 1), P("ball", 6, 28), P("motor", 15, 36, 0, on=False), P("plank", 15, 36, 6),
+       P("basket", 28, 50)],
+      [("switch", 1), ("plank", 1), ("fan", 1), ("spring", 1), ("rope", 1)], [S("switch", 3, 26, 0)], slots=2,
+      teaches="world 3 finale")
+
 for l in levels:
     with open(os.path.join(OUT, "%03d.json" % l["number"]), "w") as f:
         json.dump(l, f, indent=2)
