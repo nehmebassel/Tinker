@@ -42,18 +42,17 @@ func set_ghost(on: bool) -> void:
 	modulate.a = 0.45 if on else 1.0
 
 
-func _draw() -> void:
-	draw_circle(Vector2.ZERO, radius, PartFactory.OUTLINE_COLOR)
-	draw_circle(Vector2.ZERO, radius - PartFactory.OUTLINE_W, fill)
-	# Three finger holes so rotation is visible.
-	var hole := Color(fill.r * 0.45, fill.g * 0.45, fill.b * 0.45)
-	for a in [-0.35, 0.0, 0.35]:
-		draw_circle(Vector2(0, -radius * 0.42).rotated(a + 0.6), radius * 0.11, hole)
-
-
 static func _q(v: Vector2) -> String:
 	return PartFactory.fmt_pos(v)
 
 
 static func _qf(f: float) -> String:
 	return PartFactory.fmt_rot(f)
+
+
+func _draw() -> void:
+	Art.circle(self, Vector2.ZERO, radius, fill)
+	# Three finger holes so rotation is visible.
+	var hole := fill.darkened(0.55)
+	for a in [-0.35, 0.0, 0.35]:
+		draw_circle(Vector2(0, -radius * 0.42).rotated(a + 0.6), radius * 0.11, hole)

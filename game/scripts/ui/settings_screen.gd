@@ -1,6 +1,7 @@
 extends Control
 ## SettingsScreen — everything configurable lives here (no values hard-coded in scripts):
-## server URL (with a connection test), board name, daily reminder, and the device id (read-only).
+## server URL (with a connection test), board name, daily reminder, music and sound volume, and the
+## device id (read-only). Volumes apply and save as the slider moves.
 
 var _url: LineEdit
 var _name: LineEdit
@@ -9,6 +10,7 @@ var _status: Label
 
 
 func _ready() -> void:
+	App.audio.play_music("menu")
 	name = "SettingsScreen"
 	UiKit.background(self)
 	UiKit.top_bar(self, "Settings", func() -> void: App.open_world_select())
@@ -40,6 +42,9 @@ func _ready() -> void:
 	v.add_child(_push)
 	_paint_push()
 
+	v.add_child(_volume_row("Music", "music_volume", "MusicSlider"))
+	v.add_child(_volume_row("Sounds", "sfx_volume", "SoundSlider"))
+
 	var save := UiKit.button("Save", UiKit.GO, UiKit.INK, 120)
 	save.name = "SaveButton"
 	save.pressed.connect(_save)
@@ -49,6 +54,63 @@ func _ready() -> void:
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_status)
 	v.add_child(UiKit.label("Device %s · %s" % [App.settings.device_id.substr(0, 8), Settings.country()], 26, Color(UiKit.INK, 0.6)))
+
+
+func _volume_row(title: String, key: String, node_name: String) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 24)
+	var l := UiKit.label(title, 34)
+	l.custom_minimum_size.x = 170
+	row.add_child(l)
+	var sl := HSlider.new()
+	sl.name = node_name
+	sl.min_value = 0.0
+	sl.max_value = 1.0
+	sl.step = 0.05
+	sl.value = float(App.settings.get(key))
+	sl.custom_minimum_size = Vector2(0, 96)
+	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	sl.focus_mode = Control.FOCUS_NONE
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color("c9c2b6")
+	track.set_corner_radius_all(10)
+	track.content_margin_top = 10
+	track.content_margin_bottom = 10
+	var fill := track.duplicate()
+	fill.bg_color = UiKit.GO
+	sl.add_theme_stylebox_override("slider", track)
+	sl.add_theme_stylebox_override("grabber_area", fill)
+	sl.add_theme_stylebox_override("grabber_area_highlight", fill)
+	sl.add_theme_icon_override("grabber", _knob())
+	sl.add_theme_icon_override("grabber_highlight", _knob())
+	var pct := UiKit.label("", 30, Color(UiKit.INK, 0.7))
+	pct.custom_minimum_size.x = 90
+	pct.text = "%d%%" % roundi(sl.value * 100.0)
+	sl.value_changed.connect(func(val: float) -> void:
+		App.settings.set(key, val)
+		App.audio.apply_volumes()
+		pct.text = "%d%%" % roundi(val * 100.0))
+	sl.drag_ended.connect(func(_changed: bool) -> void:
+		App.settings.save()
+		if key == "sfx_volume":
+			App.audio.sfx("place"))  # hear the new level
+	row.add_child(sl)
+	row.add_child(pct)
+	return row
+
+
+## Round ink-outlined slider knob, drawn once into a texture (touch-sized).
+static func _knob() -> Texture2D:
+	var d := 56
+	var img := Image.create(d, d, false, Image.FORMAT_RGBA8)
+	var c := Vector2(d / 2.0, d / 2.0)
+	for y in d:
+		for x in d:
+			var r := Vector2(x + 0.5, y + 0.5).distance_to(c)
+			if r <= d / 2.0 - 1.0:
+				img.set_pixel(x, y, UiKit.INK if r > d / 2.0 - 7.0 else Color("fbf6ea"))
+	return ImageTexture.create_from_image(img)
 
 
 func _paint_push() -> void:

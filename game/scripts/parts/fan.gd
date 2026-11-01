@@ -11,6 +11,7 @@ var reach: float = 480.0  # px
 var half_angle_tan: float = 0.45
 var running: bool = false
 var _cone: Area2D
+var _spin: float = 0.0  # visual only
 
 
 func configure(p_def: Dictionary) -> void:
@@ -80,20 +81,35 @@ func set_ghost(p_on: bool) -> void:
 	modulate.a = 0.45 if p_on else 1.0
 
 
+func _process(delta: float) -> void:
+	if running and on:
+		_spin += delta * 22.0
+		queue_redraw()
+
+
 func _draw() -> void:
 	var w := float(def["shape"]["w"])
 	var h := float(def["shape"]["h"])
 	var r := Rect2(-w / 2.0, -h / 2.0, w, h)
-	draw_rect(r, PartFactory.OUTLINE_COLOR)
-	draw_rect(r.grow(-PartFactory.OUTLINE_W), fill if on else fill.darkened(0.45))
-	# Blades: a circle with three vanes.
-	draw_circle(Vector2.ZERO, h * 0.32, PartFactory.OUTLINE_COLOR)
-	draw_circle(Vector2.ZERO, h * 0.32 - 4.0, Color("fbf6ea"))
+	Art.rect(self, r, fill if on else fill.darkened(0.45))
+	# Grille ring and spinning blades (they turn only while the machine runs and the fan is on).
+	var c := Vector2.ZERO
+	var br := h * 0.34
+	draw_circle(c, br, Art.INK)
+	draw_circle(c, br - 4.0, Color("eef6fb"))
 	for i in 3:
-		var a := i * TAU / 3.0
-		draw_line(Vector2.ZERO, Vector2(h * 0.26, 0).rotated(a), PartFactory.OUTLINE_COLOR, 4.0)
-	# Wind lines when on.
+		var a := _spin + i * TAU / 3.0
+		var tip := Vector2(br * 0.86, 0).rotated(a)
+		var side := Vector2(0, br * 0.32).rotated(a)
+		draw_colored_polygon(PackedVector2Array([c, tip * 0.55 + side, tip, tip * 0.55 - side * 0.2]), fill.darkened(0.25))
+	draw_circle(c, br * 0.18, Art.INK)
+	draw_arc(c, br - 2.0, 0, TAU, 32, Color(Art.INK, 0.5), 2.0)
+	# Wind: dashes drifting out of the mouth while blowing.
 	if on:
+		var alpha := 0.45 if running else 0.25
 		for i in 3:
 			var y := (i - 1) * h * 0.3
-			draw_line(Vector2(w / 2.0 + 8, y), Vector2(w / 2.0 + 40 + 10 * absf(i - 1), y), Color(PartFactory.OUTLINE_COLOR, 0.35), 3.0)
+			var phase := fmod(_spin * 6.0 + i * 13.0, 48.0)
+			for k in 2:
+				var x0 := w / 2.0 + 8.0 + phase + k * 48.0
+				draw_line(Vector2(x0, y), Vector2(x0 + 22.0, y), Color(Art.INK, alpha * (1.0 - k * 0.45)), 3.0)

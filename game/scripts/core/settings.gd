@@ -7,6 +7,7 @@ extends RefCounted
 ##   device_id    : random id created on first launch; the only identity the backend ever sees.
 ##   name         : optional display name for boards (24 chars max).
 ##   push_enabled : daily reminder notification on/off.
+##   music_volume / sfx_volume : 0..1 sliders on the Settings screen (0 = off).
 
 const PATH := "user://settings.json"
 
@@ -14,6 +15,8 @@ var server_url: String = ""
 var device_id: String = ""
 var name: String = ""
 var push_enabled: bool = true
+var music_volume: float = 0.6
+var sfx_volume: float = 0.8
 var _path := PATH
 var _saved_url := false  # true when the player saved a server URL in Settings
 
@@ -33,6 +36,8 @@ static func load_or_new(path: String = PATH) -> Settings:
 			s.device_id = str(d.get("device_id", ""))
 			s.name = str(d.get("name", ""))
 			s.push_enabled = bool(d.get("push_enabled", true))
+			s.music_volume = clampf(float(d.get("music_volume", s.music_volume)), 0.0, 1.0)
+			s.sfx_volume = clampf(float(d.get("sfx_volume", s.sfx_volume)), 0.0, 1.0)
 	# In the browser build the game is served by the backend itself (/play/), so the page's own origin
 	# is the server: zero setup for testers. A value typed in Settings still wins.
 	if OS.has_feature("web") and not s._saved_url:
@@ -54,7 +59,8 @@ static func _new_device_id() -> String:
 func save() -> void:
 	var f := FileAccess.open(_path, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({"server_url": server_url, "device_id": device_id, "name": name, "push_enabled": push_enabled}, "  "))
+		f.store_string(JSON.stringify({"server_url": server_url, "device_id": device_id, "name": name, "push_enabled": push_enabled,
+			"music_volume": music_volume, "sfx_volume": sfx_volume}, "  "))
 
 
 func base_url() -> String:

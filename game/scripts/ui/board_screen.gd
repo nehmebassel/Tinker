@@ -13,6 +13,7 @@ var _gen := 0  # request generation: a response for an older tab press is discar
 
 
 func _ready() -> void:
+	App.audio.play_music("menu")
 	name = "BoardScreen"
 	date = App.board_date if App.board_date != "" else DailyStore.today_utc()
 	UiKit.background(self)

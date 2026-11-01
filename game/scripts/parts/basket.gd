@@ -90,6 +90,9 @@ func _draw() -> void:
 	var hx := size.x / 2.0
 	var hy := size.y / 2.0
 	# Outer U in outline colour, inner U in fill colour.
+	var so := Art.shadow_off(self)
+	for rr in [Rect2(-hx, hy - w, size.x, w), Rect2(-hx, -hy, w, size.y), Rect2(hx - w, -hy, w, size.y)]:
+		draw_rect(Rect2(rr.position + so, rr.size), Art.SHADOW)
 	draw_rect(Rect2(-hx, hy - w, size.x, w), o)
 	draw_rect(Rect2(-hx, -hy, w, size.y), o)
 	draw_rect(Rect2(hx - w, -hy, w, size.y), o)

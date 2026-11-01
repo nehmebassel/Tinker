@@ -11,6 +11,8 @@ var max_speed: float = 1500.0
 var running: bool = false
 var _pad: Area2D
 var _launched: Dictionary = {}  # body -> true until it leaves the pad
+var _squash: float = 0.0  # visual only
+var _seen_launches: int = 0
 
 
 func configure(p_def: Dictionary) -> void:
@@ -71,22 +73,32 @@ func set_ghost(p_on: bool) -> void:
 	modulate.a = 0.45 if p_on else 1.0
 
 
+func _process(delta: float) -> void:
+	var n := _launched.size()
+	if n > _seen_launches:
+		_squash = 1.0
+	_seen_launches = n
+	if _squash > 0.0:
+		_squash = maxf(0.0, _squash - delta * 4.0)
+		queue_redraw()
+
+
 func _draw() -> void:
-	var r := Rect2(-size / 2.0, size)
 	# Base plate.
 	var base := Rect2(-size.x / 2.0, size.y / 2.0 - 14.0, size.x, 14.0)
-	draw_rect(base, PartFactory.OUTLINE_COLOR)
-	# Coil zig-zag.
+	Art.rect(self, base, Color("8d8aa8"), true, 3.0)
+	# Coil: squashes then springs back after a launch (visual only; the pad does not move).
+	var bounce := sin(_squash * PI * 2.0) * _squash
+	var top_y := -size.y / 2.0 + 12.0 + bounce * 10.0
+	var bottom_y := size.y / 2.0 - 14.0
 	var pts := PackedVector2Array()
 	var n := 6
 	for i in range(n + 1):
 		var t := float(i) / n
 		var x := (size.x * 0.3) * (1 if i % 2 == 0 else -1)
-		pts.append(Vector2(x, size.y / 2.0 - 14.0 - t * (size.y - 24.0)))
-	draw_polyline(pts, PartFactory.OUTLINE_COLOR, 7.0)
-	draw_polyline(pts, fill, 3.0)
+		pts.append(Vector2(x, bottom_y - t * (bottom_y - top_y)))
+	draw_polyline(pts, Art.INK, 8.0)
+	draw_polyline(pts, fill, 4.0)
+	draw_polyline(pts, Color(fill.lightened(0.5), 0.6), 1.5)
 	# Top pad.
-	var top := Rect2(-size.x / 2.0, -size.y / 2.0, size.x, 12.0)
-	draw_rect(top, PartFactory.OUTLINE_COLOR)
-	draw_rect(top.grow(-3.0), fill)
-	var _unused := r
+	Art.rect(self, Rect2(-size.x / 2.0, top_y - 12.0, size.x, 12.0), fill, false, 3.0)

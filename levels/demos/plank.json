@@ -1,0 +1,49 @@
+{
+  "id": "demo-plank",
+  "title": "Motor spins a paddle that hits the ball",
+  "hint": "motor -> plank (paddle) -> ball",
+  "test": true,
+  "goal": {
+    "type": "displaced",
+    "index": 4,
+    "min_dx": 80
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 19,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 29,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "motor",
+      "x": 20,
+      "y": 34,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 20,
+      "y": 34,
+      "rot": 6
+    },
+    {
+      "part": "ball",
+      "x": 24,
+      "y": 38,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal",
+  "demo_seconds": 5,
+  "source": "t_motor_paddle"
+}

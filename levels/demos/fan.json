@@ -1,0 +1,31 @@
+{
+  "id": "demo-fan",
+  "title": "Fan drifts balloon",
+  "hint": "fan -> balloon",
+  "test": true,
+  "goal": {
+    "type": "displaced",
+    "index": 0,
+    "min_dx": 300
+  },
+  "fixed": [
+    {
+      "part": "balloon",
+      "x": 10,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "fan",
+      "x": 4,
+      "y": 28,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal",
+  "demo_seconds": 5,
+  "source": "t_fan_balloon"
+}

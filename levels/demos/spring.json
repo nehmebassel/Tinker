@@ -1,0 +1,31 @@
+{
+  "id": "demo-spring",
+  "title": "Spring launches ball",
+  "hint": "spring -> ball",
+  "test": true,
+  "goal": {
+    "type": "displaced",
+    "index": 1,
+    "min_dy": -100
+  },
+  "fixed": [
+    {
+      "part": "spring",
+      "x": 20,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "ball",
+      "x": 20,
+      "y": 28,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal",
+  "demo_seconds": 4,
+  "source": "t_spring_ball"
+}

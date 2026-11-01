@@ -12,10 +12,7 @@ const MUTED := Color("4a4670")
 
 
 static func background(parent: Control) -> void:
-	var bg := ColorRect.new()
-	bg.color = BG
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	parent.add_child(bg)
+	parent.add_child(WorkshopBg.new())
 
 
 static func label(text: String, size: int, color: Color = INK) -> Label:
@@ -34,7 +31,15 @@ static func style(c: Color, radius: int = 28) -> StyleBoxFlat:
 	s.set_border_width_all(5)
 	s.content_margin_left = 24
 	s.content_margin_right = 24
+	key_shadow(s)
 	return s
+
+
+## Soft shadow under buttons and tiles so they read as physical keys on the workbench.
+static func key_shadow(s: StyleBoxFlat) -> void:
+	s.shadow_color = Color(0.12, 0.07, 0.22, 0.25)
+	s.shadow_size = 2
+	s.shadow_offset = Vector2(0, 6)
 
 
 static func button(text: String, fill: Color = MUTED, txt: Color = PANEL_TXT, h: float = 120.0) -> Button:

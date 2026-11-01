@@ -69,10 +69,12 @@ func _draw() -> void:
 	var hx := size.x / 2.0
 	var hy := size.y / 2.0
 	var wedge := PackedVector2Array([Vector2(-hx, hy), Vector2(hx, hy), Vector2(hx, -hy * 0.2), Vector2(-hx, -hy)])
-	draw_colored_polygon(wedge, PartFactory.OUTLINE_COLOR)
-	var k := PartFactory.OUTLINE_W
+	Art.shadow_poly(self, wedge)
+	draw_colored_polygon(wedge, Art.INK)
+	var k := Art.OUTLINE_W
 	var inner := PackedVector2Array([Vector2(-hx + k, hy - k), Vector2(hx - k, hy - k), Vector2(hx - k, -hy * 0.2 + k * 0.5), Vector2(-hx + k, -hy + k * 1.5)])
 	draw_colored_polygon(inner, fill)
+	draw_line(Vector2(-hx + k + 2, -hy + k * 1.5 + 2), Vector2(hx - k - 2, -hy * 0.2 + k * 0.5 + 2), Color(fill.lightened(0.5), 0.8), 3.0)
 	var hole := fill.darkened(0.3)
 	draw_circle(Vector2(-hx * 0.3, hy * 0.2), 5.0, hole)
 	draw_circle(Vector2(hx * 0.35, -hy * 0.1), 4.0, hole)

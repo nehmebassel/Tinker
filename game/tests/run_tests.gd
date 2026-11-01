@@ -46,6 +46,7 @@ func _run_all() -> void:
 	_test_placement()
 	_test_registry()
 	await _test_levels()
+	await _test_sound_watcher()
 
 	_check("every level produced a determinism hash", hashes.size() == _levels_expected)
 	_log("")
@@ -54,6 +55,66 @@ func _run_all() -> void:
 		_log("FAIL: " + f)
 	_write_files()
 	quit(0 if failures.is_empty() else 1)
+
+
+# ---------------------------------------------------------------- sound must never change a replay
+
+## Runs levels with and without a SoundWatcher: the outcome hash must be identical (the watcher only
+## reads), and the events each level is built around must make their sound.
+const SOUND_CASES := {
+	"t_spring_ball": ["spring"],
+	"t_balloon_candle_pop": ["pop"],
+	"t_conveyor_ball": ["basket"],
+	"t_candle_lights_candle": ["candle"],
+	"t_rope_pulley_buckets": ["pulley"],
+	"t_mouse_cheese": ["mouse"],
+}
+
+
+func _test_sound_watcher() -> void:
+	var app: Node = root.get_node_or_null("App")
+	if app == null:
+		_check("sound watcher: App autoload present", false)
+		return
+	for id in SOUND_CASES:
+		var level := LevelData.load_from_file("res://levels/tests/%s.json" % id)
+		var sim := Simulation.new()
+		root.add_child(sim)
+		sim.load_level(level)
+		sim.set_player_parts(level.reference_solution)
+		sim.start()
+		var plain: Dictionary = await sim.finished
+		await process_frame
+		var w := SoundWatcher.new()
+		w.watch(sim)
+		root.add_child(w)
+		app.audio.history.clear()
+		sim.start()
+		var heard: Dictionary = await sim.finished
+		await process_frame
+		_check("sound: %s replay identical with the watcher" % id, heard["hash"] == plain["hash"])
+		for snd in SOUND_CASES[id]:
+			_check("sound: %s plays '%s'" % [id, snd], snd in app.audio.history)
+		w.free()
+		sim.free()
+	app.audio.stop_loops()
+	# Leaving mid-run must silence the machine loops (the watcher is freed with the level).
+	var lv := LevelData.load_from_file("res://levels/tests/t_fan_balloon.json")
+	var s2 := Simulation.new()
+	root.add_child(s2)
+	s2.load_level(lv)
+	var w2 := SoundWatcher.new()
+	w2.watch(s2)
+	root.add_child(w2)
+	s2.start()
+	for i in 10:
+		await physics_frame
+	var loop_on: bool = app.audio._loops["fan"].playing
+	w2.queue_free()
+	s2.queue_free()
+	await process_frame
+	_check("sound: fan loop plays while a fan runs", loop_on)
+	_check("sound: loops stop when the level is left mid-run", not app.audio._loops["fan"].playing)
 
 
 # ---------------------------------------------------------------- unit tests

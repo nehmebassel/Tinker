@@ -15,6 +15,7 @@ var accel: float = 2400.0  # px/s^2 toward belt speed
 var motor: Node2D = null
 var running: bool = false
 var _belt: Area2D
+var _scroll: float = 0.0  # visual only
 
 
 func configure(p_def: Dictionary) -> void:
@@ -96,14 +97,24 @@ func set_ghost(p_on: bool) -> void:
 	modulate.a = 0.45 if p_on else 1.0
 
 
+func _process(delta: float) -> void:
+	if running and on:
+		_scroll += delta * speed
+		queue_redraw()
+
+
 func _draw() -> void:
 	var r := Rect2(-size / 2.0, size)
-	draw_rect(r, PartFactory.OUTLINE_COLOR)
-	draw_rect(r.grow(-PartFactory.OUTLINE_W), fill if on else fill.darkened(0.45))
-	# Rollers at the ends and chevrons showing direction.
-	draw_circle(Vector2(-size.x / 2.0 + size.y / 2.0, 0), size.y * 0.3, PartFactory.OUTLINE_COLOR)
-	draw_circle(Vector2(size.x / 2.0 - size.y / 2.0, 0), size.y * 0.3, PartFactory.OUTLINE_COLOR)
-	var n := int(size.x / 48.0)
-	for i in range(1, n):
-		var x := -size.x / 2.0 + i * size.x / n
-		draw_polyline(PackedVector2Array([Vector2(x - 6, -8), Vector2(x + 4, 0), Vector2(x - 6, 8)]), PartFactory.OUTLINE_COLOR, 3.0)
+	Art.rect(self, r, fill if on else fill.darkened(0.45))
+	# Tread lines scroll along the belt while it runs; rollers turn with it.
+	var inner := r.grow(-Art.OUTLINE_W - 2.0)
+	var gap := 22.0
+	var off := fmod(_scroll, gap)
+	var x := inner.position.x + off
+	while x < inner.end.x:
+		draw_line(Vector2(x, inner.position.y), Vector2(x - 6.0, inner.end.y), Color(Art.INK, 0.35), 3.0)
+		x += gap
+	var rr := size.y * 0.34
+	var ang := _scroll / maxf(rr, 1.0)
+	Art.wheel(self, Vector2(-size.x / 2.0 + size.y / 2.0, 0), rr, ang, Color("c9c2b6"), 3)
+	Art.wheel(self, Vector2(size.x / 2.0 - size.y / 2.0, 0), rr, ang, Color("c9c2b6"), 3)

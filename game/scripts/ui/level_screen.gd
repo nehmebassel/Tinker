@@ -24,8 +24,12 @@ const RING_HANDLE_R := 34.0
 const RING_GRAB := 70.0
 
 const C_BG := Color("fbf6ea")
-const C_STAGE := Color("fffdf7")
-const C_GRID := Color("e6dfd0")
+const C_STAGE := Color("fdfaf1")
+const C_GRID := Color("e2ebf3")
+const C_GRID_MAJOR := Color("bfd3e6")
+const C_WALL := Color("cfb48a")
+const C_WALL_HOLE := Color("a88d64")
+const C_WOOD := Color("b07a45")
 const C_INK := Color("1f1a2e")
 const C_ACCENT := Color("ff5d73")
 const C_GO := Color("7bd389")
@@ -44,6 +48,8 @@ var _solve_ms := 0  # Daily: time from first touch to THIS solve, frozen when th
 
 var level: LevelData
 var sim: Simulation
+var sounds: SoundWatcher
+var info_card: PartInfoCard = null
 var placements: Array[Placement] = []
 var history: Array = []  # Array of Array[Placement] snapshots
 var future: Array = []
@@ -89,6 +95,7 @@ var ring_visible: bool = false
 var tray_collapsed: bool = false
 var tray_counts: Dictionary = {}
 var smoke_mode: bool = false
+var _shot_cards_dir: String = ""  # --shot-cards=dir: one PNG per part info card (docs / review)
 var shot_path: String = ""  # --shot=path: render the level, save a PNG, quit (for docs/CI)
 
 
@@ -100,6 +107,8 @@ func _ready() -> void:
 			smoke_mode = true
 		elif a.begins_with("--shot="):
 			shot_path = a.trim_prefix("--shot=")
+		elif a.begins_with("--shot-cards="):
+			_shot_cards_dir = a.trim_prefix("--shot-cards=")
 	_build_scene()
 	level_number = App.level_number if has_node("/root/App") else 0
 	daily = App.daily if has_node("/root/App") else {}
@@ -111,10 +120,13 @@ func _ready() -> void:
 		_load_level(level_path)
 	get_viewport().size_changed.connect(_on_resized)
 	_fit_camera()
+	_music("build")
 	if smoke_mode:
 		_run_smoke()
 	elif shot_path != "":
 		_run_shot()
+	elif _shot_cards_dir != "":
+		_run_shot_cards()
 
 
 # ------------------------------------------------------------------ scene construction
@@ -137,6 +149,10 @@ func _build_scene() -> void:
 	sim.name = "Simulation"
 	sim.finished.connect(_on_run_finished)
 	world.add_child(sim)
+	sounds = SoundWatcher.new()
+	sounds.name = "SoundWatcher"
+	sounds.watch(sim)
+	add_child(sounds)
 	overlay = Node2D.new()
 	overlay.name = "Overlay"
 	overlay.z_index = 10
@@ -243,6 +259,7 @@ func _build_scene() -> void:
 	play_btn.add_theme_stylebox_override("hover", _round_style(C_GO))
 	play_btn.add_theme_color_override("font_color", C_INK)
 	play_btn.pressed.connect(_toggle_play)
+	play_btn.set_meta("no_tap", true)  # has its own start / rewind sound
 	side.add_child(play_btn)
 
 	toast_lbl = _label("", 36, C_PANEL_TXT)
@@ -340,6 +357,7 @@ func _round_style(c: Color) -> StyleBoxFlat:
 	s.set_border_width_all(5)
 	s.content_margin_left = 20
 	s.content_margin_right = 20
+	UiKit.key_shadow(s)
 	return s
 
 
@@ -416,6 +434,27 @@ func _make_tray_item(part: String) -> Control:
 		var k: float = minf(170.0 / maxf(w, 1.0), 90.0 / maxf(h, 1.0))
 		preview.scale = Vector2(k, k)
 		holder.add_child(preview)
+	# "i" badge: what does this part do? (opens the info card with a live demo)
+	var info := PanelContainer.new()
+	info.name = "Info"
+	var ist := StyleBoxFlat.new()
+	ist.bg_color = Color("6ec6ff")
+	ist.set_corner_radius_all(28)
+	ist.border_color = C_INK
+	ist.set_border_width_all(4)
+	info.add_theme_stylebox_override("panel", ist)
+	info.custom_minimum_size = Vector2(56, 56)
+	info.size = Vector2(56, 56)
+	info.position = Vector2(220 - 56 - 8, 8)
+	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var il := _label("i", 34, C_INK)
+	il.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	il.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	info.add_child(il)
+	var badge_holder := Control.new()  # PanelContainer stretches direct children; this keeps the corner spot
+	badge_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge_holder.add_child(info)
+	item.add_child(badge_holder)
 	var count := _label("", 30, C_PANEL_TXT)
 	count.name = "Count"
 	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -512,6 +551,8 @@ func _world_to_screen(p: Vector2) -> Vector2:
 ## events; a touch that starts on a Button is left alone. Mouse events are ignored on purpose:
 ## the project emulates touch from mouse, so desktop testing goes through the same path.
 func _input(event: InputEvent) -> void:
+	if info_card != null and is_instance_valid(info_card):
+		return  # the card is modal: its own controls get the touches
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			if _on_hud_button(event.position):
@@ -575,6 +616,10 @@ func _tray_part_at(pos: Vector2) -> String:
 func _tray_touch(part: String, index: int, pos: Vector2) -> void:
 	if sim.running or run_ended:
 		return
+	var item := tray_items.get_node_or_null("Tray_" + part)
+	if item and item.find_child("Info", true, false).get_global_rect().grow(18).has_point(pos):
+		open_info(part)
+		return
 	if _tray_left(part) <= 0:
 		_toast("No %s left" % PartRegistry.get_def(part).get("name", part))
 		return
@@ -608,6 +653,11 @@ func _touch_down(index: int, pos: Vector2, double_tap: bool) -> void:
 		_note_first_touch()
 		drag = {"kind": "part", "index": index, "start": pos, "pidx": hit, "moved": false}
 		return
+	# A fixed part: show what it does.
+	var fixed_id := _fixed_part_at(wp)
+	if fixed_id != "" and not double_tap:
+		open_info(fixed_id)
+		return
 	# Empty stage: double tap fits, single tap deselects.
 	if double_tap:
 		_fit_camera()
@@ -618,6 +668,7 @@ func _touch_down(index: int, pos: Vector2, double_tap: bool) -> void:
 func _begin_tray_drag(part: String, index: int, pos: Vector2) -> void:
 	drag = {"kind": "tray", "index": index, "start": pos, "part": part}
 	_spawn_floating(Placement.new(part, Vector2i.ZERO, 0))
+	_snd("pick")
 	_update_drag(index, pos)
 
 
@@ -634,6 +685,7 @@ func _update_drag(_index: int, pos: Vector2) -> void:
 				_remove_placement_silent(drag["pidx"])
 				selected = -1
 				_spawn_floating(drag["lifted"])
+				_snd("pick")
 			if drag["moved"]:
 				_move_floating(pos)
 		"rotate":
@@ -643,6 +695,7 @@ func _update_drag(_index: int, pos: Vector2) -> void:
 			if steps != placements[selected].rot:
 				placements[selected].rot = steps
 				sim.set_player_parts(placements)
+				_snd("rotate", -6.0)
 				_refresh_hud()
 
 
@@ -710,6 +763,27 @@ func _part_at(wp: Vector2) -> int:
 	return nearest
 
 
+func _fixed_part_at(wp: Vector2) -> String:
+	var space := world.get_world_2d().direct_space_state
+	var q := PhysicsPointQueryParameters2D.new()
+	q.position = wp
+	q.collide_with_areas = false
+	q.collide_with_bodies = true
+	for h in space.intersect_point(q, 8):
+		var node: Node = h["collider"]
+		if node.has_meta("is_fixed") and node.get_meta("is_fixed"):
+			return str(node.get_meta("part_id"))
+	return ""
+
+
+func open_info(part: String) -> void:
+	if info_card != null and is_instance_valid(info_card):
+		return
+	touches.clear()
+	_cancel_drag()
+	info_card = PartInfoCard.open(hud, part)
+
+
 # ------------------------------------------------------------------ floating part + ghost
 
 func _spawn_floating(pl: Placement) -> void:
@@ -772,6 +846,7 @@ func _drop_floating(pos: Vector2, part: String, lifted: Placement) -> void:
 	placements.append(Placement.new(part, cell, drag["rot"]))
 	selected = placements.size() - 1
 	sim.set_player_parts(placements)
+	_snd("place")
 	_refresh_hud()
 
 
@@ -903,6 +978,7 @@ func _rotate_selected(steps: int) -> void:
 	_push_history()
 	placements[selected].rot = Grid.wrap_steps(placements[selected].rot + steps)
 	sim.set_player_parts(placements)
+	_snd("rotate")
 	_refresh_hud()
 
 
@@ -944,20 +1020,30 @@ func _start_run() -> void:
 	run_ended = false
 	result_panel.visible = false
 	sim.set_player_parts(placements)
+	sounds.reset()
 	sim.start()
+	_snd("play")
+	_music("run")
 	_refresh_hud()
 
 
 func _stop_run() -> void:
 	run_ended = false
 	result_panel.visible = false
+	var was_live := sim.running or run_ended
 	sim.stop()
 	sim.rebuild()
+	sounds.reset()
+	if was_live:
+		_snd("rewind")
+	_music("build")
 	_refresh_hud()
 
 
 func _on_run_finished(outcome: Dictionary) -> void:
 	run_ended = true
+	sounds.reset()
+	_snd("goal" if outcome["result"] == "goal" else "fail")
 	match outcome["result"]:
 		"goal":
 			solved_msec = Time.get_ticks_msec()
@@ -984,14 +1070,51 @@ func _on_run_finished(outcome: Dictionary) -> void:
 
 # ------------------------------------------------------------------ drawing
 
+## Workbench look: pegboard wall, a wooden frame, and a blueprint-ruled sheet (minor line every
+## tile, major every 4 tiles) so the snap grid reads as engineering paper. Drawn once per level.
 func _draw_stage() -> void:
 	var r := Rect2(Vector2.ZERO, Vector2(Grid.STAGE_PX))
-	stage_bg.draw_rect(r.grow(8), C_INK)
+	# Pegboard wall around the stage (visible when zoomed out / at the edges).
+	var wall := r.grow(1400)
+	stage_bg.draw_rect(wall, C_WALL)
+	var step := Grid.TILE
+	var y := wall.position.y
+	while y < wall.end.y:
+		var x := wall.position.x
+		while x < wall.end.x:
+			if not r.grow(40).has_point(Vector2(x, y)):
+				stage_bg.draw_circle(Vector2(x, y), 7.0, C_WALL_HOLE)
+			x += step
+		y += step
+	# Frame: shadow, wood, ink edges, highlight, corner screws.
+	stage_bg.draw_rect(Rect2(r.position + Vector2(14, 18), r.size).grow(30), Color(0, 0, 0, 0.18))
+	stage_bg.draw_rect(r.grow(34), C_INK)
+	stage_bg.draw_rect(r.grow(28), C_WOOD)
+	stage_bg.draw_rect(Rect2(r.position - Vector2(24, 24), Vector2(r.size.x + 48, 8)), C_WOOD.lightened(0.25))
+	for i in 6:
+		var gy := -20.0 + i * (r.size.y + 40.0) / 5.0
+		stage_bg.draw_line(Vector2(-26, gy), Vector2(-4, gy + 30), C_WOOD.darkened(0.2), 2.0)
+		stage_bg.draw_line(Vector2(r.size.x + 4, gy), Vector2(r.size.x + 26, gy + 30), C_WOOD.darkened(0.2), 2.0)
+	stage_bg.draw_rect(r.grow(6), C_INK)
+	for c in [r.position + Vector2(-17, -17), Vector2(r.end.x + 17, r.position.y - 17), Vector2(r.position.x - 17, r.end.y + 17), r.end + Vector2(17, 17)]:
+		stage_bg.draw_circle(c, 8.0, C_INK)
+		stage_bg.draw_circle(c, 5.0, Color("c9c2b6"))
+		stage_bg.draw_line(c + Vector2(-4, -4), c + Vector2(4, 4), C_INK, 2.0)
+	# Sheet.
 	stage_bg.draw_rect(r, C_STAGE)
-	# Quarter-tile dots at tile corners so the snap grid is visible but quiet.
-	for y in range(0, Grid.STAGE_CELLS.y + 1, 4):
-		for x in range(0, Grid.STAGE_CELLS.x + 1, 4):
-			stage_bg.draw_circle(Grid.cell_to_world(Vector2i(x, y)), 3.0, C_GRID)
+	var cells := Grid.STAGE_CELLS
+	for gx in range(0, cells.x + 1, 4):
+		var px := Grid.cell_to_world(Vector2i(gx, 0)).x
+		var major := gx % 16 == 0
+		stage_bg.draw_line(Vector2(px, 0), Vector2(px, r.size.y), C_GRID_MAJOR if major else C_GRID, 2.5 if major else 1.5)
+	for gy in range(0, cells.y + 1, 4):
+		var py := Grid.cell_to_world(Vector2i(0, gy)).y
+		var major := gy % 16 == 0
+		stage_bg.draw_line(Vector2(0, py), Vector2(r.size.x, py), C_GRID_MAJOR if major else C_GRID, 2.5 if major else 1.5)
+	# Title-block corner, like a drawing sheet.
+	var tb := Rect2(r.end - Vector2(300, 64), Vector2(300, 64))
+	stage_bg.draw_rect(tb, Color(C_GRID_MAJOR, 0.35))
+	stage_bg.draw_rect(tb, C_GRID_MAJOR, false, 2.0)
 
 
 func _process(_delta: float) -> void:
@@ -1021,6 +1144,17 @@ func _draw_overlay() -> void:
 		var c := Color(C_INK, 0.5) if ghost_valid else C_BAD
 		overlay.draw_line(p + Vector2(-20, 0), p + Vector2(20, 0), c, 3.0)
 		overlay.draw_line(p + Vector2(0, -20), p + Vector2(0, 20), c, 3.0)
+
+
+## Sounds go through App.audio; level scenes opened without App (tools, shots) stay silent.
+func _snd(sound: String, gain_db: float = 0.0) -> void:
+	if has_node("/root/App") and App.audio:
+		App.audio.sfx(sound, gain_db)
+
+
+func _music(track: String) -> void:
+	if has_node("/root/App") and App.audio:
+		App.audio.play_music(track)
 
 
 static func _fmt_ms(ms: int) -> String:
@@ -1085,6 +1219,19 @@ func run_smoke_steps() -> Dictionary:
 	for b in [undo_btn, redo_btn, rot_btn, rot90_btn, fit_btn]:
 		_assert(b.get_global_rect().end.x <= vw + 0.5, "%s inside the viewport (right edge %.0f <= %.0f)" % [b.text, b.get_global_rect().end.x, vw])
 	var item: Control = tray_items.get_child(0)
+	# Info card: tap the "i", the live demo must be running in its own world, then close it.
+	await _tap_button(item.find_child("Info", true, false))
+	_assert(info_card != null and is_instance_valid(info_card), "tapping i opens the part info card")
+	if info_card != null and is_instance_valid(info_card):
+		await get_tree().create_timer(1.5).timeout
+		var demo: Simulation = info_card._sim
+		_assert(demo.running and demo.parts.size() > 0, "info card demo is running (%d parts)" % demo.parts.size())
+		_assert(demo.get_viewport() != get_viewport(), "info card demo has its own viewport/world")
+		_shot(shots_dir + "/00_info_card.png")
+		await _tap_button(info_card.find_child("CloseInfo", true, false))
+		await get_tree().process_frame
+		_assert(info_card == null or not is_instance_valid(info_card), "Got it closes the card")
+		_assert(placements.is_empty(), "opening the card placed nothing")
 	var from: Vector2 = item.get_global_rect().get_center()
 	var target: Placement = level.reference_solution[0]
 	var to: Vector2 = _world_to_screen(Grid.cell_to_world(target.cell) - LIFT)
@@ -1134,6 +1281,19 @@ func _run_shot() -> void:
 	_start_run()
 	await get_tree().create_timer(1.0).timeout
 	_shot(shot_path.get_basename() + "_run.png")
+	get_tree().quit(0)
+
+
+func _run_shot_cards() -> void:
+	DirAccess.make_dir_recursive_absolute(_shot_cards_dir)
+	PartRegistry.ensure_loaded()
+	for part in PartRegistry.defs.keys():
+		open_info(part)
+		await get_tree().create_timer(2.2).timeout
+		_shot("%s/card_%s.png" % [_shot_cards_dir, part])
+		info_card.close()
+		info_card = null
+		await get_tree().process_frame
 	get_tree().quit(0)
 
 

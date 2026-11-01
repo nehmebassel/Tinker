@@ -10,15 +10,15 @@ const C_GO := Color("7bd389")
 const C_ACCENT := Color("ff5d73")
 const C_LOCK := Color("c9c2b6")
 const BTN := 180.0
+## Each world has its own tile colour (unlocked, not yet solved); solved tiles are green everywhere.
+const WORLD_COLORS := [Color("4f8fd8"), Color("e8833a"), Color("b35fd1"), Color("2fa39a"), Color("d8505c")]
 
 var _scroll: ScrollContainer
 
 
 func _ready() -> void:
-	var bg := ColorRect.new()
-	bg.color = C_BG
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	App.audio.play_music("menu")
+	UiKit.background(self)
 
 	var top := PanelContainer.new()
 	var st := StyleBoxFlat.new()
@@ -119,11 +119,11 @@ func _world_block(w: Dictionary) -> Control:
 	gm.add_child(grid)
 	box.add_child(gm)
 	for l in w["levels"]:
-		grid.add_child(_level_button(int(l["number"]), str(l["title"])))
+		grid.add_child(_level_button(int(l["number"]), str(l["title"]), WORLD_COLORS[(int(w["number"]) - 1) % WORLD_COLORS.size()]))
 	return box
 
 
-func _level_button(number: int, title: String) -> Control:
+func _level_button(number: int, title: String, world_color: Color = Color("4a4670")) -> Control:
 	var unlocked := Campaign.is_unlocked(number, App.save)
 	var best := App.save.best(number)
 	var solved := bool(best.get("solved", false))
@@ -132,10 +132,11 @@ func _level_button(number: int, title: String) -> Control:
 	b.focus_mode = Control.FOCUS_NONE
 	b.name = "Level%d" % number
 	var style := StyleBoxFlat.new()
-	style.bg_color = C_GO if solved else (Color("4a4670") if unlocked else C_LOCK)
+	style.bg_color = C_GO if solved else (world_color if unlocked else C_LOCK)
 	style.set_corner_radius_all(28)
 	style.border_color = C_INK
 	style.set_border_width_all(5)
+	UiKit.key_shadow(style)
 	b.add_theme_stylebox_override("normal", style)
 	b.add_theme_stylebox_override("hover", style)
 	var pressed := style.duplicate()

@@ -14,6 +14,7 @@ var winch_speed: float = 120.0  # px/s of rope pulled in
 var direction: int = 1
 var attached: Node2D = null
 var radius: float = 20.0
+var _spin: float = 0.0  # visual only
 
 
 func configure(p_def: Dictionary) -> void:
@@ -49,17 +50,29 @@ func set_ghost(p_on: bool) -> void:
 	modulate.a = 0.45 if p_on else 1.0
 
 
+func _process(delta: float) -> void:
+	if running_visual() and on:
+		_spin += delta * speed * float(direction)
+		queue_redraw()
+
+
+## Motors have no running flag of their own: they turn while their simulation runs.
+func running_visual() -> bool:
+	var p := get_parent()
+	return p != null and p.get("running") == true
+
+
 func _draw() -> void:
-	draw_circle(Vector2.ZERO, radius, PartFactory.OUTLINE_COLOR)
-	draw_circle(Vector2.ZERO, radius - PartFactory.OUTLINE_W, fill if on else fill.darkened(0.45))
-	# Spin arrow.
-	var c := PartFactory.OUTLINE_COLOR
+	Art.circle(self, Vector2.ZERO, radius + 6.0, Color("8d8aa8"))
+	Art.wheel(self, Vector2.ZERO, radius, _spin, fill if on else fill.darkened(0.45), 3, 8)
+	# Direction arrow around the hub.
+	var c := Art.INK
 	var pts := PackedVector2Array()
 	for i in range(9):
 		var a := -2.4 + i * 0.4 * direction
-		pts.append(Vector2(radius * 0.55, 0).rotated(a))
-	draw_polyline(pts, c, 3.0)
+		pts.append(Vector2(radius + 14.0, 0).rotated(a))
+	draw_polyline(pts, Color(c, 0.55), 3.0)
 	var tip := pts[-1]
 	var tang := (pts[-1] - pts[-2]).normalized()
-	draw_line(tip, tip - tang.rotated(0.6) * 8.0, c, 3.0)
-	draw_line(tip, tip - tang.rotated(-0.6) * 8.0, c, 3.0)
+	draw_line(tip, tip - tang.rotated(0.6) * 8.0, Color(c, 0.55), 3.0)
+	draw_line(tip, tip - tang.rotated(-0.6) * 8.0, Color(c, 0.55), 3.0)

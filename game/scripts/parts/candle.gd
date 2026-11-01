@@ -99,15 +99,25 @@ func set_ghost(on: bool) -> void:
 	modulate.a = 0.45 if on else 1.0
 
 
+func _process(_delta: float) -> void:
+	if lit:
+		queue_redraw()  # flicker (time-based, visual only)
+
+
 func _draw() -> void:
 	var r := Rect2(-size / 2.0, size)
-	draw_rect(r, PartFactory.OUTLINE_COLOR)
-	draw_rect(r.grow(-PartFactory.OUTLINE_W), fill)
+	Art.rect(self, r, fill)
+	# Wax drip.
+	draw_circle(Vector2(size.x * 0.18, -size.y / 2.0 + 14.0), 5.0, fill.lightened(0.3))
 	# Wick.
-	draw_line(Vector2(0, -size.y / 2.0), Vector2(0, -size.y / 2.0 - 12.0), PartFactory.OUTLINE_COLOR, 4.0)
+	draw_line(Vector2(0, -size.y / 2.0), Vector2(0, -size.y / 2.0 - 12.0), Art.INK, 4.0)
 	if lit:
+		var t := Time.get_ticks_msec() / 1000.0 + float(get_meta("part_index", 0))
+		var k := 1.0 + 0.09 * sin(t * 13.0) + 0.05 * sin(t * 7.3)
+		var sway := 2.5 * sin(t * 5.1)
 		var tip := Vector2(0, -size.y / 2.0 - 14.0)
-		var outer := PackedVector2Array([tip + Vector2(-16, 0), tip + Vector2(0, -44), tip + Vector2(16, 0), tip + Vector2(0, 10)])
+		draw_circle(tip + Vector2(0, -16), 34.0 * k, Color(1.0, 0.75, 0.3, 0.12))
+		var outer := PackedVector2Array([tip + Vector2(-16, 0), tip + Vector2(sway, -44 * k), tip + Vector2(16, 0), tip + Vector2(0, 10)])
 		draw_colored_polygon(outer, Color("ff9a3c"))
-		var inner := PackedVector2Array([tip + Vector2(-8, -2), tip + Vector2(0, -24), tip + Vector2(8, -2), tip + Vector2(0, 6)])
+		var inner := PackedVector2Array([tip + Vector2(-8, -2), tip + Vector2(sway * 0.6, -24 * k), tip + Vector2(8, -2), tip + Vector2(0, 6)])
 		draw_colored_polygon(inner, Color("ffe066"))

@@ -61,13 +61,19 @@ func _draw() -> void:
 	for i in range(32):
 		var a := i * TAU / 32.0
 		pts.append(Vector2(cos(a) * radius, sin(a) * radius * 1.12 + radius * 0.1))
-	draw_colored_polygon(pts, PartFactory.OUTLINE_COLOR)
+	Art.shadow_poly(self, pts)
+	draw_colored_polygon(pts, Art.INK)
 	var inner := PackedVector2Array()
+	var shade := PackedVector2Array()
 	for i in range(32):
 		var a := i * TAU / 32.0
-		inner.append(Vector2(cos(a) * (radius - PartFactory.OUTLINE_W), sin(a) * (radius - PartFactory.OUTLINE_W) * 1.12 + radius * 0.1))
-	draw_colored_polygon(inner, fill)
-	draw_circle(Vector2(-radius * 0.35, -radius * 0.35), radius * 0.16, Color(1, 1, 1, 0.55))
+		var rr := radius - Art.OUTLINE_W
+		inner.append(Vector2(cos(a) * rr, sin(a) * rr * 1.12 + radius * 0.1))
+		shade.append(Vector2(cos(a) * rr * 0.86 - rr * 0.08, sin(a) * rr * 0.96 + radius * 0.02))
+	draw_colored_polygon(inner, fill.darkened(0.18))
+	draw_colored_polygon(shade, fill)
+	draw_circle(Vector2(-radius * 0.35, -radius * 0.35), radius * 0.17, Color(1, 1, 1, 0.6))
+	draw_circle(Vector2(-radius * 0.18, -radius * 0.55), radius * 0.07, Color(1, 1, 1, 0.5))
 	var knot := Vector2(0, radius * 1.22)
-	draw_colored_polygon(PackedVector2Array([knot + Vector2(-8, 0), knot + Vector2(8, 0), knot + Vector2(0, -10)]), PartFactory.OUTLINE_COLOR)
-	draw_line(knot, knot + Vector2(4, 26), PartFactory.OUTLINE_COLOR, 3.0)
+	draw_colored_polygon(PackedVector2Array([knot + Vector2(-8, 0), knot + Vector2(8, 0), knot + Vector2(0, -10)]), Art.INK)
+	draw_line(knot, knot + Vector2(4, 26), Art.INK, 3.0)

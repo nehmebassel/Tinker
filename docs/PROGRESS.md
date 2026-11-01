@@ -103,7 +103,19 @@ Session log at the bottom tells the next agent exactly where things stand.
 - [ ] Friends board (needs Game Center / Play Games sign-in, M7)
 - [ ] Web page for the curation queue (curl works today)
 
-### M5 Sandbox · M6 Polish · M7 Store (not started)
+### M6 Polish (look, sound, explanations) — code complete, PR open (done before M5 at Bassel's request)
+- [x] Music: 3 loops (menu / build / run), generated with Lyria (lyria-002, Vertex AI, project gen-lang-client-0293187856), made seamless with a 3 s crossfade, -20 LUFS OGG
+- [x] Sound effects: 20 (taps, pick/place/rotate, play/rewind, wood/metal impacts, spring, pop, switch, candle, mouse, cat, basket, pulley, fan/motor loops, solved, failed), generated with ElevenLabs SFX v2, trimmed and loudness-matched
+- [x] Audio system (`App.audio`): Music/SFX buses, crossfade, loops while fans/motors run, tap on every button; **Music and Sounds sliders in Settings** (saved, nothing hard-coded)
+- [x] SoundWatcher: read-only observer of the simulation; a test proves replays are identical with it attached (6 levels) and that each event makes its sound
+- [x] Look: shaded parts with world-space drop shadows; blueprint stage in a wooden frame on a pegboard wall; pegboard menus; key shadows on buttons; per-world level colours (`docs/screenshots/m6_*.png`)
+- [x] Animations (visual only): fan blades + wind, motor gear, conveyor treads + rollers, pulley wheel turning with the rope, spring squash, candle flicker
+- [x] Part info cards: "i" on every tray part (and tap any fixed part) → name, description, what it works with, and a live looping demo (the real simulation of a CI-verified scene, in its own physics world)
+- [x] Determinism: levels/hashes.txt unchanged; smoke test covers the card; flow, daily cycle, server tests pass
+- [ ] Bassel's ears: music and sounds were checked by spectrogram/waveform only (no listening possible here) — swap any you dislike (files in game/assets/audio, prompts in docs/DESIGN.md)
+- [ ] Next polish pass: haptics, particles on solve, first-run tutorial
+
+### M5 Sandbox · M7 Store (not started)
 
 ## Decisions
 
@@ -125,6 +137,7 @@ Session log at the bottom tells the next agent exactly where things stand.
 
 ## Session log
 
+- **2026-11-02 (session 1g)** M6 polish on Bassel's request: Lyria music, ElevenLabs effects, sound watcher, volume sliders, workbench visuals, part animations, info cards with live demos. Hashes unchanged.
 - **2026-11-01 (session 1f)** Push registered for Android + PWA (Firebase apps, Android plugin, web FCM glue, /push/config). Redeployed. PRs #1→#2→#3 merged to main. Found: the APK link had never worked — Cloud Run returns 500 for non-streamed HTTP/1 responses over 32 MiB and earlier checks were HEAD-only. Fixed by streaming chunked (+ test); live check now does a full GET. PR #5: score elapsed-time cap now spans the full yesterday-or-today window (review finding missed before #3 merged). Live on revision tinker-api-00010.
 - **2026-11-01 (session 1e)** Deployed M4 on Bassel's approval. Fixed in production: Godot SIGILL in Cloud Run gen1 (→ gen2), Godot SIGSEGV when user://logs is unwritable (file logging off + writable XDG dirs), gcloud upload honouring .gitignore (→ .gcloudignore). Web/PWA build at /play, APK at /download.
 - **2026-11-01 (session 1d)** M4: server + generator + verifier + push + client Daily/board/settings; full day cycle passes on a staging backend and in CI. GCP: Bassel supplied a service-account key for gen-lang-client-0293187856 (owner); deploy script ready, run blocked by the safety layer pending his approval. Key kept out of the repo (.gitignore + secret scan before each commit).
