@@ -199,3 +199,15 @@ test("public player id is stable and does not reveal the device id", () => {
   assert.notEqual(publicId(DEV_A), publicId(DEV_B));
   assert.ok(!publicId(DEV_A).includes("aaaa"));
 });
+
+test("ties share a rank on the board and in the submission response (1, 1, 3)", async () => {
+  const D = "2026-10-31"; // yesterday-style isolated date written directly, then read through the API
+  const docs = [["tie-dev-0001", 1, 5000], ["tie-dev-0002", 1, 5000], ["tie-dev-0003", 2, 1000]];
+  for (const [id, parts, ms] of docs) {
+    await db.collection("scores").doc(`${D}_${id}`).set({ date: D, device_id: id, country: "LB", parts, ms, name: "" });
+  }
+  const b = await j("GET", `/board/${D}?device_id=tie-dev-0002`);
+  assert.deepEqual(b.body.rows.map((r) => r.rank), [1, 1, 3]);
+  assert.equal(b.body.me.rank, 1);
+  assert.equal(b.body.rows.find((r) => r.is_me).rank, b.body.me.rank, "my row and me agree");
+});

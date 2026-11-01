@@ -112,7 +112,16 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     if (scope === "country") q = q.where("country", "==", country);
     q = q.orderBy("parts", "asc").orderBy("ms", "asc").limit(config.boardSize);
     const snap = await q.get();
-    const rows = snap.docs.map((d, i) => row(d.data(), i + 1, deviceId));
+    // Competition ranking ("1, 1, 3"), the same policy as rankOf: a row's rank is 1 + the number of
+    // entries strictly better (fewer parts, or same parts and faster). Ties share a rank.
+    const rows = [];
+    snap.docs.forEach((d, i) => {
+      const e = d.data();
+      const prev = rows[i - 1];
+      const rank = prev && prev._parts === e.parts && prev._ms === e.ms ? prev.rank : i + 1;
+      rows.push({ ...row(e, rank, deviceId), _parts: e.parts, _ms: e.ms });
+    });
+    for (const r of rows) { delete r._parts; delete r._ms; }
     let own = null;
     if (mine) own = row(mine, await rankOf(date, scope, mine), deviceId);
     res.set("Cache-Control", "public, max-age=30");

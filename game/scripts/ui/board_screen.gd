@@ -9,6 +9,7 @@ var me_rank := 0
 var _list: VBoxContainer
 var _status: Label
 var _tabs: Dictionary = {}
+var _gen := 0  # request generation: a response for an older tab press is discarded
 
 
 func _ready() -> void:
@@ -66,7 +67,11 @@ func _load(s: String) -> void:
 	var q := "/board/%s?scope=%s&device_id=%s" % [date, s, App.settings.device_id]
 	if s == "country":
 		q += "&country=" + Settings.country()
+	_gen += 1
+	var my_gen := _gen
 	var r: Dictionary = await App.api.get_json(q)
+	if my_gen != _gen:
+		return  # the player switched tabs while this was in flight
 	if not r["ok"]:
 		_status.text = "Board unavailable: " + str(r["error"])
 		loaded = true
