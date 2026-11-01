@@ -10,7 +10,7 @@ extends SceneTree
 ## Exit code 0 = all passed. Writes build/test-report.txt and build/determinism-hashes.txt
 ## (hashes are compared across machines by CI).
 
-const LEVELS_DIR := "res://levels/campaign/"
+const LEVEL_DIRS := ["res://levels/campaign/", "res://levels/tests/"]
 
 var replays: int = 100
 var only_level: String = ""
@@ -101,7 +101,7 @@ func _test_levels() -> void:
 			continue
 		_levels_expected += 1
 		_check("%s: reference solution fits tray/slots" % level.id, level.solution_fits(level.reference_solution))
-		if level.reference_solution.is_empty():
+		if level.reference_solution.is_empty() and level.slots > 0:
 			_check("%s has a reference solution" % level.id, false)
 			continue
 		await _replay_level(level)
@@ -133,7 +133,9 @@ func _replay_level(level: LevelData) -> void:
 	root.remove_child(sim)
 	sim.free()
 	_log("%s: result=%s ticks=%d (%.2fs) hash=%s" % [level.id, result, ticks, ticks / 60.0, first_hash])
-	_check("%s: reference solution reaches the goal" % level.id, result == "goal")
+	if result != level.expect:
+		_log("  final state:\n" + first_text)
+	_check("%s: reference solution ends with '%s'" % [level.id, level.expect], result == level.expect)
 	_check("%s: %d replays identical" % [level.id, replays], identical)
 	hashes.append("%s %s %s %d" % [level.id, first_hash, result, ticks])
 
@@ -142,16 +144,20 @@ func _replay_level(level: LevelData) -> void:
 
 func _list_levels() -> PackedStringArray:
 	var out := PackedStringArray()
-	var dir := DirAccess.open(LEVELS_DIR)
-	if dir == null:
-		return out
-	dir.list_dir_begin()
-	var f := dir.get_next()
-	while f != "":
-		if f.ends_with(".json"):
-			out.append(LEVELS_DIR + f)
-		f = dir.get_next()
-	out.sort()
+	for d in LEVEL_DIRS:
+		var dir := DirAccess.open(d)
+		if dir == null:
+			continue
+		var names := PackedStringArray()
+		dir.list_dir_begin()
+		var f := dir.get_next()
+		while f != "":
+			if f.ends_with(".json") and f != "hashes.txt":
+				names.append(f)
+			f = dir.get_next()
+		names.sort()
+		for n in names:
+			out.append(d + n)
 	return out
 
 

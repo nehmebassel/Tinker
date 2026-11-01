@@ -1,0 +1,28 @@
+{
+  "id": "t_reg_plank_not_caught",
+  "title": "A plank poking into the basket does not count",
+  "hint": "basket must ignore planks",
+  "test": true,
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "basket",
+      "x": 20,
+      "y": 36,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 20,
+      "y": 34,
+      "rot": 6
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "stalled"
+}

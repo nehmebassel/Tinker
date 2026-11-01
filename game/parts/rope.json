@@ -1,0 +1,22 @@
+{
+  "id": "rope",
+  "name": "Rope",
+  "group": "connector",
+  "description": "Ties the two things at its ends. Over a pulley, pulling one end lifts the other.",
+  "body": "none",
+  "shape": {
+    "type": "none",
+    "w": 288,
+    "h": 16
+  },
+  "length_cells": 12,
+  "color": "#d9a066",
+  "script": "res://scripts/parts/rope.gd",
+  "interacts_with": [
+    "bucket",
+    "pulley",
+    "plank",
+    "ball",
+    "balloon"
+  ]
+}

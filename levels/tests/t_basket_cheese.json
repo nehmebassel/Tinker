@@ -1,0 +1,28 @@
+{
+  "id": "t_basket_cheese",
+  "title": "Cheese drops into the basket",
+  "hint": "basket <- cheese",
+  "test": true,
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "cheese",
+      "x": 20,
+      "y": 20,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 20,
+      "y": 36,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

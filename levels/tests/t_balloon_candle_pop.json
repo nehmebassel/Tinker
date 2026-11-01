@@ -1,0 +1,30 @@
+{
+  "id": "t_balloon_candle_pop",
+  "title": "Balloon rises into a flame and pops",
+  "hint": "candle -> balloon",
+  "test": true,
+  "goal": {
+    "type": "state",
+    "index": 1,
+    "key": "popped",
+    "value": true
+  },
+  "fixed": [
+    {
+      "part": "candle",
+      "x": 16,
+      "y": 12,
+      "rot": 12
+    },
+    {
+      "part": "balloon",
+      "x": 16,
+      "y": 30,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

@@ -51,8 +51,16 @@ func _add_wall(pos: Vector2, sz: Vector2) -> void:
 	add_child(cs)
 
 
+## Only things that can "land" count: never a plank (planks are rigid bodies so they can hang on
+## ropes, but a frozen ramp poking into the sensor must not satisfy the goal).
+func _catchable(body: Node) -> bool:
+	if not (body is RigidBody2D) or not body.has_meta("part_id"):
+		return false
+	return str(body.get_meta("part_id")) in def.get("catches", ["ball", "mouse", "cheese", "bucket", "balloon"])
+
+
 func _on_body_entered(body: Node) -> void:
-	if body is RigidBody2D and not _inside.has(body):
+	if _catchable(body) and not _inside.has(body):
 		_inside.append(body)
 		caught_count += 1
 		caught.emit(body)

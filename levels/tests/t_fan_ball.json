@@ -1,0 +1,47 @@
+{
+  "id": "t_fan_ball",
+  "title": "Fan pushes ball (weakly)",
+  "hint": "fan -> ball",
+  "test": true,
+  "goal": {
+    "type": "displaced",
+    "index": 3,
+    "min_dx": 120
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 9,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 19,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 29,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "ball",
+      "x": 14,
+      "y": 38,
+      "rot": 0
+    },
+    {
+      "part": "fan",
+      "x": 6,
+      "y": 37,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

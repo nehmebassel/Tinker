@@ -1,0 +1,23 @@
+{
+  "id": "balloon",
+  "name": "Balloon",
+  "group": "body",
+  "description": "Floats up, drifts in the wind, lifts light things, pops on a flame.",
+  "body": "rigid",
+  "shape": {
+    "type": "circle",
+    "radius": 40
+  },
+  "mass": 1.0,
+  "gravity_scale": -0.9,
+  "linear_damp": 1.6,
+  "wind_factor": 1.0,
+  "color": "#ff8fab",
+  "script": "res://scripts/parts/balloon.gd",
+  "interacts_with": [
+    "fan",
+    "candle",
+    "switch",
+    "rope"
+  ]
+}

@@ -54,8 +54,8 @@ static func validate(d: Dictionary) -> String:
 	for key in ["id", "name", "body", "shape", "script", "color"]:
 		if not d.has(key):
 			return "missing field '%s'" % key
-	if not (d["body"] in ["rigid", "static", "area"]):
-		return "body must be rigid, static or area"
+	if not (d["body"] in ["rigid", "static", "area", "none"]):
+		return "body must be rigid, static, area or none"
 	var s: Dictionary = d["shape"]
 	if not s.has("type"):
 		return "shape.type missing"
@@ -69,6 +69,8 @@ static func validate(d: Dictionary) -> String:
 		"basket":
 			if not (s.has("w") and s.has("h")):
 				return "basket needs w and h"
+		"none":
+			pass
 		_:
 			return "unknown shape type %s" % s["type"]
 	if not ResourceLoader.exists(d["script"]):

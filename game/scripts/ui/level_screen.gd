@@ -82,6 +82,7 @@ var ring_visible: bool = false
 var tray_collapsed: bool = false
 var tray_counts: Dictionary = {}
 var smoke_mode: bool = false
+var shot_path: String = ""  # --shot=path: render the level, save a PNG, quit (for docs/CI)
 
 
 func _ready() -> void:
@@ -90,12 +91,16 @@ func _ready() -> void:
 			level_path = a.trim_prefix("--level=")
 		elif a == "--smoke":
 			smoke_mode = true
+		elif a.begins_with("--shot="):
+			shot_path = a.trim_prefix("--shot=")
 	_build_scene()
 	_load_level(level_path)
 	get_viewport().size_changed.connect(_on_resized)
 	_fit_camera()
 	if smoke_mode:
 		_run_smoke()
+	elif shot_path != "":
+		_run_shot()
 
 
 # ------------------------------------------------------------------ scene construction
@@ -751,11 +756,27 @@ func _overlaps(cell: Vector2i, rot: int) -> bool:
 	q.collide_with_areas = false
 	q.margin = -2.0
 	var hits := space.intersect_shape(q, 8)
+	var part_id: String = ghost.get_meta("part_id")
 	for h in hits:
 		var node: Node = h["collider"]
-		if node.has_meta("part_index") and int(node.get_meta("part_index")) < 9000:
-			return true
+		if not node.has_meta("part_index") or int(node.get_meta("part_index")) >= 9000:
+			continue
+		if _attaches(part_id, cell, node):
+			continue  # same-cell attachment (plank/conveyor/pulley on a motor), not an overlap
+		return true
 	return false
+
+
+## A motor and a plank/conveyor/pulley on the SAME cell are an attachment, which the editor must
+## allow even though their shapes intersect (see docs/DESIGN.md "Parts").
+const ATTACHES_TO_MOTOR := ["plank", "conveyor", "pulley"]
+
+
+func _attaches(part_id: String, cell: Vector2i, other: Node) -> bool:
+	if Vector2i(other.get_meta("cell")) != cell:
+		return false
+	var other_id: String = other.get_meta("part_id")
+	return (part_id == "motor" and other_id in ATTACHES_TO_MOTOR) or (other_id == "motor" and part_id in ATTACHES_TO_MOTOR)
 
 
 # ------------------------------------------------------------------ pinch / pan
@@ -909,6 +930,10 @@ func _draw_stage() -> void:
 			stage_bg.draw_circle(Grid.cell_to_world(Vector2i(x, y)), 3.0, C_GRID)
 
 
+func _process(_delta: float) -> void:
+	overlay.queue_redraw()
+
+
 func _draw_overlay() -> void:
 	if ring_visible and selected >= 0 and selected < placements.size():
 		var rot := Grid.steps_to_radians(placements[selected].rot)
@@ -922,12 +947,24 @@ func _draw_overlay() -> void:
 		overlay.draw_line(ring_pos, handle, Color(C_ACCENT, 0.6), 4.0)
 		overlay.draw_circle(handle, RING_HANDLE_R, C_INK)
 		overlay.draw_circle(handle, RING_HANDLE_R - 6.0, C_ACCENT)
+	if not sim.running:
+		for p in sim.parts:
+			if p.has_method("get_link_target") and p.get_link_target() != null:
+				_draw_dashed(overlay, p.global_position + Vector2(0, -14), p.get_link_target().global_position, Color(C_INK, 0.45))
 	if ghost and ghost.visible:
 		# Landing crosshair.
 		var p := ghost.position
 		var c := Color(C_INK, 0.5) if ghost_valid else C_BAD
 		overlay.draw_line(p + Vector2(-20, 0), p + Vector2(20, 0), c, 3.0)
 		overlay.draw_line(p + Vector2(0, -20), p + Vector2(0, 20), c, 3.0)
+
+
+func _draw_dashed(on: CanvasItem, a: Vector2, b: Vector2, c: Color) -> void:
+	var d := a.distance_to(b)
+	var n := int(d / 18.0)
+	for i in range(0, n, 2):
+		on.draw_line(a.lerp(b, float(i) / n), a.lerp(b, float(mini(i + 1, n)) / n), c, 3.0)
+	on.draw_circle(b, 7.0, c)
 
 
 func _toast(msg: String) -> void:
@@ -972,12 +1009,16 @@ func _run_smoke() -> void:
 	ok = ok and _assert(placements[0].rot != target.rot, "undo reverted rotation")
 	_redo()
 	ok = ok and _assert(placements[0].rot == target.rot, "redo restored rotation")
-	# 4. Play and wait.
+	# 4. Play and wait. Subscribe BEFORE starting: a fast level can finish within the first second.
+	var outcome_box := {}
+	sim.finished.connect(func(o: Dictionary) -> void: outcome_box["o"] = o, CONNECT_ONE_SHOT)
 	_start_run()
 	ok = ok and _assert(sim.running, "simulation running after PLAY")
 	await get_tree().create_timer(1.0).timeout
 	_shot(shots_dir + "/04_running.png")
-	var outcome: Dictionary = await sim.finished
+	while not outcome_box.has("o"):
+		await get_tree().process_frame
+	var outcome: Dictionary = outcome_box["o"]
 	await get_tree().create_timer(0.5).timeout
 	_shot(shots_dir + "/05_result.png")
 	ok = ok and _assert(outcome["result"] == "goal", "level solved through the UI (result=%s)" % outcome["result"])
@@ -989,6 +1030,22 @@ func _run_smoke() -> void:
 	_shot(shots_dir + "/06_rewound.png")
 	print("SMOKE %s" % ("PASS" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
+
+
+func _run_shot() -> void:
+	for i in 3:
+		await get_tree().process_frame
+	_shot(shot_path)
+	if level and not level.reference_solution.is_empty():
+		placements = []
+		for p in level.reference_solution:
+			placements.append(p.duplicate_placement())
+		sim.set_player_parts(placements)
+		_refresh_hud()
+	_start_run()
+	await get_tree().create_timer(1.0).timeout
+	_shot(shot_path.get_basename() + "_run.png")
+	get_tree().quit(0)
 
 
 func _assert(cond: bool, what: String) -> bool:

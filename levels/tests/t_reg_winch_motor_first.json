@@ -1,0 +1,41 @@
+{
+  "id": "t_reg_winch_motor_first",
+  "title": "Winch works when the motor is created before the pulley",
+  "hint": "rope must tie to the pulley, not the co-located motor",
+  "test": true,
+  "goal": {
+    "type": "displaced",
+    "index": 2,
+    "min_dy": -100
+  },
+  "fixed": [
+    {
+      "part": "motor",
+      "x": 20,
+      "y": 10,
+      "rot": 0
+    },
+    {
+      "part": "pulley",
+      "x": 20,
+      "y": 10,
+      "rot": 0
+    },
+    {
+      "part": "bucket",
+      "x": 20,
+      "y": 22,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 20,
+      "y": 22,
+      "rot": 18
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

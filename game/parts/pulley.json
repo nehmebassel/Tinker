@@ -1,0 +1,19 @@
+{
+  "id": "pulley",
+  "name": "Pulley",
+  "group": "connector",
+  "description": "Turns a downward pull into lift. With a motor it winches.",
+  "body": "static",
+  "shape": {
+    "type": "circle",
+    "radius": 30
+  },
+  "color": "#8d99ae",
+  "script": "res://scripts/parts/pulley.gd",
+  "interacts_with": [
+    "rope",
+    "bucket",
+    "plank",
+    "motor"
+  ]
+}

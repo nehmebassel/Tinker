@@ -1,0 +1,23 @@
+{
+  "id": "motor",
+  "name": "Motor",
+  "group": "mover",
+  "description": "Spins whatever shares its spot: plank, pulley or conveyor. Flip it to reverse. A switch turns it on and off.",
+  "body": "static",
+  "shape": {
+    "type": "circle",
+    "radius": 20
+  },
+  "speed": 3.5,
+  "winch_speed": 120,
+  "state": {
+    "on": true
+  },
+  "color": "#c77dff",
+  "script": "res://scripts/parts/motor.gd",
+  "interacts_with": [
+    "plank",
+    "pulley",
+    "conveyor"
+  ]
+}

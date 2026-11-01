@@ -4,12 +4,24 @@
   "group": "body",
   "description": "Heavy, reliable, rolls. Interacts with everything.",
   "body": "rigid",
-  "shape": {"type": "circle", "radius": 36},
+  "shape": {
+    "type": "circle",
+    "radius": 36
+  },
   "mass": 10.0,
   "friction": 0.8,
   "bounce": 0.1,
   "gravity_scale": 1.0,
+  "wind_factor": 0.12,
   "color": "#ff5d73",
   "script": "res://scripts/parts/ball.gd",
-  "interacts_with": ["plank", "basket", "fan", "conveyor", "spring", "bucket", "switch"]
+  "interacts_with": [
+    "plank",
+    "basket",
+    "fan",
+    "conveyor",
+    "spring",
+    "bucket",
+    "switch"
+  ]
 }

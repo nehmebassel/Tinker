@@ -1,0 +1,27 @@
+{
+  "id": "cat",
+  "name": "Cat",
+  "group": "actor",
+  "description": "Sleeps until a mouse comes near, then gives chase. Afraid of candles.",
+  "body": "rigid",
+  "shape": {
+    "type": "rect",
+    "w": 84,
+    "h": 48
+  },
+  "mass": 3.0,
+  "speed": 190,
+  "hop": 260,
+  "wake_range": 420,
+  "fear_range": 160,
+  "friction": 0.9,
+  "wind_factor": 0.15,
+  "color": "#f28c28",
+  "script": "res://scripts/parts/cat.gd",
+  "interacts_with": [
+    "mouse",
+    "candle",
+    "conveyor",
+    "switch"
+  ]
+}

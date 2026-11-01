@@ -39,6 +39,21 @@ build/       outputs (gitignored)
 | Rewind = full rebuild from data | `Simulation.stop()` |
 | Outcome hash = md5 of level id, result, ticks and every part's quantised position/rotation/velocity | `Simulation.state_hash()` |
 | Nothing in the simulation reads wall-clock time or RNG | code review rule |
+| A brand-new `World2D` (physics space) for every build | `Simulation.rebuild()` |
+| Links (motor→plank, switch→target, rope ends) resolved in creation order from integer cells | `Simulation._attach_pass()` |
+| Bodies that leave the stage (+3 tiles) are frozen where they crossed | `Simulation._freeze_escapees()` |
+| Whenever a part iterates bodies in an Area2D, the list is sorted by part index | `PartFactory.sorted_bodies()` |
+
+### Two Godot physics findings (M2) — do not undo
+1. **Fresh physics space per build.** Godot's 2D broadphase hands out ids from a free list. Rebuilding
+   parts inside the same space reuses ids in a different order, which changes pair/constraint order and
+   with it the last bits of the solver's float sums: replay 2 differed from replay 1 by 0.001 px on a ball
+   crossing plank seams. `get_viewport().world_2d = World2D.new()` in `rebuild()` fixed it; 3,200 replays
+   across 32 levels are now bit-identical, in-process and across processes.
+2. **`StaticBody2D.constant_linear_velocity` is ignored for an already-resting contact.** A conveyor switched
+   on mid-run would not move the ball on it. The belt is therefore driven by the conveyor itself (an Area2D
+   strip accelerates bodies toward belt speed each tick). Same for motorised paddles: `PinJoint2D`'s motor is
+   far too weak, so a powered plank sets its angular velocity directly.
 
 Verified so far: 100 in-process replays identical; separate processes identical; `--fixed-fps 30/60/144` and real time identical.
 Not yet verified: two real phones (ARM) vs CI (x86). If they diverge, the plan is a Box2D v3 GDExtension or fixed-point, not tweaking.
@@ -58,7 +73,7 @@ Godot steps physics from wall-clock time. In headless runs that would make 100 r
   "reference_solution": [{"part": "plank", "x": 18, "y": 39, "rot": 4}]
 }
 ```
-Stage is 45×60 cells. Keep fixed parts out of the PLAY corner (x>35 and y>48).
+Stage is 45×60 cells. Keep fixed parts out of the PLAY corner (x>35 and y>48). Switches go one cell above the floor they sit on (`y = floor_y - 1`).
 Find a reference solution with `tests/find_solution.gd` (brute force over one part) and record the hash with
 `godot --headless --fixed-fps 60 --path game -s res://tests/run_tests.gd` → copy `build/determinism-hashes.txt` to `levels/hashes.txt`.
 
@@ -71,6 +86,41 @@ Find a reference solution with `tests/find_solution.gd` (brute force over one pa
 ```
 Every part script implements `configure(def)`, `set_running(bool)`, `snapshot() -> String`, `set_ghost(bool)` and draws itself in `_draw()` (flat fill, thick ink outline — art direction: clean flat, thick outlines, bright colours).
 New parts: add the JSON, the script, and the id to `parts/index.json`.
+
+## Parts (M2) — the 15 from the brief plus cheese
+
+Every part is `game/parts/<id>.json` + `game/scripts/parts/<id>.gd`. Links are decided by **what shares a cell**
+(so a solution stays `(part, x, y, rot)` integers) or by **nearest part**:
+
+| Part | Behaviour | Links |
+| --- | --- | --- |
+| Ball | heavy rigid body, CCD on | — |
+| Plank | static ramp; **pivot** when a motor shares its cell (motor on = spinning paddle, off = free see-saw); **dynamic** when a rope ties to it | motor, rope |
+| Basket | three static walls + sensor; counts rigid bodies inside (ball, mouse, cheese) | — |
+| Fan | force cone along +X, strength × `wind_factor` of the target part × falloff, sampled at several points so a see-saw tips | switch |
+| Conveyor | belt strip accelerates resting bodies along +X; powered unless a motor on its cell is off | motor, switch |
+| Spring | pad above the body; replaces the incoming normal speed with `gain·v_in + kick` once per landing | — |
+| Motor | powered pivot; rot steps 0–11 clockwise, 12–23 counter-clockwise; drives plank / conveyor / pulley (winch) on its cell | switch |
+| Rope | ties the part at its cell to the part `length_cells` away along its facing (nearest within 2 cells); enforced as a one-sided distance constraint by `Simulation.RopeLine` | any two parts, pulley |
+| Pulley | fixed wheel; ropes that end on it join into one line (total length conserved); motor on its cell = winch | rope, motor |
+| Switch | pressure plate; toggles the **nearest** fan/motor/conveyor (lowest index on ties; a motor-powered conveyor is controlled via its motor); re-arms when empty; link drawn as a dashed line | — |
+| Balloon | negative gravity scale, damped; lifts light things on a rope; pops in a lit flame | fan, candle, rope |
+| Bucket | rigid U, rotation locked; gets heavier with contents; hangs on a rope | rope |
+| Candle | `lit` state; flame pops balloons, scares the cat, lights an unlit candle whose wick it overlaps | — |
+| Cheese | light rigid body; eaten when the mouse touches it | — |
+| Mouse | runs toward the nearest cheese, flees an awake cat within `fear_range`, hops low steps | — |
+| Cat | sleeps until a mouse is within `wake_range`, chases it, catches on contact; flees a lit candle | — |
+
+Initial state for fixed parts comes from the level: `{"part":"motor","x":..,"y":..,"rot":0,"state":{"on":false}}`
+(also `candle.lit`, `fan.on`, `conveyor.on`, `cat.awake`). Player-placed parts always use the definition default.
+
+Goal types: `basket {count}`, `candle` (every initially-unlit candle lit), `cheese`, `state {index,key,value}`,
+`displaced {index,min_dx,min_dy}`, `rotated {index,min_abs_rad}`. Levels may set `"expect": "stalled"` for
+negative demonstrations.
+
+Interaction test levels: `levels/tests/*.json`, generated by `python3 levels/tests/make_tests.py` (one per row of
+the interaction table; all fixed parts, empty solution; the harness replays each 100×). Gallery:
+`docs/screenshots/m2_parts_gallery.png`.
 
 ## Touch controls (M1)
 

@@ -1,0 +1,14 @@
+{
+  "id": "t_ui_attach",
+  "title": "Place a plank on a motor",
+  "hint": "UI smoke test: the editor must allow dropping a plank onto a motor's cell (same-cell attachment).",
+  "test": true,
+  "goal": {"type": "rotated", "index": 1, "min_abs_rad": 1.0},
+  "fixed": [
+    {"part": "motor", "x": 20, "y": 30, "rot": 0}
+  ],
+  "tray": [{"part": "plank", "count": 1}],
+  "slots": 1,
+  "reference_solution": [{"part": "plank", "x": 20, "y": 30, "rot": 2}],
+  "expect": "goal"
+}

@@ -1,0 +1,36 @@
+{
+  "id": "t_switch_balloon_fan",
+  "title": "Balloon rises into an upside-down switch",
+  "hint": "balloon -> switch -> fan",
+  "test": true,
+  "goal": {
+    "type": "state",
+    "index": 2,
+    "key": "on",
+    "value": false
+  },
+  "fixed": [
+    {
+      "part": "switch",
+      "x": 16,
+      "y": 10,
+      "rot": 12
+    },
+    {
+      "part": "balloon",
+      "x": 16,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "fan",
+      "x": 30,
+      "y": 30,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

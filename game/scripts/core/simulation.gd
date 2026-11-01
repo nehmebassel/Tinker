@@ -9,9 +9,12 @@ extends Node2D
 ##
 ## DETERMINISM RULES enforced here:
 ##  * parts are created in a fixed order (fixed parts first, then player parts, in list order)
+##  * links between parts (motor->plank, switch->target, rope->bodies) are resolved in that same
+##    order by an attach pass that runs after every rebuild, from integer cells only
 ##  * the run is counted in physics ticks, never in seconds
 ##  * end conditions: goal reached, TIMEOUT_TICKS elapsed, or no body moved for STALL_TICKS
 ##  * no randomness, no reads of wall-clock time
+##  * whenever several parts are iterated, it is this node's `parts` array (creation order)
 
 signal finished(outcome: Dictionary)
 signal tick(ticks: int)
@@ -20,6 +23,7 @@ const TIMEOUT_TICKS := 30 * 60  # 30 s at 60 Hz
 const STALL_TICKS := 2 * 60  # 2 s with nothing moving
 const STALL_SPEED := 4.0  # px/s below which a body counts as still
 const MIN_RUN_TICKS := 30  # never declare a stall before half a second
+const GOAL_HOLD_TICKS := 15  # goal must hold this long (a ball bouncing straight out does not count)
 
 var level: LevelData
 var player_parts: Array[Placement] = []
@@ -27,10 +31,13 @@ var parts: Array[Node2D] = []
 var running: bool = false
 var ticks: int = 0
 var outcome: Dictionary = {}
+var rope_lines: Array = []  # Array[RopeLine]
 
 var _still_ticks: int = 0
 var _goal_hit_tick: int = -1
-var _baskets: Array = []
+var _start_positions: Array[Vector2] = []
+var _start_rotations: Array[float] = []
+var _links: Node2D  # joints and other helper nodes created by the attach pass
 
 
 func load_level(p_level: LevelData) -> void:
@@ -53,11 +60,22 @@ func rebuild() -> void:
 	_still_ticks = 0
 	_goal_hit_tick = -1
 	outcome = {}
+	rope_lines.clear()
 	for p in parts:
 		remove_child(p)
 		p.free()
 	parts.clear()
-	_baskets.clear()
+	if _links:
+		remove_child(_links)
+		_links.free()
+	_links = Node2D.new()
+	_links.name = "Links"
+	add_child(_links)
+	# DETERMINISM: a brand-new physics space for every build. The broadphase hands out ids from a
+	# free list, so re-using a space after frees changes pair ordering and with it the last bits
+	# of the solver's float sums. A fresh World2D makes build N identical to build 1.
+	if is_inside_tree():
+		get_viewport().world_2d = World2D.new()
 	if level == null:
 		return
 	var index := 0
@@ -67,6 +85,7 @@ func rebuild() -> void:
 	for pl in player_parts:
 		_spawn(pl, index, false)
 		index += 1
+	_attach_pass()
 
 
 func _spawn(pl: Placement, index: int, is_fixed: bool) -> void:
@@ -75,8 +94,14 @@ func _spawn(pl: Placement, index: int, is_fixed: bool) -> void:
 		return
 	add_child(node)
 	parts.append(node)
-	if node.has_signal("caught"):
-		_baskets.append(node)
+
+
+## Resolve every link in creation order. Parts implement on_attach(sim) and use the finders below.
+func _attach_pass() -> void:
+	for p in parts:
+		if p.has_method("on_attach"):
+			p.on_attach(self)
+	_build_rope_lines()
 
 
 func start() -> void:
@@ -85,8 +110,15 @@ func start() -> void:
 	# Always start from a clean rebuild so a Play after a Stop is identical to the first Play.
 	rebuild()
 	running = true
+	_start_positions = []
+	_start_rotations = []
+	for p in parts:
+		_start_positions.append(p.global_position)
+		_start_rotations.append(p.global_rotation)
 	for p in parts:
 		p.set_running(true)
+	for rl in rope_lines:
+		rl.on_start()
 
 
 func stop() -> void:
@@ -100,13 +132,15 @@ func _physics_process(_delta: float) -> void:
 		return
 	ticks += 1
 	tick.emit(ticks)
+	_freeze_escapees()
+	for rl in rope_lines:
+		rl.enforce()
 	# Goal check.
 	if _goal_hit_tick < 0 and _goal_reached():
 		_goal_hit_tick = ticks
-	# Count the goal only once it has held for 15 ticks (a ball that bounces straight out does not count).
 	if _goal_hit_tick >= 0:
 		if _goal_reached():
-			if ticks - _goal_hit_tick >= 15:
+			if ticks - _goal_hit_tick >= GOAL_HOLD_TICKS:
 				_end("goal")
 				return
 		else:
@@ -124,22 +158,86 @@ func _physics_process(_delta: float) -> void:
 				return
 
 
+# ---------------------------------------------------------------- goals
+
 func _goal_reached() -> bool:
-	match str(level.goal.get("type", "basket")):
+	var g := level.goal
+	match str(g.get("type", "basket")):
 		"basket":
-			var need := int(level.goal.get("count", 1))
+			var need := int(g.get("count", 1))
 			var got := 0
-			for b in _baskets:
-				got += b.caught_count
+			for p in parts:
+				if p.get_meta("part_id") == "basket":
+					got += p.caught_count
 			return got >= need
+		"candle":
+			# Every candle that started unlit must be lit.
+			var any := false
+			for p in parts:
+				if p.get_meta("part_id") == "candle" and not p.lit_at_start:
+					any = true
+					if not p.lit:
+						return false
+			return any
+		"cheese":
+			for p in parts:
+				if p.get_meta("part_id") == "cheese" and p.eaten:
+					return true
+			return false
+		"state":
+			# {"type":"state","index":i,"key":"popped","value":true}
+			var i := int(g.get("index", -1))
+			if i < 0 or i >= parts.size():
+				return false
+			return parts[i].get(str(g.get("key", ""))) == g.get("value")
+		"displaced":
+			# {"type":"displaced","index":i,"min_dx":200} and/or "min_dy" (signed; negative = up)
+			var i := int(g.get("index", -1))
+			if i < 0 or i >= parts.size() or i >= _start_positions.size():
+				return false
+			var d := parts[i].global_position - _start_positions[i]
+			if g.has("min_dx"):
+				var mdx := float(g["min_dx"])
+				if (mdx >= 0.0 and d.x < mdx) or (mdx < 0.0 and d.x > mdx):
+					return false
+			if g.has("min_dy"):
+				var mdy := float(g["min_dy"])
+				if (mdy >= 0.0 and d.y < mdy) or (mdy < 0.0 and d.y > mdy):
+					return false
+			return true
+		"rotated":
+			# {"type":"rotated","index":i,"min_abs_rad":1.0}
+			var i := int(g.get("index", -1))
+			if i < 0 or i >= parts.size() or i >= _start_rotations.size():
+				return false
+			return absf(angle_difference(_start_rotations[i], parts[i].global_rotation)) >= float(g.get("min_abs_rad", 1.0)) \
+				or absf(parts[i].global_rotation - _start_rotations[i]) >= float(g.get("min_abs_rad", 1.0))
 	return false
+
+
+## Anything that leaves the stage (plus a margin) is out of play: frozen where it crossed the
+## line so the run can stall instead of waiting 30 s for a body falling forever.
+const OUT_MARGIN := Grid.TILE * 3.0
+
+
+func _freeze_escapees() -> void:
+	var bounds := Rect2(Vector2.ZERO, Vector2(Grid.STAGE_PX)).grow(OUT_MARGIN)
+	for p in parts:
+		if p is RigidBody2D and not p.freeze and not bounds.has_point(p.global_position):
+			p.set_meta("out", true)
+			p.set_deferred("freeze", true)
+			p.set_deferred("linear_velocity", Vector2.ZERO)
+			p.set_deferred("angular_velocity", 0.0)
 
 
 func _anything_moving() -> bool:
 	for p in parts:
-		if p is RigidBody2D:
+		if p is RigidBody2D and not p.freeze:
 			if p.linear_velocity.length() > STALL_SPEED or absf(p.angular_velocity) > 0.05:
 				return true
+	for rl in rope_lines:
+		if rl.is_winching():
+			return true
 	return false
 
 
@@ -172,3 +270,198 @@ func state_text() -> String:
 	for p in parts:
 		lines.append(p.snapshot())
 	return "\n".join(lines)
+
+
+# ---------------------------------------------------------------- finders (used by on_attach)
+
+## Part whose cell is exactly `cell` (lowest index wins), else nearest within `radius` cells, else null.
+func part_at_cell(cell: Vector2i, exclude: Node = null, radius: int = 1, filter: Callable = Callable()) -> Node2D:
+	var best: Node2D = null
+	var best_d := radius * radius + 1
+	for p in parts:
+		if p == exclude:
+			continue
+		if filter.is_valid() and not filter.call(p):
+			continue
+		var c: Vector2i = p.get_meta("cell")
+		var d := (c - cell).length_squared()
+		if d < best_d:
+			best_d = d
+			best = p
+	return best
+
+
+## Nearest part (cell distance) satisfying `filter`; ties go to the lowest index.
+func nearest_part(from: Node2D, filter: Callable) -> Node2D:
+	var fc: Vector2i = from.get_meta("cell")
+	var best: Node2D = null
+	var best_d := 1 << 30
+	for p in parts:
+		if p == from or not filter.call(p):
+			continue
+		var d := (Vector2i(p.get_meta("cell")) - fc).length_squared()
+		if d < best_d:
+			best_d = d
+			best = p
+	return best
+
+
+func parts_of(id: String) -> Array:
+	var out := []
+	for p in parts:
+		if p.get_meta("part_id") == id:
+			out.append(p)
+	return out
+
+
+func add_link_node(n: Node) -> void:
+	_links.add_child(n)
+
+
+# ---------------------------------------------------------------- ropes
+
+## Ropes register (rope, end_a, end_b). Ropes that share a pulley are merged into one line so the
+## total length is conserved across the pulley: pulling one end lifts the other.
+var _rope_regs: Array = []
+
+
+func register_rope(rope: Node2D, a: Node2D, b: Node2D) -> void:
+	_rope_regs.append({"rope": rope, "a": a, "b": b})
+
+
+func _build_rope_lines() -> void:
+	rope_lines.clear()
+	var used := {}
+	for i in _rope_regs.size():
+		if used.has(i):
+			continue
+		var reg: Dictionary = _rope_regs[i]
+		if reg["a"] == null or reg["b"] == null:
+			used[i] = true
+			continue
+		used[i] = true
+		var chain: Array = [reg["a"], reg["b"]]
+		var ropes: Array = [reg["rope"]]
+		var length: float = reg["rope"].rope_length_px()
+		# Extend through pulleys at either end.
+		for _pass in range(8):
+			var grew := false
+			for side in [0, 1]:
+				var end: Node2D = chain[0] if side == 0 else chain[-1]
+				if end.get_meta("part_id") != "pulley":
+					continue
+				for j in _rope_regs.size():
+					if used.has(j):
+						continue
+					var r2: Dictionary = _rope_regs[j]
+					if r2["a"] == null or r2["b"] == null:
+						continue
+					var other: Node2D = null
+					if r2["a"] == end:
+						other = r2["b"]
+					elif r2["b"] == end:
+						other = r2["a"]
+					if other == null:
+						continue
+					used[j] = true
+					ropes.append(r2["rope"])
+					length += r2["rope"].rope_length_px()
+					if side == 0:
+						chain.push_front(other)
+					else:
+						chain.push_back(other)
+					grew = true
+					break
+			if not grew:
+				break
+		var line := RopeLine.new(chain, length, ropes)
+		rope_lines.append(line)
+		for r in ropes:
+			r.line = line
+	_rope_regs.clear()
+
+
+## One inextensible line through zero or more pulleys. Enforced as a one-sided distance
+## constraint with impulses on the dynamic end bodies. Pulleys are fixed waypoints; a motor on a
+## pulley winches the line (shortens it while on).
+class RopeLine:
+	var chain: Array  # [end_a, pulley..., end_b]
+	var length: float
+	var ropes: Array
+	var start_length: float
+	var winch: Node2D = null  # motor, if any pulley on the line has one
+	const BETA := 12.0  # position correction per second
+	const MIN_LENGTH := 24.0
+
+	func _init(p_chain: Array, p_length: float, p_ropes: Array) -> void:
+		chain = p_chain
+		length = p_length
+		start_length = p_length
+		ropes = p_ropes
+		for n in chain:
+			if n.get_meta("part_id") == "pulley" and n.winch != null:
+				winch = n.winch
+
+	func on_start() -> void:
+		length = start_length
+
+	func is_winching() -> bool:
+		if winch == null or not winch.on or is_slack():
+			return false
+		# Still counts as motion only while the length can still change.
+		return (winch.direction > 0 and length > MIN_LENGTH) or (winch.direction < 0 and length < start_length * 2.0)
+
+	func current_length() -> float:
+		var d := 0.0
+		for i in range(chain.size() - 1):
+			d += chain[i].global_position.distance_to(chain[i + 1].global_position)
+		return d
+
+	static func _dynamic(n: Node2D) -> bool:
+		return n is RigidBody2D and not n.freeze
+
+	## An endpoint that left play (popped balloon, eaten cheese, caught mouse, fell off the stage)
+	## no longer holds the rope: the line goes slack instead of acting as an invisible anchor.
+	static func _gone(n: Node2D) -> bool:
+		if n.get_meta("out", false):
+			return true
+		for key in ["popped", "eaten", "caught"]:
+			if n.get(key) == true:
+				return true
+		return false
+
+	func is_slack() -> bool:
+		return _gone(chain[0]) or _gone(chain[-1])
+
+	func enforce() -> void:
+		if is_slack():
+			return
+		if winch != null and winch.on:
+			length = clampf(length - winch.direction * winch.winch_speed / 60.0, MIN_LENGTH, start_length * 2.0)
+		var d := current_length()
+		var excess := d - length
+		if excess <= 0.0:
+			return
+		var a: Node2D = chain[0]
+		var b: Node2D = chain[-1]
+		var na: Node2D = chain[1]
+		var nb: Node2D = chain[-2]
+		var dir_a := (na.global_position - a.global_position).normalized()
+		var dir_b := (nb.global_position - b.global_position).normalized()
+		var wa: float = (1.0 / a.mass) if _dynamic(a) else 0.0
+		var wb: float = (1.0 / b.mass) if _dynamic(b) else 0.0
+		var wsum: float = wa + wb
+		if wsum <= 0.0:
+			return
+		# Rate at which the line is stretching (positive = getting longer).
+		var v_sep := 0.0
+		if wa > 0.0:
+			v_sep += -a.linear_velocity.dot(dir_a)
+		if wb > 0.0:
+			v_sep += -b.linear_velocity.dot(dir_b)
+		var dv: float = excess * BETA + maxf(0.0, v_sep)
+		var j: float = dv / wsum
+		if wa > 0.0:
+			a.apply_central_impulse(dir_a * j)
+		if wb > 0.0:
+			b.apply_central_impulse(dir_b * j)
