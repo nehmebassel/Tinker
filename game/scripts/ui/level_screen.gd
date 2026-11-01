@@ -1157,6 +1157,9 @@ func _assert(cond: bool, what: String) -> bool:
 
 
 func _shot(path: String) -> void:
+	# Headless (dummy renderer) has no framebuffer: reading it only logs engine errors.
+	if DisplayServer.get_name() == "headless":
+		return
 	var img := get_viewport().get_texture().get_image()
 	if img:
 		img.save_png(path)

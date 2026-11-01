@@ -9,6 +9,7 @@ signal token_changed(token: String)
 
 var _plugin: Object = null
 var _polling := false
+var _poll_left := 0.0  # seconds of web polling left; a new request extends a poll already running
 
 
 func _ready() -> void:
@@ -49,17 +50,18 @@ func request() -> void:
 
 
 func _poll_web(seconds: float) -> void:
+	_poll_left = maxf(_poll_left, seconds)
 	if _polling:
-		return
+		return  # the running loop picks up the extended deadline
 	_polling = true
-	var waited := 0.0
-	while waited < seconds:
+	while _poll_left > 0.0:
 		var t := str(JavaScriptBridge.eval("window.tinkerPush ? window.tinkerPush.token : ''", true))
 		if t != "" and t != "null":
 			_on_token(t)
 			break
 		await get_tree().create_timer(1.0).timeout
-		waited += 1.0
+		_poll_left -= 1.0
+	_poll_left = 0.0
 	_polling = false
 
 

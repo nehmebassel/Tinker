@@ -73,9 +73,12 @@ func _save() -> void:
 	App.settings.name = _name.text.strip_edges().substr(0, 24)
 	App.settings.push_enabled = _push.button_pressed
 	App.settings.save()
-	if App.settings.push_enabled and App.push.supported() and App.push.status() != "granted":
-		App.push.request()  # asks the OS/browser, then registers the token
-		_status.text = "Saved. Allow notifications to get the daily reminder."
+	var need_token: bool = App.push.status() != "granted" or App.fcm_token == ""
+	if App.settings.push_enabled and App.push.supported() and need_token:
+		# Not allowed yet: asks the OS/browser. Allowed but no token this launch (reminders were off at
+		# startup, so none was fetched): fetches one silently. Either way the token is then registered.
+		App.push.request()
+		_status.text = "Saved." if App.push.status() == "granted" else "Saved. Allow notifications to get the daily reminder."
 	else:
 		App.sync_push()
 		_status.text = "Saved."
