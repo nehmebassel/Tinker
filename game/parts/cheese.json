@@ -1,0 +1,21 @@
+{
+  "id": "cheese",
+  "name": "Cheese",
+  "group": "goal",
+  "description": "What the mouse wants.",
+  "body": "rigid",
+  "shape": {
+    "type": "rect",
+    "w": 48,
+    "h": 36
+  },
+  "mass": 0.5,
+  "wind_factor": 0.3,
+  "color": "#ffd60a",
+  "script": "res://scripts/parts/cheese.gd",
+  "interacts_with": [
+    "mouse",
+    "basket",
+    "bucket"
+  ]
+}

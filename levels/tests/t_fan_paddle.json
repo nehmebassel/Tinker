@@ -1,0 +1,38 @@
+{
+  "id": "t_fan_paddle",
+  "title": "Fan turns a see-saw",
+  "hint": "fan -> plank on pivot",
+  "test": true,
+  "goal": {
+    "type": "rotated",
+    "index": 1,
+    "min_abs_rad": 0.5
+  },
+  "fixed": [
+    {
+      "part": "motor",
+      "x": 22,
+      "y": 30,
+      "rot": 0,
+      "state": {
+        "on": false
+      }
+    },
+    {
+      "part": "plank",
+      "x": 22,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "fan",
+      "x": 26,
+      "y": 24,
+      "rot": 6
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

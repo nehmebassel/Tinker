@@ -1,0 +1,22 @@
+{
+  "id": "spring",
+  "name": "Spring",
+  "group": "mover",
+  "description": "Launches whatever lands on it. Harder landing, higher launch.",
+  "body": "static",
+  "shape": {
+    "type": "rect",
+    "w": 96,
+    "h": 48
+  },
+  "gain": 1.7,
+  "kick": 420,
+  "max_speed": 1500,
+  "color": "#ffd166",
+  "script": "res://scripts/parts/spring.gd",
+  "interacts_with": [
+    "ball",
+    "mouse",
+    "bucket"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "id": "conveyor",
+  "name": "Conveyor",
+  "group": "mover",
+  "description": "Carries whatever rests on it in the arrow direction.",
+  "body": "static",
+  "shape": {
+    "type": "rect",
+    "w": 288,
+    "h": 36
+  },
+  "speed": 220,
+  "friction": 0.15,
+  "state": {
+    "on": true
+  },
+  "color": "#9b8cff",
+  "script": "res://scripts/parts/conveyor.gd",
+  "interacts_with": [
+    "ball",
+    "bucket",
+    "mouse",
+    "cat"
+  ],
+  "accel": 2400
+}

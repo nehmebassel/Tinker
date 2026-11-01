@@ -1,0 +1,30 @@
+{
+  "id": "t_candle_lights_candle",
+  "title": "Lit candle lights its neighbour",
+  "hint": "candle -> candle",
+  "test": true,
+  "goal": {
+    "type": "candle"
+  },
+  "fixed": [
+    {
+      "part": "candle",
+      "x": 16,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "candle",
+      "x": 17,
+      "y": 30,
+      "rot": 0,
+      "state": {
+        "lit": false
+      }
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

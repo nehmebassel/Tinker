@@ -1,0 +1,35 @@
+{
+  "id": "t_rope_plank_hangs",
+  "title": "Plank hangs from a rope and drops until taut",
+  "hint": "rope -> plank, pulley as anchor",
+  "test": true,
+  "goal": {
+    "type": "displaced",
+    "index": 1,
+    "min_dy": 60
+  },
+  "fixed": [
+    {
+      "part": "pulley",
+      "x": 20,
+      "y": 8,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 20,
+      "y": 16,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 20,
+      "y": 16,
+      "rot": 18
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

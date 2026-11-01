@@ -1,0 +1,43 @@
+{
+  "id": "t_motor_conveyor_off",
+  "title": "Motor off keeps conveyor still",
+  "hint": "motor (off) -> conveyor",
+  "test": true,
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "conveyor",
+      "x": 14,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "motor",
+      "x": 14,
+      "y": 30,
+      "rot": 0,
+      "state": {
+        "on": false
+      }
+    },
+    {
+      "part": "ball",
+      "x": 14,
+      "y": 28,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 28,
+      "y": 36,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "stalled"
+}

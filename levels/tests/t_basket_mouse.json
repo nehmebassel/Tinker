@@ -1,0 +1,40 @@
+{
+  "id": "t_basket_mouse",
+  "title": "Mouse falls into a basket on the way to the cheese",
+  "hint": "basket <- mouse",
+  "test": true,
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 9,
+      "y": 36,
+      "rot": 0
+    },
+    {
+      "part": "mouse",
+      "x": 6,
+      "y": 34,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 18,
+      "y": 46,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 30,
+      "y": 36,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

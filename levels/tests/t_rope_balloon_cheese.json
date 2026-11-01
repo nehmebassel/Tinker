@@ -1,0 +1,35 @@
+{
+  "id": "t_rope_balloon_cheese",
+  "title": "Balloon lifts cheese on a rope",
+  "hint": "balloon -> rope -> cheese",
+  "test": true,
+  "goal": {
+    "type": "displaced",
+    "index": 1,
+    "min_dy": -100
+  },
+  "fixed": [
+    {
+      "part": "balloon",
+      "x": 20,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 20,
+      "y": 42,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 20,
+      "y": 42,
+      "rot": 18
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

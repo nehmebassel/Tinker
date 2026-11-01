@@ -1,0 +1,53 @@
+{
+  "id": "t_rope_pulley_buckets",
+  "title": "Ball into bucket lifts the other bucket",
+  "hint": "ball -> bucket -> rope -> pulley -> bucket",
+  "test": true,
+  "goal": {
+    "type": "displaced",
+    "index": 2,
+    "min_dy": -100
+  },
+  "fixed": [
+    {
+      "part": "pulley",
+      "x": 20,
+      "y": 8,
+      "rot": 0
+    },
+    {
+      "part": "bucket",
+      "x": 20,
+      "y": 20,
+      "rot": 0
+    },
+    {
+      "part": "bucket",
+      "x": 26,
+      "y": 18,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 20,
+      "y": 20,
+      "rot": 18
+    },
+    {
+      "part": "rope",
+      "x": 26,
+      "y": 18,
+      "rot": 16
+    },
+    {
+      "part": "ball",
+      "x": 20,
+      "y": 12,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

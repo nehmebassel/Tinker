@@ -1,0 +1,50 @@
+{
+  "id": "t_candle_scares_cat",
+  "title": "Awake cat flees a candle",
+  "hint": "candle -> cat",
+  "test": true,
+  "goal": {
+    "type": "displaced",
+    "index": 3,
+    "min_dx": 150
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 9,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 19,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 29,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "cat",
+      "x": 14,
+      "y": 38,
+      "rot": 0,
+      "state": {
+        "awake": true
+      }
+    },
+    {
+      "part": "candle",
+      "x": 10,
+      "y": 38,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

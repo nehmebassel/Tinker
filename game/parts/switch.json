@@ -1,0 +1,24 @@
+{
+  "id": "switch",
+  "name": "Switch",
+  "group": "connector",
+  "description": "Step on it to toggle the nearest fan, motor or conveyor.",
+  "body": "static",
+  "shape": {
+    "type": "rect",
+    "w": 96,
+    "h": 24
+  },
+  "color": "#ff5d73",
+  "script": "res://scripts/parts/switch.gd",
+  "interacts_with": [
+    "ball",
+    "mouse",
+    "cat",
+    "bucket",
+    "balloon",
+    "fan",
+    "motor",
+    "conveyor"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "id": "fan",
+  "name": "Fan",
+  "group": "mover",
+  "description": "Blows light things away from its face. A switch turns it on and off.",
+  "body": "static",
+  "shape": {
+    "type": "rect",
+    "w": 60,
+    "h": 96
+  },
+  "strength": 2600,
+  "reach": 480,
+  "half_angle_deg": 24,
+  "state": {
+    "on": true
+  },
+  "color": "#6ec6ff",
+  "script": "res://scripts/parts/fan.gd",
+  "interacts_with": [
+    "ball",
+    "balloon",
+    "mouse",
+    "plank"
+  ]
+}

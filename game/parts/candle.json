@@ -1,0 +1,23 @@
+{
+  "id": "candle",
+  "name": "Candle",
+  "group": "goal",
+  "description": "Pops balloons, scares the cat, lights another candle it touches.",
+  "body": "static",
+  "shape": {
+    "type": "rect",
+    "w": 36,
+    "h": 84
+  },
+  "flame_reach": 60,
+  "state": {
+    "lit": true
+  },
+  "color": "#fff1a8",
+  "script": "res://scripts/parts/candle.gd",
+  "interacts_with": [
+    "balloon",
+    "cat",
+    "candle"
+  ]
+}

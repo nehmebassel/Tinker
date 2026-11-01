@@ -22,6 +22,7 @@ func configure(p_def: Dictionary) -> void:
 	max_contacts_reported = 4
 	freeze_mode = RigidBody2D.FREEZE_MODE_STATIC
 	freeze = true
+	can_sleep = false
 	var cs := CollisionShape2D.new()
 	cs.shape = PartFactory.make_shape(def)
 	add_child(cs)
@@ -51,8 +52,8 @@ func _draw() -> void:
 
 
 static func _q(v: Vector2) -> String:
-	return "%d,%d" % [roundi(v.x * 1000.0), roundi(v.y * 1000.0)]
+	return PartFactory.fmt_pos(v)
 
 
 static func _qf(f: float) -> String:
-	return str(roundi(f * 10000.0))
+	return PartFactory.fmt_rot(f)

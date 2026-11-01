@@ -1,0 +1,28 @@
+{
+  "id": "mouse",
+  "name": "Mouse",
+  "group": "actor",
+  "description": "Runs to the cheese, runs from the cat, steps on switches.",
+  "body": "rigid",
+  "shape": {
+    "type": "rect",
+    "w": 52,
+    "h": 36
+  },
+  "mass": 0.6,
+  "speed": 220,
+  "hop": 280,
+  "fear_range": 240,
+  "friction": 0.9,
+  "wind_factor": 0.6,
+  "color": "#bfbfbf",
+  "script": "res://scripts/parts/mouse.gd",
+  "interacts_with": [
+    "cheese",
+    "cat",
+    "conveyor",
+    "switch",
+    "basket",
+    "spring"
+  ]
+}

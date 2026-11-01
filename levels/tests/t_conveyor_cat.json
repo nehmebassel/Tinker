@@ -1,0 +1,29 @@
+{
+  "id": "t_conveyor_cat",
+  "title": "Conveyor carries sleeping cat",
+  "hint": "conveyor -> cat",
+  "test": true,
+  "goal": {
+    "type": "displaced",
+    "index": 1,
+    "min_dx": 150
+  },
+  "fixed": [
+    {
+      "part": "conveyor",
+      "x": 14,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "cat",
+      "x": 10,
+      "y": 28,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

@@ -21,6 +21,9 @@ var fixed: Array[Placement] = []
 var tray: Dictionary = {}  # part id -> count
 var slots: int = 0  # max parts the player may place (0 = sum of tray)
 var reference_solution: Array[Placement] = []
+## Expected outcome of the reference solution: "goal" (default), "stalled" or "timeout".
+## Test levels for failure interactions (cat catches mouse) use "stalled".
+var expect: String = "goal"
 
 
 static func from_dict(d: Dictionary) -> LevelData:
@@ -41,6 +44,7 @@ static func from_dict(d: Dictionary) -> LevelData:
 		l.slots = total
 	for p in d.get("reference_solution", []):
 		l.reference_solution.append(Placement.from_dict(p))
+	l.expect = str(d.get("expect", "goal"))
 	return l
 
 

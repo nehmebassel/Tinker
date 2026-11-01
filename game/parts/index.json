@@ -1,3 +1,20 @@
 {
-  "parts": ["ball", "plank", "basket"]
+  "parts": [
+    "ball",
+    "plank",
+    "basket",
+    "fan",
+    "conveyor",
+    "spring",
+    "motor",
+    "rope",
+    "pulley",
+    "switch",
+    "balloon",
+    "bucket",
+    "candle",
+    "cheese",
+    "mouse",
+    "cat"
+  ]
 }

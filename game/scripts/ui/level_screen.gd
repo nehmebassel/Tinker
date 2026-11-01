@@ -82,6 +82,7 @@ var ring_visible: bool = false
 var tray_collapsed: bool = false
 var tray_counts: Dictionary = {}
 var smoke_mode: bool = false
+var shot_path: String = ""  # --shot=path: render the level, save a PNG, quit (for docs/CI)
 
 
 func _ready() -> void:
@@ -90,12 +91,16 @@ func _ready() -> void:
 			level_path = a.trim_prefix("--level=")
 		elif a == "--smoke":
 			smoke_mode = true
+		elif a.begins_with("--shot="):
+			shot_path = a.trim_prefix("--shot=")
 	_build_scene()
 	_load_level(level_path)
 	get_viewport().size_changed.connect(_on_resized)
 	_fit_camera()
 	if smoke_mode:
 		_run_smoke()
+	elif shot_path != "":
+		_run_shot()
 
 
 # ------------------------------------------------------------------ scene construction
@@ -909,6 +914,10 @@ func _draw_stage() -> void:
 			stage_bg.draw_circle(Grid.cell_to_world(Vector2i(x, y)), 3.0, C_GRID)
 
 
+func _process(_delta: float) -> void:
+	overlay.queue_redraw()
+
+
 func _draw_overlay() -> void:
 	if ring_visible and selected >= 0 and selected < placements.size():
 		var rot := Grid.steps_to_radians(placements[selected].rot)
@@ -922,12 +931,24 @@ func _draw_overlay() -> void:
 		overlay.draw_line(ring_pos, handle, Color(C_ACCENT, 0.6), 4.0)
 		overlay.draw_circle(handle, RING_HANDLE_R, C_INK)
 		overlay.draw_circle(handle, RING_HANDLE_R - 6.0, C_ACCENT)
+	if not sim.running:
+		for p in sim.parts:
+			if p.has_method("get_link_target") and p.get_link_target() != null:
+				_draw_dashed(overlay, p.global_position + Vector2(0, -14), p.get_link_target().global_position, Color(C_INK, 0.45))
 	if ghost and ghost.visible:
 		# Landing crosshair.
 		var p := ghost.position
 		var c := Color(C_INK, 0.5) if ghost_valid else C_BAD
 		overlay.draw_line(p + Vector2(-20, 0), p + Vector2(20, 0), c, 3.0)
 		overlay.draw_line(p + Vector2(0, -20), p + Vector2(0, 20), c, 3.0)
+
+
+func _draw_dashed(on: CanvasItem, a: Vector2, b: Vector2, c: Color) -> void:
+	var d := a.distance_to(b)
+	var n := int(d / 18.0)
+	for i in range(0, n, 2):
+		on.draw_line(a.lerp(b, float(i) / n), a.lerp(b, float(mini(i + 1, n)) / n), c, 3.0)
+	on.draw_circle(b, 7.0, c)
 
 
 func _toast(msg: String) -> void:
@@ -989,6 +1010,22 @@ func _run_smoke() -> void:
 	_shot(shots_dir + "/06_rewound.png")
 	print("SMOKE %s" % ("PASS" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
+
+
+func _run_shot() -> void:
+	for i in 3:
+		await get_tree().process_frame
+	_shot(shot_path)
+	if level and not level.reference_solution.is_empty():
+		placements = []
+		for p in level.reference_solution:
+			placements.append(p.duplicate_placement())
+		sim.set_player_parts(placements)
+		_refresh_hud()
+	_start_run()
+	await get_tree().create_timer(1.0).timeout
+	_shot(shot_path.get_basename() + "_run.png")
+	get_tree().quit(0)
 
 
 func _assert(cond: bool, what: String) -> bool:

@@ -1,0 +1,53 @@
+{
+  "id": "t_pulley_plank_bucket",
+  "title": "Ball into bucket raises a hanging plank",
+  "hint": "pulley -> plank",
+  "test": true,
+  "goal": {
+    "type": "displaced",
+    "index": 1,
+    "min_dy": -60
+  },
+  "fixed": [
+    {
+      "part": "pulley",
+      "x": 20,
+      "y": 8,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 28,
+      "y": 16,
+      "rot": 0
+    },
+    {
+      "part": "bucket",
+      "x": 20,
+      "y": 20,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 28,
+      "y": 16,
+      "rot": 15
+    },
+    {
+      "part": "rope",
+      "x": 20,
+      "y": 20,
+      "rot": 18
+    },
+    {
+      "part": "ball",
+      "x": 20,
+      "y": 12,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

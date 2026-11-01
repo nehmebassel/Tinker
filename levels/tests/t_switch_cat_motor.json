@@ -1,0 +1,60 @@
+{
+  "id": "t_switch_cat_motor",
+  "title": "Cat chasing mouse trips switch, motor turns off",
+  "hint": "cat -> switch -> motor",
+  "test": true,
+  "goal": {
+    "type": "state",
+    "index": 6,
+    "key": "on",
+    "value": false
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 9,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 19,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 29,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "cat",
+      "x": 8,
+      "y": 38,
+      "rot": 0
+    },
+    {
+      "part": "switch",
+      "x": 16,
+      "y": 39,
+      "rot": 0
+    },
+    {
+      "part": "mouse",
+      "x": 24,
+      "y": 38,
+      "rot": 0
+    },
+    {
+      "part": "motor",
+      "x": 20,
+      "y": 20,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

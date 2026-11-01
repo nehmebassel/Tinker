@@ -6,6 +6,9 @@ extends RefCounted
 var part: String
 var cell: Vector2i
 var rot: int  # 0..23, multiples of 15 degrees
+## Optional initial state for FIXED parts only (e.g. {"on": false} for a motor, {"lit": false}
+## for a candle). Never part of a player solution; solutions stay (part, x, y, rot).
+var state: Dictionary = {}
 
 
 func _init(p_part: String = "", p_cell: Vector2i = Vector2i.ZERO, p_rot: int = 0) -> void:
@@ -15,15 +18,23 @@ func _init(p_part: String = "", p_cell: Vector2i = Vector2i.ZERO, p_rot: int = 0
 
 
 func duplicate_placement() -> Placement:
-	return Placement.new(part, cell, rot)
+	var p := Placement.new(part, cell, rot)
+	p.state = state.duplicate()
+	return p
 
 
 func to_dict() -> Dictionary:
-	return {"part": part, "x": cell.x, "y": cell.y, "rot": rot}
+	var d := {"part": part, "x": cell.x, "y": cell.y, "rot": rot}
+	if not state.is_empty():
+		d["state"] = state.duplicate()
+	return d
 
 
 static func from_dict(d: Dictionary) -> Placement:
-	return Placement.new(str(d.get("part", "")), Vector2i(int(d.get("x", 0)), int(d.get("y", 0))), int(d.get("rot", 0)))
+	var p := Placement.new(str(d.get("part", "")), Vector2i(int(d.get("x", 0)), int(d.get("y", 0))), int(d.get("rot", 0)))
+	if d.has("state") and d["state"] is Dictionary:
+		p.state = d["state"].duplicate()
+	return p
 
 
 ## Strict check used for anything coming over the network or from a file.
@@ -41,6 +52,8 @@ static func is_valid_dict(d: Variant) -> bool:
 			return false
 	var rot := int(d["rot"])
 	if rot < 0 or rot >= Grid.ROT_STEPS:
+		return false
+	if d.has("state") and not (d["state"] is Dictionary):
 		return false
 	return Grid.in_stage(Vector2i(int(d["x"]), int(d["y"])))
 

@@ -1,0 +1,25 @@
+{
+  "id": "bucket",
+  "name": "Bucket",
+  "group": "body",
+  "description": "Catches things and gets heavier. Hang it from a rope.",
+  "body": "rigid",
+  "shape": {
+    "type": "rect",
+    "w": 144,
+    "h": 120
+  },
+  "mass": 3.0,
+  "friction": 0.8,
+  "wind_factor": 0.25,
+  "color": "#48bfe3",
+  "script": "res://scripts/parts/bucket.gd",
+  "interacts_with": [
+    "rope",
+    "pulley",
+    "ball",
+    "switch",
+    "conveyor",
+    "spring"
+  ]
+}
