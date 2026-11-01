@@ -1,5 +1,7 @@
 # tinker-api — runbook
 
+Live: https://tinker-api-1053857179342.europe-west1.run.app · game in the browser at `/play/` · APK at `/download/tinker.apk`
+
 Node 22 + Express on Cloud Run, Firestore (named database `tinker`), FCM for the daily reminder, and
 the game's own headless Godot for server-side replay. Scores are never trusted from the client: an
 entry exists only if the server's replay of the submitted integer solution reaches the goal.
@@ -8,6 +10,8 @@ entry exists only if the server's replay of the submitted integer solution reach
 | Method | Path | Does |
 | --- | --- | --- |
 | GET | `/health` | liveness + server's UTC day |
+| GET | `/play/` | the game's browser (PWA) build, gzip; `/` redirects here |
+| GET | `/download/tinker.apk` | Android build (debug-signed until M7) |
 | GET | `/daily/{date}` | the day's level (no reference solution) + `day` number; `404` until generated; future dates (beyond tomorrow) hidden |
 | POST | `/score` | `{device_id, date, solution, elapsed_ms, country, name}` → server replay → `201 {parts, ms, rank}`; `409` second submission; `422` doesn't reach the goal; only today or yesterday (UTC) open |
 | GET | `/board/{date}?scope=global\|country&device_id=&country=` | top `BOARD_SIZE` (parts asc, ms asc) + the caller's row |
@@ -35,6 +39,7 @@ entry exists only if the server's replay of the submitted integer solution reach
 | `REPLAY_TIMEOUT_MS` / `GENERATE_TIMEOUT_MS` | 60000 / 600000 | Godot process limits |
 
 ## Deploy
+Runs on the **gen2** execution environment: Godot's official build dies with SIGILL in gen1's sandbox.
 `PROJECT=<id> bash server/deploy.sh` from the repo root — idempotent (APIs, named DB + indexes,
 runtime SA with `datastore.user` + `firebasecloudmessaging.admin` only, admin secret, image via
 Cloud Build, Cloud Run, two scheduler jobs). Re-run to ship a new version.
