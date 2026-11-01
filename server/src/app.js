@@ -1,7 +1,7 @@
 import express from "express";
 import compression from "compression";
-import { existsSync, createReadStream } from "node:fs";
-import { join } from "node:path";
+import { existsSync, createReadStream, statSync } from "node:fs";
+import { join, resolve, sep, extname } from "node:path";
 import { randomBytes, createHash } from "node:crypto";
 import { config, todayUtc, addDays, dayNumber } from "./config.js";
 import { fcm as realFcm, isFcmToken, dailyMessage } from "./push.js";
@@ -56,6 +56,23 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
   app.get("/play/fcm/sw.js", (_req, res) => res.set({ "Cache-Control": "no-cache", "Service-Worker-Allowed": "/play/fcm/" }).type("application/javascript").sendFile(staticDir + "fcm-sw.js"));
 
   if (config.webDir && existsSync(config.webDir)) {
+    // Cloud Run 500s non-streamed responses over 32 MiB. Gzip responses are streamed (chunked) by
+    // compression(), but a client that refuses gzip would get index.wasm (~36 MB) with a
+    // Content-Length -> stream large files chunked for those clients.
+    const webRoot = resolve(config.webDir);
+    app.get("/play/*rest", (req, res, next) => {
+      if (req.acceptsEncodings("gzip")) return next();
+      const file = resolve(webRoot, "." + decodeURIComponent(req.path.slice("/play".length)));
+      if (!file.startsWith(webRoot + sep)) return next();
+      let st;
+      try { st = statSync(file); } catch { return next(); }
+      if (!st.isFile() || st.size <= 30 * 1024 * 1024) return next();
+      res.type(extname(file)).set("Cache-Control", "public, max-age=3600");
+      res.flushHeaders();
+      const rs = createReadStream(file);
+      rs.on("error", () => res.destroy());
+      rs.pipe(res);
+    });
     app.use("/play", compression({ threshold: 1024 }), express.static(config.webDir, {
       setHeaders(res, path) {
         // The engine (wasm/js) is versioned by deploy; the service worker and HTML must revalidate.
