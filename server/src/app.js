@@ -2,6 +2,7 @@ import express from "express";
 import compression from "compression";
 import { existsSync, createReadStream, statSync } from "node:fs";
 import { join, resolve, sep, extname } from "node:path";
+import { pipeline } from "node:stream/promises";
 import { randomBytes, createHash } from "node:crypto";
 import { config, todayUtc, addDays, dayNumber } from "./config.js";
 import { fcm as realFcm, isFcmToken, dailyMessage } from "./push.js";
@@ -69,9 +70,7 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
       if (!st.isFile() || st.size <= 30 * 1024 * 1024) return next();
       res.type(extname(file)).set("Cache-Control", "public, max-age=3600");
       res.flushHeaders();
-      const rs = createReadStream(file);
-      rs.on("error", () => res.destroy());
-      rs.pipe(res);
+      pipeline(createReadStream(file), res).catch(() => {});
     });
     app.use("/play", compression({ threshold: 1024 }), express.static(config.webDir, {
       setHeaders(res, path) {
@@ -96,9 +95,8 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
       });
       if (req.method === "HEAD") return res.end();
       res.flushHeaders();  // headers go out now, without Content-Length -> Transfer-Encoding: chunked
-      const st = createReadStream(file);
-      st.on("error", () => res.destroy());
-      st.pipe(res);
+      // pipeline closes the file when the client aborts (pipe() would leave the fd open).
+      pipeline(createReadStream(file), res).catch(() => {});
     });
   }
 
