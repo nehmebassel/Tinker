@@ -1,0 +1,36 @@
+{
+  "id": "demo-ball",
+  "title": "Conveyor carries ball into basket",
+  "hint": "conveyor -> ball",
+  "test": true,
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "conveyor",
+      "x": 14,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "ball",
+      "x": 10,
+      "y": 27,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 28,
+      "y": 36,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal",
+  "demo_seconds": 5,
+  "source": "t_conveyor_ball"
+}

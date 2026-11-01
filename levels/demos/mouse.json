@@ -1,0 +1,47 @@
+{
+  "id": "demo-mouse",
+  "title": "Mouse runs to the cheese",
+  "hint": "mouse -> cheese",
+  "test": true,
+  "goal": {
+    "type": "cheese"
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 9,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 19,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 29,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "mouse",
+      "x": 8,
+      "y": 38,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 28,
+      "y": 38,
+      "rot": 0
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal",
+  "demo_seconds": 6,
+  "source": "t_mouse_cheese"
+}

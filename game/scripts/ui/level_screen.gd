@@ -49,6 +49,7 @@ var _solve_ms := 0  # Daily: time from first touch to THIS solve, frozen when th
 var level: LevelData
 var sim: Simulation
 var sounds: SoundWatcher
+var info_card: PartInfoCard = null
 var placements: Array[Placement] = []
 var history: Array = []  # Array of Array[Placement] snapshots
 var future: Array = []
@@ -94,6 +95,7 @@ var ring_visible: bool = false
 var tray_collapsed: bool = false
 var tray_counts: Dictionary = {}
 var smoke_mode: bool = false
+var _shot_cards_dir: String = ""  # --shot-cards=dir: one PNG per part info card (docs / review)
 var shot_path: String = ""  # --shot=path: render the level, save a PNG, quit (for docs/CI)
 
 
@@ -105,6 +107,8 @@ func _ready() -> void:
 			smoke_mode = true
 		elif a.begins_with("--shot="):
 			shot_path = a.trim_prefix("--shot=")
+		elif a.begins_with("--shot-cards="):
+			_shot_cards_dir = a.trim_prefix("--shot-cards=")
 	_build_scene()
 	level_number = App.level_number if has_node("/root/App") else 0
 	daily = App.daily if has_node("/root/App") else {}
@@ -121,6 +125,8 @@ func _ready() -> void:
 		_run_smoke()
 	elif shot_path != "":
 		_run_shot()
+	elif _shot_cards_dir != "":
+		_run_shot_cards()
 
 
 # ------------------------------------------------------------------ scene construction
@@ -428,6 +434,27 @@ func _make_tray_item(part: String) -> Control:
 		var k: float = minf(170.0 / maxf(w, 1.0), 90.0 / maxf(h, 1.0))
 		preview.scale = Vector2(k, k)
 		holder.add_child(preview)
+	# "i" badge: what does this part do? (opens the info card with a live demo)
+	var info := PanelContainer.new()
+	info.name = "Info"
+	var ist := StyleBoxFlat.new()
+	ist.bg_color = Color("6ec6ff")
+	ist.set_corner_radius_all(28)
+	ist.border_color = C_INK
+	ist.set_border_width_all(4)
+	info.add_theme_stylebox_override("panel", ist)
+	info.custom_minimum_size = Vector2(56, 56)
+	info.size = Vector2(56, 56)
+	info.position = Vector2(220 - 56 - 8, 8)
+	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var il := _label("i", 34, C_INK)
+	il.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	il.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	info.add_child(il)
+	var badge_holder := Control.new()  # PanelContainer stretches direct children; this keeps the corner spot
+	badge_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge_holder.add_child(info)
+	item.add_child(badge_holder)
 	var count := _label("", 30, C_PANEL_TXT)
 	count.name = "Count"
 	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -524,6 +551,8 @@ func _world_to_screen(p: Vector2) -> Vector2:
 ## events; a touch that starts on a Button is left alone. Mouse events are ignored on purpose:
 ## the project emulates touch from mouse, so desktop testing goes through the same path.
 func _input(event: InputEvent) -> void:
+	if info_card != null and is_instance_valid(info_card):
+		return  # the card is modal: its own controls get the touches
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			if _on_hud_button(event.position):
@@ -587,6 +616,10 @@ func _tray_part_at(pos: Vector2) -> String:
 func _tray_touch(part: String, index: int, pos: Vector2) -> void:
 	if sim.running or run_ended:
 		return
+	var item := tray_items.get_node_or_null("Tray_" + part)
+	if item and item.find_child("Info", true, false).get_global_rect().grow(18).has_point(pos):
+		open_info(part)
+		return
 	if _tray_left(part) <= 0:
 		_toast("No %s left" % PartRegistry.get_def(part).get("name", part))
 		return
@@ -619,6 +652,11 @@ func _touch_down(index: int, pos: Vector2, double_tap: bool) -> void:
 	if hit >= 0:
 		_note_first_touch()
 		drag = {"kind": "part", "index": index, "start": pos, "pidx": hit, "moved": false}
+		return
+	# A fixed part: show what it does.
+	var fixed_id := _fixed_part_at(wp)
+	if fixed_id != "" and not double_tap:
+		open_info(fixed_id)
 		return
 	# Empty stage: double tap fits, single tap deselects.
 	if double_tap:
@@ -723,6 +761,27 @@ func _part_at(wp: Vector2) -> int:
 			nd = d
 			nearest = i
 	return nearest
+
+
+func _fixed_part_at(wp: Vector2) -> String:
+	var space := world.get_world_2d().direct_space_state
+	var q := PhysicsPointQueryParameters2D.new()
+	q.position = wp
+	q.collide_with_areas = false
+	q.collide_with_bodies = true
+	for h in space.intersect_point(q, 8):
+		var node: Node = h["collider"]
+		if node.has_meta("is_fixed") and node.get_meta("is_fixed"):
+			return str(node.get_meta("part_id"))
+	return ""
+
+
+func open_info(part: String) -> void:
+	if info_card != null and is_instance_valid(info_card):
+		return
+	touches.clear()
+	_cancel_drag()
+	info_card = PartInfoCard.open(hud, part)
 
 
 # ------------------------------------------------------------------ floating part + ghost
@@ -1160,6 +1219,19 @@ func run_smoke_steps() -> Dictionary:
 	for b in [undo_btn, redo_btn, rot_btn, rot90_btn, fit_btn]:
 		_assert(b.get_global_rect().end.x <= vw + 0.5, "%s inside the viewport (right edge %.0f <= %.0f)" % [b.text, b.get_global_rect().end.x, vw])
 	var item: Control = tray_items.get_child(0)
+	# Info card: tap the "i", the live demo must be running in its own world, then close it.
+	await _tap_button(item.find_child("Info", true, false))
+	_assert(info_card != null and is_instance_valid(info_card), "tapping i opens the part info card")
+	if info_card != null and is_instance_valid(info_card):
+		await get_tree().create_timer(1.5).timeout
+		var demo: Simulation = info_card._sim
+		_assert(demo.running and demo.parts.size() > 0, "info card demo is running (%d parts)" % demo.parts.size())
+		_assert(demo.get_viewport() != get_viewport(), "info card demo has its own viewport/world")
+		_shot(shots_dir + "/00_info_card.png")
+		await _tap_button(info_card.find_child("CloseInfo", true, false))
+		await get_tree().process_frame
+		_assert(info_card == null or not is_instance_valid(info_card), "Got it closes the card")
+		_assert(placements.is_empty(), "opening the card placed nothing")
 	var from: Vector2 = item.get_global_rect().get_center()
 	var target: Placement = level.reference_solution[0]
 	var to: Vector2 = _world_to_screen(Grid.cell_to_world(target.cell) - LIFT)
@@ -1209,6 +1281,19 @@ func _run_shot() -> void:
 	_start_run()
 	await get_tree().create_timer(1.0).timeout
 	_shot(shot_path.get_basename() + "_run.png")
+	get_tree().quit(0)
+
+
+func _run_shot_cards() -> void:
+	DirAccess.make_dir_recursive_absolute(_shot_cards_dir)
+	PartRegistry.ensure_loaded()
+	for part in PartRegistry.defs.keys():
+		open_info(part)
+		await get_tree().create_timer(2.2).timeout
+		_shot("%s/card_%s.png" % [_shot_cards_dir, part])
+		info_card.close()
+		info_card = null
+		await get_tree().process_frame
 	get_tree().quit(0)
 
 
