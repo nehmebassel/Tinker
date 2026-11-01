@@ -11,6 +11,7 @@ var save: SaveData
 var settings: Settings
 var daily_store: DailyStore
 var api: Api
+var push: Push
 var level_number: int = 0
 ## The Daily currently open: {"date": String, "day": int, "level": Dictionary} or {} for campaign play.
 var daily: Dictionary = {}
@@ -26,6 +27,9 @@ func _ready() -> void:
 	daily_store = DailyStore.load_or_new()
 	api = Api.new(settings)
 	add_child(api)
+	push = Push.new()
+	push.name = "Push"
+	add_child(push)
 	for a in OS.get_cmdline_user_args():
 		if a == "--reset-save":
 			save.reset()

@@ -1,0 +1,8 @@
+// Maven Central is used through Google's official mirror first (Central rate-limits CI/proxied traffic).
+pluginManagement {
+    repositories { google(); maven { url "https://maven-central.storage-download.googleapis.com/maven2/" }; gradlePluginPortal(); mavenCentral() }
+}
+dependencyResolutionManagement {
+    repositories { google(); maven { url "https://maven-central.storage-download.googleapis.com/maven2/" }; mavenCentral() }
+}
+rootProject.name = "tinker_push"

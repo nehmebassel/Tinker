@@ -33,6 +33,14 @@ func _ready() -> void:
 	var mine: Dictionary = App.daily_store.day(date)
 	if mine.get("submitted", false):
 		body.add_child(UiKit.label("You: %d part%s · %s" % [int(mine["parts"]), "" if int(mine["parts"]) == 1 else "s", _fmt(int(mine["ms"]))], 40))
+		# The natural moment to offer the reminder: right after today's entry.
+		if App.settings.push_enabled and App.push.supported() and App.push.status() == "default":
+			var remind := UiKit.button("Remind me tomorrow", UiKit.GO, UiKit.INK, 100)
+			remind.name = "RemindButton"
+			remind.pressed.connect(func() -> void:
+				App.push.request()
+				remind.queue_free())
+			body.add_child(remind)
 
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 16)

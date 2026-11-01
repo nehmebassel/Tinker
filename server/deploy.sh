@@ -13,6 +13,9 @@ SERVICE=${SERVICE:-tinker-api}
 DB=${DB:-tinker}
 REPO=${REPO:-tinker}
 RUNTIME_SA_NAME=${RUNTIME_SA_NAME:-tinker-api}
+# Firebase apps registered for push (Firebase console -> Project settings -> Your apps)
+ANDROID_APP_ID=${ANDROID_APP_ID:-1:1053857179342:android:aca0010d2fd3a1fb5e929f}
+WEB_APP_ID=${WEB_APP_ID:-1:1053857179342:web:5d92a85e3e58c5b05e929f}
 SCHED_TZ=${SCHED_TZ:-Etc/UTC}
 GENERATE_CRON=${GENERATE_CRON:-"10 22 * * *"}   # pre-generate the coming week, nightly
 NOTIFY_CRON=${NOTIFY_CRON:-"5 7 * * *"}         # "today's puzzle is ready" (07:05 UTC = 09:05 Beirut)
@@ -50,8 +53,24 @@ if ! $G secrets describe tinker-admin-token >/dev/null 2>&1; then
 fi
 $G secrets add-iam-policy-binding tinker-admin-token --member="serviceAccount:$RUNTIME_SA" --role=roles/secretmanager.secretAccessor >/dev/null
 
-step "Client builds (web PWA + Android APK)"
-bash tools/build_clients.sh
+step "Client builds (web PWA + Android APK with push)"
+PROJECT=$PROJECT ANDROID_APP_ID=$ANDROID_APP_ID bash tools/build_clients.sh
+
+step "Firebase client configs for /push/config"
+FB_TOKEN=$(gcloud auth print-access-token)
+FB=https://firebase.googleapis.com/v1beta1/projects/$PROJECT
+WEB_CFG=$(curl -fsS -H "Authorization: Bearer $FB_TOKEN" "$FB/webApps/$WEB_APP_ID/config" \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps({k: d[k] for k in ['apiKey','appId','projectId','messagingSenderId','authDomain','storageBucket'] if k in d}, separators=(',',':')))")
+ANDROID_CFG=$(python3 -c "import json; g=json.load(open('build/firebase/google-services.json')); c=[x for x in g['client'] if x['client_info']['android_client_info']['package_name']=='my.otono.tinker'][0]; print(json.dumps({'appId':c['client_info']['mobilesdk_app_id'],'projectId':g['project_info']['project_id'],'messagingSenderId':g['project_info']['project_number']}, separators=(',',':')))")
+ENV_FILE=$(mktemp)
+python3 - "$ENV_FILE" "$PROJECT" "$DB" "$WEB_CFG" "$ANDROID_CFG" <<'PY'
+import json, sys
+f, project, db, web, android = sys.argv[1:]
+with open(f, "w") as out:
+    for k, v in {"GOOGLE_CLOUD_PROJECT": project, "FIRESTORE_DATABASE": db,
+                 "FIREBASE_WEB_CONFIG": web, "FIREBASE_ANDROID_CONFIG": android}.items():
+        out.write("%s: %s\n" % (k, json.dumps(v)))
+PY
 
 step "Artifact Registry + image $IMAGE"
 $G artifacts repositories describe "$REPO" --location="$REGION" >/dev/null 2>&1 || \
@@ -61,7 +80,7 @@ $G builds submit --region="$REGION" --config server/cloudbuild.yaml --substituti
 step "Cloud Run $SERVICE"
 $G run deploy "$SERVICE" --region="$REGION" --image="$IMAGE" --service-account="$RUNTIME_SA" \
   --allow-unauthenticated --execution-environment=gen2 --cpu=2 --memory=2Gi --concurrency=4 --timeout=3600 --min-instances=0 --max-instances=5 \
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=$PROJECT,FIRESTORE_DATABASE=$DB" \
+  --env-vars-file="$ENV_FILE" \
   --update-secrets="ADMIN_TOKEN=tinker-admin-token:latest"
 URL=$($G run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')
 echo "URL: $URL"

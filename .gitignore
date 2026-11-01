@@ -20,3 +20,8 @@ tools/*
 service-account*.json
 .env
 server/.env
+# Built at build time
+game/addons/tinker_push/bin/
+android/tinker_push/build/
+android/tinker_push/.gradle/
+local.properties

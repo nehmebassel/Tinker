@@ -22,6 +22,7 @@ RUN chown -R node:node /app/game
 COPY server/package.json server/package-lock.json /app/server/
 RUN cd /app/server && npm ci --omit=dev
 COPY server/src/ /app/server/src/
+COPY server/static/ /app/server/static/
 
 # Player-facing builds, exported by tools/build_clients.sh before the image is built.
 COPY build/web/ /app/web/

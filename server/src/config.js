@@ -16,6 +16,11 @@ export const config = {
   maxLevelBytes: Number(env.MAX_LEVEL_BYTES || 32768),
   emulator: Boolean(env.FIRESTORE_EMULATOR_HOST),
   webDir: env.WEB_DIR || "",
+  // Firebase client configs (public by design: they identify the app, they grant nothing). Set by
+  // deploy.sh from the Firebase API; editable in the Cloud Run console.
+  firebaseWeb: parseJson(env.FIREBASE_WEB_CONFIG),
+  firebaseAndroid: parseJson(env.FIREBASE_ANDROID_CONFIG),
+  vapidKey: env.FCM_VAPID_KEY || "",
   downloadDir: env.DOWNLOAD_DIR || "",
   pushEnabled: (env.PUSH_ENABLED || "true") === "true",
   pushTopic: env.PUSH_TOPIC || "tinker-daily",
@@ -23,6 +28,10 @@ export const config = {
   pushBody: env.PUSH_BODY || "Day {day}: same parts for everyone. How few do you need?",
   dailyEpoch: env.DAILY_EPOCH || "2026-11-01",       // day 1 of the Daily (for the day number)
 };
+
+function parseJson(s) {
+  try { return s ? JSON.parse(s) : null; } catch { return null; }
+}
 
 export function todayUtc(now = new Date()) {
   return now.toISOString().slice(0, 10);

@@ -276,3 +276,17 @@ test("generate never overwrites a level curated while it was generating", async 
     assert.equal((await j("GET", `/daily/${D}`)).body.level.title, "Curated wins");
   } finally { s4.close(); }
 });
+
+test("push config and the web push glue are served", async () => {
+  const c = await j("GET", "/push/config");
+  assert.equal(c.status, 200);
+  assert.equal(c.body.topic, "tinker-daily");
+  assert.ok("web" in c.body && "android" in c.body);
+  const js = await fetch(base + "/play/push.js");
+  assert.equal(js.status, 200);
+  assert.match(js.headers.get("content-type"), /javascript/);
+  assert.match(await js.text(), /window\.tinkerPush/);
+  const sw = await fetch(base + "/play/fcm/sw.js");
+  assert.equal(sw.status, 200);
+  assert.equal(sw.headers.get("service-worker-allowed"), "/play/fcm/");
+});

@@ -44,6 +44,16 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
   // /play/   : the browser (PWA) build — same origin as the API, so no CORS and no setup.
   // /download/tinker.apk : the Android build for side-loading.
   // Both are optional (WEB_DIR / DOWNLOAD_DIR); the API works without them.
+  // Push client config for the web page and the Android plugin (both fetch it at runtime).
+  app.get("/push/config", (_req, res) => {
+    res.set("Cache-Control", "public, max-age=300");
+    res.json({ web: config.firebaseWeb, android: config.firebaseAndroid, vapidKey: config.vapidKey || null, topic: config.pushTopic });
+  });
+  // The web push glue lives with the server (not the Godot export) so it ships with every deploy.
+  const staticDir = new URL("../static/", import.meta.url).pathname;
+  app.get("/play/push.js", (_req, res) => res.set("Cache-Control", "no-cache").type("application/javascript").sendFile(staticDir + "push.js"));
+  app.get("/play/fcm/sw.js", (_req, res) => res.set({ "Cache-Control": "no-cache", "Service-Worker-Allowed": "/play/fcm/" }).type("application/javascript").sendFile(staticDir + "fcm-sw.js"));
+
   if (config.webDir && existsSync(config.webDir)) {
     app.use("/play", compression({ threshold: 1024 }), express.static(config.webDir, {
       setHeaders(res, path) {

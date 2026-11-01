@@ -73,8 +73,14 @@ func _save() -> void:
 	App.settings.name = _name.text.strip_edges().substr(0, 24)
 	App.settings.push_enabled = _push.button_pressed
 	App.settings.save()
-	App.sync_push()
-	_status.text = "Saved."
+	if App.settings.push_enabled and App.push.supported() and App.push.status() != "granted":
+		App.push.request()  # asks the OS/browser, then registers the token
+		_status.text = "Saved. Allow notifications to get the daily reminder."
+	else:
+		App.sync_push()
+		_status.text = "Saved."
+	if App.settings.push_enabled and App.push.status() == "denied":
+		_status.text = "Saved, but notifications are blocked for Tinker in your phone/browser settings."
 
 
 func _test() -> void:
