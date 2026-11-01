@@ -15,5 +15,12 @@
     "ball",
     "mouse",
     "cheese"
+  ],
+  "catches": [
+    "ball",
+    "mouse",
+    "cheese",
+    "bucket",
+    "balloon"
   ]
 }

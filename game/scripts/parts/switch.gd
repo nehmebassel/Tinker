@@ -42,9 +42,12 @@ func configure(p_def: Dictionary) -> void:
 
 func on_attach(sim: Node) -> void:
 	target = sim.nearest_part(self, func(p): return p.get_meta("part_id") in TOGGLEABLE)
-	# A conveyor that is powered by a motor on its cell is controlled through that motor.
-	if target != null and target.get("motor") != null:
-		target = target.motor
+	# A conveyor (or pulley/plank) with a motor on its cell is controlled through that motor.
+	# Looked up directly, not via target.motor: the conveyor's own on_attach may not have run yet.
+	if target != null and target.get_meta("part_id") != "motor":
+		var m: Node2D = sim.part_at_cell(target.get_meta("cell"), target, 0, func(p): return p.get_meta("part_id") == "motor")
+		if m != null:
+			target = m
 
 
 func get_link_target() -> Node2D:

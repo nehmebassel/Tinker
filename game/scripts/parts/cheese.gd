@@ -6,6 +6,7 @@ var def: Dictionary
 var size: Vector2 = Vector2(48, 36)
 var fill: Color = Color.WHITE
 var eaten: bool = false
+var running: bool = false
 var _sensor: Area2D
 
 
@@ -38,7 +39,7 @@ func configure(p_def: Dictionary) -> void:
 
 
 func _on_body(body: Node) -> void:
-	if eaten or body.get_meta("part_id", "") != "mouse" or body.caught:
+	if not running or eaten or body.get_meta("part_id", "") != "mouse" or body.caught:
 		return
 	eaten = true
 	set_deferred("freeze", true)
@@ -48,8 +49,12 @@ func _on_body(body: Node) -> void:
 	set_deferred("visible", false)
 
 
-func set_running(running: bool) -> void:
+func set_running(p_running: bool) -> void:
+	running = p_running
 	freeze = (not running) or eaten
+	if running:
+		for body in PartFactory.sorted_bodies(_sensor):
+			_on_body(body)
 
 
 func snapshot() -> String:

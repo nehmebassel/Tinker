@@ -147,6 +147,14 @@ level("t_bucket_ball_switch", "Ball lands in a bucket that sits on a switch",
       [P("switch", 16, 40, 0), P("bucket", 16, 34), P("ball", 16, 20), P("fan", 30, 40, 0)],
       {"type": "state", "index": 3, "key": "on", "value": False}, note="ball -> bucket -> switch -> fan")
 
+# ---------------------------------------------------------------- regressions (PR #1 review)
+level("t_reg_plank_not_caught", "A plank poking into the basket does not count",
+      [P("basket", 20, 36), P("plank", 20, 34, 6)],
+      {"type": "basket", "count": 1}, expect="stalled", note="basket must ignore planks")
+level("t_reg_switch_before_conveyor", "Switch created before the motor-powered conveyor still targets the motor",
+      [P("switch", 8, 44, 0), P("ball", 8, 36), P("conveyor", 14, 30, 0), P("motor", 14, 30, 0, on=False), P("ball", 14, 28), P("basket", 28, 36)],
+      {"type": "basket", "count": 1}, note="switch -> motor regardless of creation order")
+
 for l in levels:
     with open(os.path.join(OUT, l["id"] + ".json"), "w") as f:
         json.dump(l, f, indent=2)

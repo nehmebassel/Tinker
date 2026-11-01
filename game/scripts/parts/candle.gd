@@ -8,6 +8,7 @@ var fill: Color = Color.WHITE
 var lit: bool = true
 var lit_at_start: bool = true
 var flame_reach: float = 60.0
+var running: bool = false
 var _flame: Area2D
 var _wick: Area2D
 
@@ -60,7 +61,8 @@ func light() -> void:
 
 
 func _on_flame_body(body: Node) -> void:
-	if not lit:
+	# Flames act only during a run; while building, the stage must show the real initial setup.
+	if not lit or not running:
 		return
 	if body.has_method("pop"):
 		body.pop()
@@ -69,15 +71,24 @@ func _on_flame_body(body: Node) -> void:
 
 
 func _on_flame_area(area: Area2D) -> void:
-	if not lit:
+	if not lit or not running:
 		return
 	var other := area.get_parent()
 	if other != self and other.has_method("light"):
 		other.light()
 
 
-func set_running(_running: bool) -> void:
-	pass
+func set_running(p_running: bool) -> void:
+	running = p_running
+	if running and lit:
+		# Overlaps that already exist at PLAY would never fire *_entered again: process them now,
+		# in creation order.
+		for body in PartFactory.sorted_bodies(_flame):
+			_on_flame_body(body)
+		var areas := _flame.get_overlapping_areas()
+		areas.sort_custom(func(x, y): return int(x.get_parent().get_meta("part_index", 1 << 30)) < int(y.get_parent().get_meta("part_index", 1 << 30)))
+		for a in areas:
+			_on_flame_area(a)
 
 
 func snapshot() -> String:
