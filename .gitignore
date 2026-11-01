@@ -11,3 +11,10 @@ tools/*
 !tools/setup.sh
 # OS
 .DS_Store
+# Secrets never enter the repo
+*.key.json
+*_SA.json
+*-sa.json
+service-account*.json
+.env
+server/.env

@@ -1,0 +1,19 @@
+{
+  "name": "tinker-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tinker backend: daily seed, score submit with headless replay, boards, shared levels.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.11.0",
+    "express": "^4.21.2",
+    "firebase-admin": "^14.5.0"
+  }
+}

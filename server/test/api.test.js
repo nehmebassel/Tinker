@@ -1,0 +1,167 @@
+// End-to-end API tests against the Firestore emulator and the REAL Godot verifier.
+//   FIRESTORE_EMULATOR_HOST=127.0.0.1:8081 GOOGLE_CLOUD_PROJECT=tinker-test ADMIN_TOKEN=t npm test
+// A fake generator is injected (real generation takes up to minutes); the replay is real.
+import { test, before, after } from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { createApp, db } from "../src/app.js";
+import { todayUtc } from "../src/config.js";
+
+process.env.ADMIN_TOKEN = process.env.ADMIN_TOKEN || "test-admin";
+const ADMIN = process.env.ADMIN_TOKEN;
+const campaign = new URL("../../levels/campaign/001.json", import.meta.url).pathname;
+
+let server, base, level1;
+const fcmCalls = [];
+const fakeFcm = {
+  async subscribe(token, topic) { fcmCalls.push(["sub", token, topic]); return { ok: true }; },
+  async unsubscribe(token, topic) { fcmCalls.push(["unsub", token, topic]); return { ok: true }; },
+  async sendTopic(topic, msg, dry) { fcmCalls.push(["send", topic, msg, dry]); return { ok: true, id: "projects/x/messages/1" }; },
+};
+const fakeGenerate = async (date) => ({ ok: true, level: { ...level1, id: "d-" + date, title: "Daily " + date }, info: { template: "fake" } });
+
+before(async () => {
+  level1 = JSON.parse(await readFile(campaign, "utf8"));
+  // Wipe emulator state for the collections we touch.
+  for (const c of ["daily", "scores", "levels", "devices", "push"]) {
+    const snap = await db.collection(c).get();
+    await Promise.all(snap.docs.map((d) => d.ref.delete()));
+  }
+  const app = createApp({ generateFn: fakeGenerate, fcm: fakeFcm });
+  server = app.listen(0);
+  base = `http://127.0.0.1:${server.address().port}`;
+});
+after(() => server.close());
+
+const j = async (method, path, body, headers = {}) => {
+  const r = await fetch(base + path, { method, headers: { "content-type": "application/json", ...headers }, body: body ? JSON.stringify(body) : undefined });
+  return { status: r.status, body: await r.json().catch(() => null) };
+};
+const today = todayUtc();
+const DEV_A = "device-aaaa-0001", DEV_B = "device-bbbb-0002";
+
+test("health", async () => {
+  const r = await j("GET", "/health");
+  assert.equal(r.status, 200);
+  assert.equal(r.body.ok, true);
+});
+
+test("daily 404 before generation, admin needs token, generate fills the week", async () => {
+  assert.equal((await j("GET", `/daily/${today}`)).status, 404);
+  assert.equal((await j("POST", "/admin/generate?days=2")).status, 401);
+  const g = await j("POST", "/admin/generate?days=2", null, { "x-admin-token": ADMIN });
+  assert.equal(g.status, 200);
+  assert.equal(g.body.made.length, 2);
+  const again = await j("POST", "/admin/generate?days=2", null, { "x-admin-token": ADMIN });
+  assert.equal(again.body.skipped.length, 2, "idempotent");
+});
+
+test("daily is served without the reference solution", async () => {
+  const r = await j("GET", `/daily/${today}`);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.level.id, "d-" + today);
+  assert.equal(r.body.level.reference_solution, undefined);
+  assert.equal(r.body.level.generator, undefined);
+  assert.equal((await j("GET", "/daily/2099-01-01")).status, 404);
+  assert.equal((await j("GET", "/daily/not-a-date")).status, 400);
+});
+
+test("score: rejects bad input before touching Godot", async () => {
+  assert.equal((await j("POST", "/score", { device_id: "x", date: today, solution: [], elapsed_ms: 1 })).status, 400);
+  assert.equal((await j("POST", "/score", { device_id: DEV_A, date: today, solution: [{ part: "plank", x: 1.5, y: 2, rot: 0 }], elapsed_ms: 1 })).status, 400);
+  assert.equal((await j("POST", "/score", { device_id: DEV_A, date: today, solution: [{ part: "fan", x: 1, y: 2, rot: 0 }], elapsed_ms: 1 })).status, 400, "fan is not in level 1's tray");
+  assert.equal((await j("POST", "/score", { device_id: DEV_A, date: "2000-01-01", solution: [], elapsed_ms: 1 })).status, 400, "date not open");
+});
+
+test("score: a wrong solution is replayed and refused (422)", async () => {
+  const r = await j("POST", "/score", { device_id: DEV_A, date: today, solution: [{ part: "plank", x: 2, y: 2, rot: 0 }], elapsed_ms: 5000, country: "LB" });
+  assert.equal(r.status, 422);
+  assert.notEqual(r.body.result, "goal");
+});
+
+test("score: the real solution is accepted once per device per day, then boards rank it", async () => {
+  const sol = level1.reference_solution;
+  const a = await j("POST", "/score", { device_id: DEV_A, date: today, solution: sol, elapsed_ms: 12000, country: "LB", name: "Bassel" });
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+  assert.equal(a.body.parts, 1);
+  assert.equal(a.body.rank, 1);
+  const dup = await j("POST", "/score", { device_id: DEV_A, date: today, solution: sol, elapsed_ms: 1000, country: "LB" });
+  assert.equal(dup.status, 409);
+  const b = await j("POST", "/score", { device_id: DEV_B, date: today, solution: sol, elapsed_ms: 8000, country: "FR" });
+  assert.equal(b.status, 201);
+  assert.equal(b.body.rank, 1, "same parts, faster => rank 1");
+  const board = await j("GET", `/board/${today}?device_id=${DEV_A}`);
+  assert.equal(board.status, 200);
+  assert.deepEqual(board.body.rows.map((r) => r.device_id), [DEV_B, DEV_A]);
+  assert.equal(board.body.me.rank, 2);
+  const country = await j("GET", `/board/${today}?scope=country&device_id=${DEV_A}`);
+  assert.equal(country.body.country, "LB");
+  assert.equal(country.body.rows.length, 1);
+  assert.equal(country.body.me.rank, 1);
+});
+
+test("shared levels: author solution must replay; fetch strips it", async () => {
+  const bad = await j("POST", "/level", { device_id: DEV_A, level: { ...level1, reference_solution: [{ part: "plank", x: 2, y: 2, rot: 0 }] } });
+  assert.equal(bad.status, 422);
+  const good = await j("POST", "/level", { device_id: DEV_A, level: level1 });
+  assert.equal(good.status, 201, JSON.stringify(good.body));
+  assert.match(good.body.id, /^[a-z0-9]{8}$/);
+  const got = await j("GET", `/level/${good.body.id}`);
+  assert.equal(got.status, 200);
+  assert.equal(got.body.level.reference_solution, undefined);
+  assert.equal(got.body.author_parts, 1);
+  assert.equal((await j("GET", "/level/nope")).status, 400);
+  assert.equal((await j("GET", "/level/zzzzzzzz")).status, 404);
+});
+
+test("admin: queue lists upcoming days; curated swap replaces a day", async () => {
+  const q = await j("GET", "/admin/queue", null, { "x-admin-token": ADMIN });
+  assert.equal(q.status, 200);
+  assert.ok(q.body.days.length >= 2);
+  const swap = await j("PUT", `/admin/daily/${today}`, { level: { ...level1, title: "Curated one" } }, { "x-admin-token": ADMIN });
+  assert.equal(swap.status, 200, JSON.stringify(swap.body));
+  const r = await j("GET", `/daily/${today}`);
+  assert.equal(r.body.level.title, "Curated one");
+  const badSwap = await j("PUT", `/admin/daily/${today}`, { level: { ...level1, reference_solution: [{ part: "plank", x: 2, y: 2, rot: 0 }] } }, { "x-admin-token": ADMIN });
+  assert.equal(badSwap.status, 422);
+});
+
+test("push: register subscribes to the topic, a new token replaces the old, disable unsubscribes", async () => {
+  const T1 = "tok1:" + "a".repeat(40), T2 = "tok2:" + "b".repeat(40);
+  assert.equal((await j("POST", "/push/register", { device_id: DEV_A, token: "short" })).status, 400);
+  const r1 = await j("POST", "/push/register", { device_id: DEV_A, token: T1 });
+  assert.equal(r1.status, 200);
+  assert.equal(r1.body.topic, "tinker-daily");
+  const r2 = await j("POST", "/push/register", { device_id: DEV_A, token: T2 });
+  assert.equal(r2.status, 200);
+  assert.deepEqual(fcmCalls.filter((c) => c[0] !== "send").slice(-3).map((c) => c.slice(0, 2)), [["sub", T1], ["unsub", T1], ["sub", T2]]);
+  const off = await j("POST", "/push/register", { device_id: DEV_A, token: T2, enabled: false });
+  assert.equal(off.body.enabled, false);
+  assert.deepEqual(fcmCalls.at(-1).slice(0, 2), ["unsub", T2]);
+  const dev = (await db.collection("devices").doc(DEV_A).get()).data();
+  assert.equal(dev.fcm_token, T2);
+  assert.equal(dev.push_enabled, false);
+});
+
+test("push: daily notify needs a level, sends once per day, dry run does not record", async () => {
+  assert.equal((await j("POST", "/admin/notify")).status, 401);
+  assert.equal((await j("POST", "/admin/notify?date=2099-01-01", null, { "x-admin-token": ADMIN })).status, 409);
+  const dry = await j("POST", "/admin/notify?dry_run=1", null, { "x-admin-token": ADMIN });
+  assert.equal(dry.status, 200);
+  assert.equal(dry.body.dry_run, true);
+  assert.equal(fcmCalls.at(-1)[3], true);
+  const sent = await j("POST", "/admin/notify", null, { "x-admin-token": ADMIN });
+  assert.equal(sent.status, 200);
+  assert.equal(sent.body.id, "projects/x/messages/1");
+  const msg = fcmCalls.at(-1)[2];
+  assert.match(msg.body, /^Day \d+:/);
+  assert.equal(msg.data.date, today);
+  const again = await j("POST", "/admin/notify", null, { "x-admin-token": ADMIN });
+  assert.equal(again.body.skipped, "already sent");
+  assert.equal(fcmCalls.filter((c) => c[0] === "send" && c[3] === false).length, 1, "exactly one real send");
+});
+
+test("daily carries the day number", async () => {
+  const r = await j("GET", `/daily/${today}`);
+  assert.ok(Number.isInteger(r.body.day) && r.body.day >= 1);
+});
