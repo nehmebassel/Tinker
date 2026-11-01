@@ -290,3 +290,58 @@ test("push config and the web push glue are served", async () => {
   assert.equal(sw.status, 200);
   assert.equal(sw.headers.get("service-worker-allowed"), "/play/fcm/");
 });
+
+test("APK download is streamed chunked (Cloud Run rejects non-streamed responses over 32 MiB)", async () => {
+  const { config } = await import("../src/config.js");
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "tinker-dl-"));
+  const prev = config.downloadDir;
+  const body = Buffer.alloc(3 * 1024 * 1024, 7);
+  await writeFile(join(dir, "tinker.apk"), body);
+  config.downloadDir = dir;
+  const s5 = createApp({ fcm: fakeFcm }).listen(0);
+  const b5 = `http://127.0.0.1:${s5.address().port}`;
+  try {
+    const r = await fetch(`${b5}/download/tinker.apk`);
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get("content-length"), null);
+    assert.equal(r.headers.get("transfer-encoding"), "chunked");
+    assert.match(r.headers.get("content-type"), /android\.package-archive/);
+    assert.equal((await r.arrayBuffer()).byteLength, body.length);
+    assert.equal((await fetch(`${b5}/download/..%2Fsecret.apk`)).status, 404);
+    assert.equal((await fetch(`${b5}/download/missing.apk`)).status, 404);
+  } finally { s5.close(); config.downloadDir = prev; await rm(dir, { recursive: true, force: true }); }
+});
+
+test("large web files are streamed chunked to clients that refuse gzip", async () => {
+  const { config } = await import("../src/config.js");
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "tinker-web-"));
+  const prev = config.webDir;
+  const big = Buffer.alloc(31 * 1024 * 1024, 1);
+  await writeFile(join(dir, "index.wasm"), big);
+  await writeFile(join(dir, "index.html"), "<html>ok</html>");
+  config.webDir = dir;
+  const s6 = createApp({ fcm: fakeFcm }).listen(0);
+  const b6 = `http://127.0.0.1:${s6.address().port}`;
+  const http = await import("node:http");
+  const raw = (path) => new Promise((ok, bad) => http.get(b6 + path, { headers: { "accept-encoding": "identity" } }, (r) => {
+    let n = 0; r.on("data", (d) => (n += d.length)); r.on("end", () => ok({ status: r.statusCode, headers: r.headers, n }));
+  }).on("error", bad));
+  try {
+    const w = await raw("/play/index.wasm");
+    assert.equal(w.status, 200);
+    assert.equal(w.headers["content-length"], undefined);
+    assert.equal(w.headers["transfer-encoding"], "chunked");
+    assert.match(w.headers["content-type"], /wasm/);
+    assert.equal(w.n, big.length);
+    const h = await raw("/play/index.html");  // small files still go through express.static
+    assert.equal(h.status, 200);
+    assert.equal(h.headers["content-length"], "15");
+    assert.equal((await raw("/play/..%2F..%2Fetc%2Fpasswd")).status, 404);
+  } finally { s6.close(); config.webDir = prev; await rm(dir, { recursive: true, force: true }); }
+});
