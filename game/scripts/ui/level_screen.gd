@@ -13,7 +13,7 @@ extends Control
 ##  * minimum touch target 44 pt (we use 132 px at 1080 wide, about 48 pt on a 6" phone)
 
 const LEVEL_PATH_DEFAULT := "res://levels/campaign/001.json"
-const TOP_BAR_H := 160.0
+const TOP_BAR_H := 236.0  # 72 title row + 132 buttons + margins
 const TRAY_H := 320.0
 const TRAY_TAB_H := 72.0
 const BTN := 132.0  # touch target in px at design width
@@ -146,44 +146,52 @@ func _build_scene() -> void:
 	add_child(hud)
 
 	# Top bar: title, counter, undo, redo.
+	# Top bar: two rows. Row 1: back, title, counter. Row 2: Undo Redo Turn 90 Fit (132 px targets).
+	# Two rows because a one-row bar leaves ~200 px for the title at 1080 wide, which is not a title.
 	var top := PanelContainer.new()
 	top.name = "TopBar"
 	top.add_theme_stylebox_override("panel", _panel_style(C_PANEL, 0))
 	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	top.custom_minimum_size.y = TOP_BAR_H
 	hud.add_child(top)
-	var top_h := HBoxContainer.new()
-	top_h.add_theme_constant_override("separation", 16)
-	top.add_child(top_h)
-	back_btn = _button("<", BTN * 0.8)
+	var top_v := VBoxContainer.new()
+	top_v.add_theme_constant_override("separation", 8)
+	top.add_child(top_v)
+	var row1 := HBoxContainer.new()
+	row1.add_theme_constant_override("separation", 16)
+	top_v.add_child(row1)
+	back_btn = _button("<", 96)
+	back_btn.custom_minimum_size = Vector2(96, 72)
 	back_btn.pressed.connect(func() -> void: App.open_world_select())
-	top_h.add_child(back_btn)
-	var vb := VBoxContainer.new()
-	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	top_h.add_child(vb)
-	title_lbl = _label("", 44, C_PANEL_TXT)
-	vb.add_child(title_lbl)
+	row1.add_child(back_btn)
+	title_lbl = _label("", 40, C_PANEL_TXT)
+	title_lbl.clip_text = true
+	title_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row1.add_child(title_lbl)
 	counter_lbl = _label("", 30, Color(C_PANEL_TXT, 0.8))
-	vb.add_child(counter_lbl)
+	counter_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row1.add_child(counter_lbl)
+	var row2 := HBoxContainer.new()
+	row2.add_theme_constant_override("separation", 16)
+	row2.alignment = BoxContainer.ALIGNMENT_END
+	top_v.add_child(row2)
 	undo_btn = _button("Undo", BTN)
 	undo_btn.pressed.connect(_undo)
-	top_h.add_child(undo_btn)
+	row2.add_child(undo_btn)
 	redo_btn = _button("Redo", BTN)
 	redo_btn.pressed.connect(_redo)
-	top_h.add_child(redo_btn)
+	row2.add_child(redo_btn)
 	rot_btn = _button("Turn", BTN)
 	rot_btn.pressed.connect(func() -> void: _rotate_selected(1))
-	top_h.add_child(rot_btn)
+	row2.add_child(rot_btn)
 	rot90_btn = _button("90°", BTN)
 	rot90_btn.pressed.connect(func() -> void: _rotate_selected(6))
-	top_h.add_child(rot90_btn)
+	row2.add_child(rot90_btn)
 	fit_btn = _button("Fit", BTN)
 	fit_btn.pressed.connect(_fit_camera)
-	top_h.add_child(fit_btn)
-	var pad2 := Control.new()
-	pad2.custom_minimum_size.x = 8
-	top_h.add_child(pad2)
+	row2.add_child(fit_btn)
 
 	# Tray at the bottom with a collapse tab.
 	tray = PanelContainer.new()
@@ -374,7 +382,7 @@ func _make_tray_item(part: String) -> Control:
 	item.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	item.set_meta("part", part)
 	var holder := Node2D.new()
-	holder.position = Vector2(110, 84)
+	holder.position = Vector2(110, 78)
 	item.add_child(holder)
 	var preview := PartFactory.create(Placement.new(part, Vector2i.ZERO, 0), 9000, false)
 	if preview:
@@ -383,7 +391,7 @@ func _make_tray_item(part: String) -> Control:
 		var s: Dictionary = def["shape"]
 		var w: float = float(s.get("w", s.get("radius", 40) * 2.0))
 		var h: float = float(s.get("h", s.get("radius", 40) * 2.0))
-		var k: float = minf(170.0 / maxf(w, 1.0), 120.0 / maxf(h, 1.0))
+		var k: float = minf(170.0 / maxf(w, 1.0), 90.0 / maxf(h, 1.0))
 		preview.scale = Vector2(k, k)
 		holder.add_child(preview)
 	var count := _label("", 30, C_PANEL_TXT)
@@ -1027,6 +1035,9 @@ func run_smoke_steps() -> Dictionary:
 	var shots_dir := "res://../build/shots"
 	DirAccess.make_dir_recursive_absolute(shots_dir)
 	_shot(shots_dir + "/01_start.png")
+	var vw := get_viewport_rect().size.x
+	for b in [undo_btn, redo_btn, rot_btn, rot90_btn, fit_btn]:
+		_assert(b.get_global_rect().end.x <= vw + 0.5, "%s inside the viewport (right edge %.0f <= %.0f)" % [b.text, b.get_global_rect().end.x, vw])
 	var item: Control = tray_items.get_child(0)
 	var from: Vector2 = item.get_global_rect().get_center()
 	var target: Placement = level.reference_solution[0]
