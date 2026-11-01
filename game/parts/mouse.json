@@ -14,7 +14,7 @@
   "hop": 280,
   "fear_range": 240,
   "friction": 0.9,
-  "wind_factor": 0.6,
+  "wind_factor": 1.5,
   "color": "#bfbfbf",
   "script": "res://scripts/parts/mouse.gd",
   "interacts_with": [

@@ -1,0 +1,67 @@
+{
+  "id": "c016",
+  "world": 2,
+  "number": 16,
+  "title": "Seesaw",
+  "hint": "A plank on a motor that is off is just a seesaw. Drop something on the other end.",
+  "teaches": "see-saw launch",
+  "goal": {
+    "type": "caught",
+    "index": 2
+  },
+  "fixed": [
+    {
+      "part": "motor",
+      "x": 20,
+      "y": 36,
+      "rot": 0,
+      "state": {
+        "on": false
+      }
+    },
+    {
+      "part": "plank",
+      "x": 20,
+      "y": 36,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 16,
+      "y": 34,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 11,
+      "y": 37,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 30,
+      "y": 36,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "ball",
+      "count": 1
+    },
+    {
+      "part": "plank",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "ball",
+      "x": 22,
+      "y": 10,
+      "rot": 0
+    }
+  ],
+  "expect": "goal"
+}

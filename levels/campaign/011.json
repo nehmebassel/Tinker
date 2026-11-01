@@ -1,0 +1,56 @@
+{
+  "id": "c011",
+  "world": 2,
+  "number": 11,
+  "title": "Pick one",
+  "hint": "Three parts in the tray, one slot. Choose well.",
+  "teaches": "slots < tray",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 6,
+      "y": 14,
+      "rot": 1
+    },
+    {
+      "part": "ball",
+      "x": 6,
+      "y": 12,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 30,
+      "y": 50,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "plank",
+      "count": 1
+    },
+    {
+      "part": "fan",
+      "count": 1
+    },
+    {
+      "part": "spring",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "plank",
+      "x": 18,
+      "y": 36,
+      "rot": 3
+    }
+  ],
+  "expect": "goal"
+}

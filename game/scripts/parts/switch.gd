@@ -13,6 +13,8 @@ var pressed: bool = false
 var toggles: int = 0
 var running: bool = false
 var _plate: Area2D
+var _empty_ticks: int = 0
+const REARM_TICKS := 20
 
 
 func configure(p_def: Dictionary) -> void:
@@ -57,6 +59,7 @@ func get_link_target() -> Node2D:
 func set_running(p_running: bool) -> void:
 	running = p_running
 	pressed = false
+	_empty_ticks = 0
 
 
 func _physics_process(_delta: float) -> void:
@@ -67,15 +70,21 @@ func _physics_process(_delta: float) -> void:
 		if body is RigidBody2D and not body.freeze:
 			occupied = true
 			break
-	if occupied and not pressed:
-		pressed = true
-		toggles += 1
-		if target != null and target.has_method("toggle"):
-			target.toggle()
-		queue_redraw()
-	elif not occupied and pressed:
-		pressed = false
-		queue_redraw()
+	if occupied:
+		_empty_ticks = 0
+		if not pressed:
+			pressed = true
+			toggles += 1
+			if target != null and target.has_method("toggle"):
+				target.toggle()
+			queue_redraw()
+	elif pressed:
+		# Re-arm only after the plate has been empty for a moment: a hopping mouse or a bouncing
+		# ball must not toggle twice.
+		_empty_ticks += 1
+		if _empty_ticks >= REARM_TICKS:
+			pressed = false
+			queue_redraw()
 
 
 func snapshot() -> String:

@@ -184,6 +184,15 @@ func _goal_reached() -> bool:
 				if p.get_meta("part_id") == "cheese" and p.eaten:
 					return true
 			return false
+		"caught":
+			# {"type":"caught","index":i}: that specific part is inside a basket.
+			var ci := int(g.get("index", -1))
+			if ci < 0 or ci >= parts.size():
+				return false
+			for p in parts:
+				if p.get_meta("part_id") == "basket" and p._inside.has(parts[ci]):
+					return true
+			return false
 		"pop":
 			# Any balloon popped (fixed or player-placed).
 			for p in parts:

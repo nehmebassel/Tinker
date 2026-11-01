@@ -1,0 +1,56 @@
+{
+  "id": "c012",
+  "world": 2,
+  "number": 12,
+  "title": "Two of three",
+  "hint": "Two slots. The ball must travel a long way right.",
+  "teaches": "choose movers",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "ball",
+      "x": 8,
+      "y": 10,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 8,
+      "y": 30,
+      "rot": 1
+    },
+    {
+      "part": "basket",
+      "x": 32,
+      "y": 46,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "conveyor",
+      "count": 1
+    },
+    {
+      "part": "fan",
+      "count": 1
+    },
+    {
+      "part": "plank",
+      "count": 1
+    }
+  ],
+  "slots": 2,
+  "reference_solution": [
+    {
+      "part": "conveyor",
+      "x": 19,
+      "y": 32,
+      "rot": 0
+    }
+  ],
+  "expect": "goal"
+}
