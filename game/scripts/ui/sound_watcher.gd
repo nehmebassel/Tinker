@@ -42,6 +42,14 @@ func reset() -> void:
 		a.stop_loops()
 
 
+## Leaving the level mid-run (Back, Next) frees this watcher: the fan/motor loops belong to the
+## persistent App.audio, so stop them here or they would keep playing over the menus.
+func _exit_tree() -> void:
+	var a := _audio()
+	if a:
+		a.stop_loops()
+
+
 func _physics_process(_delta: float) -> void:
 	var a := _audio()
 	if sim == null or not sim.running or a == null:

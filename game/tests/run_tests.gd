@@ -98,6 +98,23 @@ func _test_sound_watcher() -> void:
 		w.free()
 		sim.free()
 	app.audio.stop_loops()
+	# Leaving mid-run must silence the machine loops (the watcher is freed with the level).
+	var lv := LevelData.load_from_file("res://levels/tests/t_fan_balloon.json")
+	var s2 := Simulation.new()
+	root.add_child(s2)
+	s2.load_level(lv)
+	var w2 := SoundWatcher.new()
+	w2.watch(s2)
+	root.add_child(w2)
+	s2.start()
+	for i in 10:
+		await physics_frame
+	var loop_on: bool = app.audio._loops["fan"].playing
+	w2.queue_free()
+	s2.queue_free()
+	await process_frame
+	_check("sound: fan loop plays while a fan runs", loop_on)
+	_check("sound: loops stop when the level is left mid-run", not app.audio._loops["fan"].playing)
 
 
 # ---------------------------------------------------------------- unit tests
