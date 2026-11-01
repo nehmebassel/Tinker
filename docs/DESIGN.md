@@ -175,6 +175,39 @@ The smoke test synthesises touch events (converted to window coordinates with `g
 
 `game/export_presets.cfg` has the "Android" preset (arm64-v8a + x86_64, debug signing). Godot reads the SDK/JDK paths from `~/.config/godot/editor_settings-4.5.tres` and the debug keystore from `GODOT_ANDROID_KEYSTORE_DEBUG_PATH/USER/PASSWORD`. See `tools/setup.sh` for the full local setup and `.github/workflows/ci.yml` for the CI version.
 
+## Look, sound and part cards (M6)
+
+**Look.** Flat fills + thick ink outlines (brief) with three depth cues from `scripts/parts/art.gd`: a drop
+shadow cast down-right in *world* space (it does not turn with the part), a top-left highlight, a darker
+lower edge. Stage = blueprint-ruled sheet (minor line per tile, major every 4) in a wooden frame on a
+pegboard wall; menus use `WorkshopBg` (pegboard). Animations live in each part's `_process` and only
+advance a visual phase + redraw; they never touch bodies, so `levels/hashes.txt` is unchanged.
+
+**Sound.** `App.audio` (`scripts/core/audio.gd`): buses Music and SFX, volumes = Settings sliders.
+Music crossfades between `menu` (menus), `build` (editing) and `run` (machine running).
+`SoundWatcher` (`scripts/ui/sound_watcher.gd`) reads the running simulation after each physics tick and
+plays effects for state changes (popped, lit, caught_count, spring launches, switch pressed, cat awake,
+mouse caught, cheese eaten), impacts (velocity jump > 260 px/s in one tick, volume by strength, pitch by
+part, rate-limited) and a creak while a pulley line moves; fan / motor loops while any is on.
+Test `sound:` in run_tests: same hash with and without the watcher.
+
+| Asset | Source | Prompt (abridged) |
+|---|---|---|
+| music_menu.ogg | Lyria lyria-002 (Vertex), seed 101 | calm cozy inventor's workshop, music box + celesta, clockwork ticks, 84 BPM |
+| music_build.ogg | Lyria, seed 202 | focused, pizzicato + marimba, light tick-tock, 96 BPM, unobtrusive |
+| music_run.ogg | Lyria, seed 303 | upbeat Rube Goldberg in motion, xylophone runs, ratchet percussion, 116 BPM |
+| 20 effects | ElevenLabs Sound Effects v2 (flow "Tinker game SFX") | one prompt each, e.g. "cartoon metal spring boing", "ball dropping into a wicker basket" |
+
+Music loops: Lyria's 32.8 s clip minus its 0.8 s fade-out, last 3 s equal-power crossfaded into the head
+(seamless), loudness-normalised to -20 LUFS, Vorbis q3. Effects: leading silence trimmed, capped length,
+fade-out, mono, per-type loudness. Replacing a sound = drop a same-named .ogg in `game/assets/audio`.
+
+**Part cards.** `PartInfoCard` (`scripts/ui/part_info.gd`) opens from the "i" on a tray part or by tapping a
+fixed part. It shows the part JSON's `name`, `description` and `interacts_with`, and runs the part's demo
+scene (`levels/demos/<id>.json`, copied from a CI-verified test scene by `levels/demos/make_demos.py`)
+in a SubViewport with its own physics world, restarting every `demo_seconds`. The demo camera widens
+smoothly to everything that moves. `--shot-cards=dir` renders all cards (`docs/screenshots/m6_info_cards.png`).
+
 ## Backend (M4)
 
 See `server/README.md` (endpoints, configuration table, deploy, curation). Key decisions:
