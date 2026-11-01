@@ -175,6 +175,17 @@ The smoke test synthesises touch events (converted to window coordinates with `g
 
 `game/export_presets.cfg` has the "Android" preset (arm64-v8a + x86_64, debug signing). Godot reads the SDK/JDK paths from `~/.config/godot/editor_settings-4.5.tres` and the debug keystore from `GODOT_ANDROID_KEYSTORE_DEBUG_PATH/USER/PASSWORD`. See `tools/setup.sh` for the full local setup and `.github/workflows/ci.yml` for the CI version.
 
-## Backend (M4, not built)
+## Backend (M4)
 
-Node 22 on Cloud Run + Firestore. `GET /daily/{date}`, `POST /score` (headless Godot replays the solution), `GET /board/{date}?scope=`, `POST/GET /level`. Scores are never trusted from the client. Device id only; no tracking SDKs. All configuration from environment / remote config, never hard-coded.
+See `server/README.md` (endpoints, configuration table, deploy, curation). Key decisions:
+- **Server replay is the proof.** `/score` spawns the same Godot build headless (`verify.gd`) on the
+  submitted integers; an entry exists only if that replay reaches the goal. Parts are counted by the
+  server. Time is the client's clock (from first touch, persisted per day) — it can be lied about, but
+  only as a tie-breaker after parts; rate limits and one submission per device per day bound abuse.
+- **Daily generation is offline and deterministic**: nightly scheduler job generates the coming week;
+  nothing is generated in a request. Curation = inspect `/admin/queue`, swap with `PUT /admin/daily/{date}`.
+- **Named Firestore database** `tinker`, so a shared GCP project's `(default)` DB is never touched.
+- **Push via FCM topic** `tinker-daily`: one send reaches everyone; tokens kept on device docs for later
+  targeted messages. Idempotent per day so scheduler retries never double-notify.
+- **Client config is in Settings** (server URL, name, reminder), persisted in `user://settings.json`;
+  the initial server URL comes from the project setting `tinker/server_url`.

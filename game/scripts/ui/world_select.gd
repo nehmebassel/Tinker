@@ -44,8 +44,13 @@ func _ready() -> void:
 	solved.add_theme_color_override("font_color", Color(C_PANEL_TXT, 0.8))
 	solved.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	h.add_child(solved)
+	var gear := UiKit.button("Settings", UiKit.MUTED, UiKit.PANEL_TXT, 112)
+	gear.add_theme_font_size_override("font_size", 28)
+	gear.name = "SettingsButton"
+	gear.pressed.connect(func() -> void: App.open_settings())
+	h.add_child(gear)
 	var pad := Control.new()
-	pad.custom_minimum_size.x = 32
+	pad.custom_minimum_size.x = 16
 	h.add_child(pad)
 
 	_scroll = ScrollContainer.new()
@@ -61,11 +66,36 @@ func _ready() -> void:
 	spacer.custom_minimum_size.y = 16
 	v.add_child(spacer)
 
+	v.add_child(_daily_block())
 	for w in Campaign.worlds():
 		v.add_child(_world_block(w))
 	var bottom := Control.new()
 	bottom.custom_minimum_size.y = 48
 	v.add_child(bottom)
+
+
+func _daily_block() -> Control:
+	var m := MarginContainer.new()
+	for k in ["margin_left", "margin_right"]:
+		m.add_theme_constant_override(k, 32)
+	var today := DailyStore.today_utc()
+	var done := App.daily_store.is_submitted(today)
+	var streak := App.daily_store.streak()
+	var label := "Daily · %s" % ("see board" if done else "play today's")
+	if streak > 0:
+		label += "   ·   streak %d" % streak
+	var b := UiKit.button(label, UiKit.ACCENT if not done else UiKit.GO, UiKit.INK, 140)
+	b.name = "DailyButton"
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.pressed.connect(func() -> void:
+		b.disabled = true
+		b.text = "Loading…"
+		var err: String = await App.open_daily()
+		if err != "":
+			b.disabled = false
+			b.text = err)
+	m.add_child(b)
+	return m
 
 
 func _world_block(w: Dictionary) -> Control:

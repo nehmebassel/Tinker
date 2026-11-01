@@ -1,0 +1,8 @@
+# gcloud builds submit --config server/cloudbuild.yaml --substitutions=_IMAGE=... .   (from the repo root)
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "server/Dockerfile", "-t", "${_IMAGE}", "."]
+images: ["${_IMAGE}"]
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 1200s

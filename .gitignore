@@ -8,6 +8,21 @@ build/
 server/node_modules/
 # Local tool installs
 tools/*
+!tools/ci_daily.sh
+!tools/build_clients.sh
+!tools/android_prepare.py
 !tools/setup.sh
 # OS
 .DS_Store
+# Secrets never enter the repo
+*.key.json
+*_SA.json
+*-sa.json
+service-account*.json
+.env
+server/.env
+# Built at build time
+game/addons/tinker_push/bin/
+android/tinker_push/build/
+android/tinker_push/.gradle/
+local.properties

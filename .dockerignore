@@ -1,0 +1,11 @@
+.git
+build/*
+!build/web
+!build/download
+tools
+game/.godot
+game/android
+server/node_modules
+docs
+*_SA.json
+*.key.json

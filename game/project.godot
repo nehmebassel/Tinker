@@ -16,6 +16,11 @@ config/icon="res://assets/icons/icon.svg"
 
 App="*res://scripts/core/app.gd"
 
+[debug]
+
+; No log files: nothing reads them, and creating user://logs fails in read-only containers.
+file_logging/enable_file_logging.pc=false
+
 [display]
 
 ; Portrait only at launch. 1080x1920 design resolution, canvas_items stretch, expand vertically.
@@ -24,6 +29,10 @@ window/size/viewport_height=1920
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=1
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/tinker_push/plugin.cfg")
 
 [input_devices]
 
@@ -50,3 +59,9 @@ common/physics_interpolation=true
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+
+[tinker]
+
+; Initial backend URL for fresh installs. Players/testers change it in the in-game Settings screen;
+; the browser build ignores it when served by the backend (it uses its own origin).
+server_url="https://tinker-api-1053857179342.europe-west1.run.app"
