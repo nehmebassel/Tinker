@@ -103,7 +103,7 @@ Session log at the bottom tells the next agent exactly where things stand.
 - [ ] Friends board (needs Game Center / Play Games sign-in, M7)
 - [ ] Web page for the curation queue (curl works today)
 
-### M6 Polish (look, sound, explanations) — code complete, PR open (done before M5 at Bassel's request)
+### M6 Polish (look, sound, explanations) — LIVE (PR #6 merged, revision tinker-api-00011; done before M5 at Bassel's request)
 - [x] Music: 3 loops (menu / build / run), generated with Lyria (lyria-002, Vertex AI, project gen-lang-client-0293187856), made seamless with a 3 s crossfade, -20 LUFS OGG
 - [x] Sound effects: 20 (taps, pick/place/rotate, play/rewind, wood/metal impacts, spring, pop, switch, candle, mouse, cat, basket, pulley, fan/motor loops, solved, failed), generated with ElevenLabs SFX v2, trimmed and loudness-matched
 - [x] Audio system (`App.audio`): Music/SFX buses, crossfade, loops while fans/motors run, tap on every button; **Music and Sounds sliders in Settings** (saved, nothing hard-coded)
@@ -112,6 +112,8 @@ Session log at the bottom tells the next agent exactly where things stand.
 - [x] Animations (visual only): fan blades + wind, motor gear, conveyor treads + rollers, pulley wheel turning with the rope, spring squash, candle flicker
 - [x] Part info cards: "i" on every tray part (and tap any fixed part) → name, description, what it works with, and a live looping demo (the real simulation of a CI-verified scene, in its own physics world)
 - [x] Determinism: levels/hashes.txt unchanged; smoke test covers the card; flow, daily cycle, server tests pass
+- [x] Review fix: machine loops stop when a level is left mid-run (test added)
+- [x] Live check: info card with running demo opened on production in mobile Chromium, no console errors
 - [ ] Bassel's ears: music and sounds were checked by spectrogram/waveform only (no listening possible here) — swap any you dislike (files in game/assets/audio, prompts in docs/DESIGN.md)
 - [ ] Next polish pass: haptics, particles on solve, first-run tutorial
 
