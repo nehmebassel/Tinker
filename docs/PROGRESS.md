@@ -80,8 +80,21 @@ Session log at the bottom tells the next agent exactly where things stand.
 - [ ] Reference solutions replay identically on two phones (needs devices)
 - [ ] World 3+ paid gate (M7) — everything is open for now so the campaign can be play-tested
 
-### M4 Daily (not started)
-- [ ] Generator, `server/` Cloud Run (GET /daily, POST /score, GET /board), headless replay verifier
+### M4 Daily — code complete and tested end to end on a staging backend; production deploy awaiting approval
+- [x] Generator `game/tests/gen_daily.gd`: seed from the UTC date, 6 templates, accepted only if not solved empty, ≥4 solutions, <45% of placements solve it; deterministic (same date → identical level); every generated solution replays to goal
+- [x] Verifier `game/tests/verify.gd`: what the server runs for every score and shared level
+- [x] Server `server/` (Node 22, Express): daily, score with server replay, boards (global/country, top 100 + my row), shared levels, admin curation (queue, swap, generate), push register/notify; all config from env
+- [x] Firestore: named database `tinker` (shared project's `(default)` untouched), rules deny all client SDK access, composite indexes for boards
+- [x] Push: FCM topic `tinker-daily`, token stored on the device doc, daily notify idempotent; client side waits for the Android FCM plugin (needs google-services.json from the deploy)
+- [x] Client: Daily button + streak on the world select, Daily mode (clock persists across restarts, Submit is final), board screen (World / country tabs), Settings screen (server URL with connection test, board name, reminder) — nothing hard-coded
+- [x] 11 server API tests on the Firestore emulator with the real Godot verifier
+- [x] **Acceptance**: full day cycle on a staging backend — real generator → served → game client plays via touch → submit → server replay accepts → board rank 1 → second tap goes to board. `tools/ci_daily.sh`, runs in CI (`daily` job)
+- [x] Dockerfile (Node 22 + headless Godot 4.5.1), Cloud Build config, idempotent `server/deploy.sh`, runbook `server/README.md`
+- [ ] **Deploy to `gen-lang-client-0293187856`** — blocked by the agent's safety layer pending Bassel's explicit approval (or Bassel runs `server/deploy.sh`)
+- [ ] Register the Android app `my.otono.tinker` in Firebase, add google-services.json + Godot FCM plugin, then `App.fcm_token` → `/push/register`
+- [ ] Friends board (needs Game Center / Play Games sign-in, M7)
+- [ ] Web page for the curation queue (curl works today)
+
 ### M5 Sandbox · M6 Polish · M7 Store (not started)
 
 ## Decisions
@@ -98,11 +111,13 @@ Session log at the bottom tells the next agent exactly where things stand.
 
 1. Install `build/tinker-debug.apk` (from the CI artifact once the workflow runs, or ask me to send it) on your phone. Place a plank. Feel review → go / no-go for M2.
 2. Merge PR #1 (M2) then PR #2 (M3); PR #2 is stacked on #1 and retargets to main when #1 merges.
-3. Confirm Node 22 for the backend.
-4. gcloud has no credentials in this environment; needed from M4.
+3. Approve the M4 deploy (or run `PROJECT=gen-lang-client-0293187856 bash server/deploy.sh`)
+4. Node 22 confirmed for the backend.
+5. GCP: service-account key received for gen-lang-client-0293187856.
 
 ## Session log
 
+- **2026-11-01 (session 1d)** M4: server + generator + verifier + push + client Daily/board/settings; full day cycle passes on a staging backend and in CI. GCP: Bassel supplied a service-account key for gen-lang-client-0293187856 (owner); deploy script ready, run blocked by the safety layer pending his approval. Key kept out of the repo (.gitignore + secret scan before each commit).
 - **2026-11-01 (session 1c)** M3: 30 campaign levels (all solver-verified, none pre-solved), campaign index/loader, save, world select, Next/back flow, flow test in CI. Physics/actor fixes found while designing levels (see DESIGN.md). Branch `m3-campaign` stacked on `m2-parts`; PR #2.
 - **2026-11-01 (session 1b)** M2: 13 new parts, attach pass, rope lines, goal types, 31 interaction levels, determinism fix (fresh World2D per build), conveyor/paddle workarounds. Branch `m2-parts`, PR opened.
 - **2026-11-01 (session 1, autonomous)** Tooling installed; title checked; Godot project, 3 parts, simulation, determinism harness, M1 touch screen, UI smoke test, Android export, CI workflow, docs. Repo created by Bassel at 06:27 local; pushed; CI green on first run. Next: Bassel's phone feel review (M1 kill gate), then M2 parts.

@@ -77,6 +77,36 @@ jobs:
             build/smoke.log
             build/flow.log
 
+  daily:
+    # Server API tests on the Firestore emulator + the full Daily cycle (real generator, real
+    # server-side replay, game client playing through the touch path) on a throwaway backend.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install Godot + Xvfb + emulator
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libgl1-mesa-dri libegl1 libasound2t64 >/dev/null
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q godot.zip && sudo mv Godot_v${GODOT_VERSION}_linux.x86_64 /usr/local/bin/godot
+          npm i -g firebase-tools@15.34.2 >/dev/null && firebase setup:emulators:firestore >/dev/null
+          cd server && npm ci
+      - name: Import project
+        run: godot --headless --path game --import || true
+      - name: Server tests + full day cycle
+        run: bash tools/ci_daily.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daily-logs
+          path: /tmp/*.log
+
   android:
     runs-on: ubuntu-24.04
     needs: [test]

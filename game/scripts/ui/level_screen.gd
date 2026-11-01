@@ -38,6 +38,8 @@ var level_number: int = 0  # campaign number when opened from the world select, 
 var next_btn: Button
 var levels_btn: Button
 var back_btn: Button
+var submit_btn: Button
+var daily: Dictionary = {}  # set when playing the Daily (see App.daily)
 
 var level: LevelData
 var sim: Simulation
@@ -99,9 +101,13 @@ func _ready() -> void:
 			shot_path = a.trim_prefix("--shot=")
 	_build_scene()
 	level_number = App.level_number if has_node("/root/App") else 0
-	if level_number > 0:
-		level_path = Campaign.path_for(level_number)
-	_load_level(level_path)
+	daily = App.daily if has_node("/root/App") else {}
+	if not daily.is_empty():
+		_load_level_data(LevelData.from_dict(daily["level"]))
+	else:
+		if level_number > 0:
+			level_path = Campaign.path_for(level_number)
+		_load_level(level_path)
 	get_viewport().size_changed.connect(_on_resized)
 	_fit_camera()
 	if smoke_mode:
@@ -290,6 +296,13 @@ func _build_scene() -> void:
 	next_btn.add_theme_color_override("font_color", C_INK)
 	next_btn.pressed.connect(func() -> void: App.open_level(level_number + 1))
 	row.add_child(next_btn)
+	submit_btn = _button("Submit", BTN)
+	submit_btn.add_theme_stylebox_override("normal", _round_style(C_GO))
+	submit_btn.add_theme_stylebox_override("hover", _round_style(C_GO))
+	submit_btn.add_theme_color_override("font_color", C_INK)
+	submit_btn.pressed.connect(_submit_daily)
+	submit_btn.visible = false
+	row.add_child(submit_btn)
 
 
 func _label(text: String, size: int, color: Color) -> Label:
@@ -344,10 +357,15 @@ func _panel_style(c: Color, radius: int) -> StyleBoxFlat:
 # ------------------------------------------------------------------ level
 
 func _load_level(path: String) -> void:
-	level = LevelData.load_from_file(path)
-	if level == null:
+	var l := LevelData.load_from_file(path)
+	if l == null:
 		title_lbl.text = "Level failed to load"
 		return
+	_load_level_data(l)
+
+
+func _load_level_data(l: LevelData) -> void:
+	level = l
 	placements = []
 	history = []
 	future = []
@@ -355,8 +373,11 @@ func _load_level(path: String) -> void:
 	first_touch_msec = -1
 	run_ended = false
 	sim.load_level(level)
-	title_lbl.text = ("%d · " % level_number if level_number > 0 else "") + level.title
-	back_btn.visible = level_number > 0
+	if not daily.is_empty():
+		title_lbl.text = "Daily · Day %d" % int(daily.get("day", 0))
+	else:
+		title_lbl.text = ("%d · " % level_number if level_number > 0 else "") + level.title
+	back_btn.visible = level_number > 0 or not daily.is_empty()
 	_rebuild_tray()
 	_refresh_hud()
 	stage_bg.queue_redraw()
@@ -900,6 +921,8 @@ func _toggle_tray() -> void:
 func _note_first_touch() -> void:
 	if first_touch_msec < 0:
 		first_touch_msec = Time.get_ticks_msec()
+	if not daily.is_empty():
+		App.daily_store.start_clock(daily["date"])  # persists: closing the app does not reset it
 
 
 # ------------------------------------------------------------------ play / stop
@@ -945,6 +968,10 @@ func _on_run_finished(outcome: Dictionary) -> void:
 					result_lbl.text += "\nNew best!"
 			next_btn.visible = level_number > 0 and App.has_next(level_number)
 			levels_btn.visible = level_number > 0
+			if not daily.is_empty():
+				var ms: int = App.daily_store.elapsed_ms(daily["date"])
+				result_lbl.text = "Solved!\n%d part%s · %s\nSubmit is final: one entry per day." % [outcome["parts_used"], "" if outcome["parts_used"] == 1 else "s", _fmt_ms(ms)]
+			submit_btn.visible = not daily.is_empty()
 			result_panel.visible = true
 		"stalled":
 			_toast("Everything stopped. Press STOP to rewind.")
@@ -992,6 +1019,23 @@ func _draw_overlay() -> void:
 		var c := Color(C_INK, 0.5) if ghost_valid else C_BAD
 		overlay.draw_line(p + Vector2(-20, 0), p + Vector2(20, 0), c, 3.0)
 		overlay.draw_line(p + Vector2(0, -20), p + Vector2(0, 20), c, 3.0)
+
+
+static func _fmt_ms(ms: int) -> String:
+	var t := ms / 1000
+	return "%d:%02d" % [t / 60, t % 60] if t >= 60 else "%.1f s" % (ms / 1000.0)
+
+
+func _submit_daily() -> void:
+	submit_btn.disabled = true
+	submit_btn.text = "Checking…"
+	var r: Dictionary = await App.submit_daily(placements)
+	if r["ok"] or r["status"] == 409:
+		App.open_board(daily["date"])
+		return
+	submit_btn.disabled = false
+	submit_btn.text = "Submit"
+	_toast(str(r["error"]))
 
 
 func _draw_dashed(on: CanvasItem, a: Vector2, b: Vector2, c: Color) -> void:
