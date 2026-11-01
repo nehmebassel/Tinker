@@ -1,0 +1,48 @@
+{
+  "id": "c004",
+  "world": 1,
+  "number": 4,
+  "title": "Wrong way",
+  "hint": "Parts have a direction. Place yours pointing the right way.",
+  "teaches": "direction",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "conveyor",
+      "x": 14,
+      "y": 22,
+      "rot": 12
+    },
+    {
+      "part": "ball",
+      "x": 14,
+      "y": 20,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 24,
+      "y": 50,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "conveyor",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "conveyor",
+      "x": 8,
+      "y": 28,
+      "rot": 0
+    }
+  ],
+  "expect": "goal"
+}

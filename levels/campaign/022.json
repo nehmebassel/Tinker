@@ -1,0 +1,77 @@
+{
+  "id": "c022",
+  "world": 3,
+  "number": 22,
+  "title": "Belt and braces",
+  "hint": "The belt is off. Ball B can switch it on.",
+  "teaches": "switch via a second ball",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "conveyor",
+      "x": 14,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "motor",
+      "x": 14,
+      "y": 30,
+      "rot": 0,
+      "state": {
+        "on": false
+      }
+    },
+    {
+      "part": "ball",
+      "x": 10,
+      "y": 28,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 30,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 36,
+      "y": 14,
+      "rot": 23
+    },
+    {
+      "part": "ball",
+      "x": 38,
+      "y": 12,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "switch",
+      "count": 1
+    },
+    {
+      "part": "plank",
+      "count": 1
+    },
+    {
+      "part": "fan",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "switch",
+      "x": 22,
+      "y": 24,
+      "rot": 0
+    }
+  ],
+  "expect": "goal"
+}

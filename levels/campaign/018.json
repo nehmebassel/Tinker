@@ -1,0 +1,64 @@
+{
+  "id": "c018",
+  "world": 2,
+  "number": 18,
+  "title": "Pop and drop",
+  "hint": "The cheese hangs from a balloon stuck under the ceiling. Pop it.",
+  "teaches": "rope goes slack",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 10,
+      "y": 12,
+      "rot": 0
+    },
+    {
+      "part": "balloon",
+      "x": 10,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 10,
+      "y": 42,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 10,
+      "y": 42,
+      "rot": 18
+    },
+    {
+      "part": "basket",
+      "x": 10,
+      "y": 50,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "candle",
+      "count": 1
+    },
+    {
+      "part": "fan",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "candle",
+      "x": 10,
+      "y": 20,
+      "rot": 12
+    }
+  ],
+  "expect": "goal"
+}

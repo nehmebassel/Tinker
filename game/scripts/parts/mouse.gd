@@ -17,12 +17,14 @@ func alive() -> bool:
 
 
 func decide() -> int:
-	var cat := nearest("cat", fear_range, func(c): return c.awake and not c.scared())
+	# Fear only cats on the same level: one stuck in a pit below (or on a ledge above) is no threat.
+	var cat := nearest("cat", fear_range, func(c): return c.awake and not c.scared() and absf(c.global_position.y - global_position.y) < Grid.TILE * 0.5)
 	if cat != null:
 		return -sign_toward(global_position, cat.global_position, 0.0) if cat.global_position.x != global_position.x else 1
 	var cheese := nearest("cheese", sight, func(c): return not c.eaten)
 	if cheese != null:
-		return sign_toward(global_position, cheese.global_position)
+		# Stop once the cheese is within the mouse's own half-width (it is straight above or below).
+		return sign_toward(global_position, cheese.global_position, size.x / 2.0)
 	return 0
 
 

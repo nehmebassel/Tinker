@@ -1,0 +1,48 @@
+{
+  "id": "c015",
+  "world": 2,
+  "number": 15,
+  "title": "Two for one",
+  "hint": "Both balls into the basket. One part.",
+  "teaches": "one part, two jobs",
+  "goal": {
+    "type": "basket",
+    "count": 2
+  },
+  "fixed": [
+    {
+      "part": "ball",
+      "x": 5,
+      "y": 12,
+      "rot": 0
+    },
+    {
+      "part": "ball",
+      "x": 5,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 24,
+      "y": 50,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "plank",
+      "count": 2
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "plank",
+      "x": 8,
+      "y": 32,
+      "rot": 2
+    }
+  ],
+  "expect": "goal"
+}

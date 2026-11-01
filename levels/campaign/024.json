@@ -1,0 +1,87 @@
+{
+  "id": "c024",
+  "world": 3,
+  "number": 24,
+  "title": "High switch",
+  "hint": "The switch has to be up where only the ball can reach it.",
+  "teaches": "switch placement",
+  "goal": {
+    "type": "cheese"
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 5,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 15,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 25,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 35,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "mouse",
+      "x": 2,
+      "y": 42,
+      "rot": 0
+    },
+    {
+      "part": "fan",
+      "x": 29,
+      "y": 38,
+      "rot": 12
+    },
+    {
+      "part": "cheese",
+      "x": 33,
+      "y": 42,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 14,
+      "y": 24,
+      "rot": 0
+    },
+    {
+      "part": "ball",
+      "x": 14,
+      "y": 8,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "switch",
+      "count": 1
+    },
+    {
+      "part": "plank",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "switch",
+      "x": 14,
+      "y": 23,
+      "rot": 0
+    }
+  ],
+  "expect": "goal"
+}

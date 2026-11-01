@@ -1,0 +1,85 @@
+{
+  "id": "c029",
+  "world": 3,
+  "number": 29,
+  "title": "Ceiling switch",
+  "hint": "Only something that floats can reach that switch.",
+  "teaches": "balloon + switch",
+  "goal": {
+    "type": "cheese"
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 5,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 15,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 25,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 35,
+      "y": 40,
+      "rot": 0
+    },
+    {
+      "part": "mouse",
+      "x": 2,
+      "y": 38,
+      "rot": 0
+    },
+    {
+      "part": "fan",
+      "x": 29,
+      "y": 34,
+      "rot": 12
+    },
+    {
+      "part": "cheese",
+      "x": 33,
+      "y": 38,
+      "rot": 0
+    },
+    {
+      "part": "switch",
+      "x": 4,
+      "y": 10,
+      "rot": 12
+    }
+  ],
+  "tray": [
+    {
+      "part": "balloon",
+      "count": 1
+    },
+    {
+      "part": "plank",
+      "count": 1
+    },
+    {
+      "part": "candle",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "balloon",
+      "x": 4,
+      "y": 34,
+      "rot": 0
+    }
+  ],
+  "expect": "goal"
+}

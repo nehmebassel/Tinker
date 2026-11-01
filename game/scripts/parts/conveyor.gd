@@ -30,15 +30,18 @@ func configure(p_def: Dictionary) -> void:
 	var cs := CollisionShape2D.new()
 	cs.shape = PartFactory.make_shape(def)
 	add_child(cs)
+	# Belt strips on BOTH faces: a conveyor rotated 180 degrees (the only way to point it left
+	# with 15-degree steps) must still carry things on its upper face.
 	_belt = Area2D.new()
 	_belt.name = "Belt"
 	_belt.monitorable = false
-	var bcs := CollisionShape2D.new()
-	var r := RectangleShape2D.new()
-	r.size = Vector2(size.x - 8.0, 14.0)
-	bcs.shape = r
-	bcs.position = Vector2(0, -size.y / 2.0 - 5.0)
-	_belt.add_child(bcs)
+	for side in [-1.0, 1.0]:
+		var bcs := CollisionShape2D.new()
+		var r := RectangleShape2D.new()
+		r.size = Vector2(size.x - 8.0, 14.0)
+		bcs.shape = r
+		bcs.position = Vector2(0, side * (size.y / 2.0 + 5.0))
+		_belt.add_child(bcs)
 	add_child(_belt)
 	queue_redraw()
 

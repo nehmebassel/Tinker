@@ -1,0 +1,74 @@
+{
+  "id": "c025",
+  "world": 3,
+  "number": 25,
+  "title": "Wrecking ball II",
+  "hint": "Same trick, one slot, three parts.",
+  "teaches": "rope with distractors",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 9,
+      "y": 32,
+      "rot": 1
+    },
+    {
+      "part": "ball",
+      "x": 12,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "pulley",
+      "x": 20,
+      "y": 20,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 25,
+      "y": 32,
+      "rot": 0
+    },
+    {
+      "part": "ball",
+      "x": 24,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 31,
+      "y": 46,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "rope",
+      "count": 1
+    },
+    {
+      "part": "plank",
+      "count": 1
+    },
+    {
+      "part": "spring",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "rope",
+      "x": 12,
+      "y": 30,
+      "rot": 21
+    }
+  ],
+  "expect": "goal"
+}

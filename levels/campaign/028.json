@@ -1,0 +1,85 @@
+{
+  "id": "c028",
+  "world": 3,
+  "number": 28,
+  "title": "Spring board",
+  "hint": "The cheese is up there. Mice can't climb, but they can be launched.",
+  "teaches": "spring + actor",
+  "goal": {
+    "type": "cheese"
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 5,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 15,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 25,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 4,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "mouse",
+      "x": 2,
+      "y": 28,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 24,
+      "y": 34,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 27,
+      "y": 32,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 29,
+      "y": 31,
+      "rot": 6
+    }
+  ],
+  "tray": [
+    {
+      "part": "spring",
+      "count": 1
+    },
+    {
+      "part": "plank",
+      "count": 1
+    },
+    {
+      "part": "fan",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "spring",
+      "x": 14,
+      "y": 37,
+      "rot": 2
+    }
+  ],
+  "expect": "goal"
+}

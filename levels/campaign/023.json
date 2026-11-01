@@ -1,0 +1,90 @@
+{
+  "id": "c023",
+  "world": 3,
+  "number": 23,
+  "title": "Catapult",
+  "hint": "Feed the mouse. The seesaw can throw.",
+  "teaches": "see-saw + actor",
+  "goal": {
+    "type": "cheese"
+  },
+  "fixed": [
+    {
+      "part": "motor",
+      "x": 20,
+      "y": 36,
+      "rot": 0,
+      "state": {
+        "on": false
+      }
+    },
+    {
+      "part": "plank",
+      "x": 20,
+      "y": 36,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 16,
+      "y": 34,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 11,
+      "y": 37,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 31,
+      "y": 22,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 39,
+      "y": 22,
+      "rot": 0
+    },
+    {
+      "part": "mouse",
+      "x": 35,
+      "y": 20,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 43,
+      "y": 19,
+      "rot": 6
+    },
+    {
+      "part": "plank",
+      "x": 26,
+      "y": 19,
+      "rot": 6
+    }
+  ],
+  "tray": [
+    {
+      "part": "ball",
+      "count": 1
+    },
+    {
+      "part": "fan",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "ball",
+      "x": 22,
+      "y": 2,
+      "rot": 0
+    }
+  ],
+  "expect": "goal"
+}

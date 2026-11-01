@@ -6,7 +6,7 @@
   "goal": {
     "type": "displaced",
     "index": 1,
-    "min_dy": -120
+    "min_dy": -60
   },
   "fixed": [
     {

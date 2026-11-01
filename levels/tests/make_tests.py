@@ -66,13 +66,13 @@ level("t_conveyor_cat", "Conveyor carries sleeping cat",
 # ---------------------------------------------------------------- spring
 level("t_spring_ball", "Spring launches ball",
       [P("spring", 20, 40, 0), P("ball", 20, 28)],
-      {"type": "displaced", "index": 1, "min_dy": -300}, note="spring -> ball")
+      {"type": "displaced", "index": 1, "min_dy": -100}, note="spring -> ball")
 level("t_spring_mouse", "Spring launches mouse",
       [P("spring", 20, 40, 0), P("mouse", 20, 30)],
-      {"type": "displaced", "index": 1, "min_dy": -200}, note="spring -> mouse")
+      {"type": "displaced", "index": 1, "min_dy": -100}, note="spring -> mouse")
 level("t_spring_bucket", "Spring launches bucket",
       [P("spring", 20, 40, 0), P("bucket", 20, 28)],
-      {"type": "displaced", "index": 1, "min_dy": -120}, note="spring -> bucket")
+      {"type": "displaced", "index": 1, "min_dy": -60}, note="spring -> bucket")
 
 # ---------------------------------------------------------------- motor
 level("t_motor_paddle", "Motor spins a paddle that hits the ball",

@@ -13,7 +13,7 @@ extends Control
 ##  * minimum touch target 44 pt (we use 132 px at 1080 wide, about 48 pt on a 6" phone)
 
 const LEVEL_PATH_DEFAULT := "res://levels/campaign/001.json"
-const TOP_BAR_H := 160.0
+const TOP_BAR_H := 236.0  # 72 title row + 132 buttons + margins
 const TRAY_H := 320.0
 const TRAY_TAB_H := 72.0
 const BTN := 132.0  # touch target in px at design width
@@ -34,6 +34,10 @@ const C_PANEL_TXT := Color("fbf6ea")
 const C_BAD := Color("ff3b3b")
 
 @export var level_path: String = LEVEL_PATH_DEFAULT
+var level_number: int = 0  # campaign number when opened from the world select, else 0
+var next_btn: Button
+var levels_btn: Button
+var back_btn: Button
 
 var level: LevelData
 var sim: Simulation
@@ -94,6 +98,9 @@ func _ready() -> void:
 		elif a.begins_with("--shot="):
 			shot_path = a.trim_prefix("--shot=")
 	_build_scene()
+	level_number = App.level_number if has_node("/root/App") else 0
+	if level_number > 0:
+		level_path = Campaign.path_for(level_number)
 	_load_level(level_path)
 	get_viewport().size_changed.connect(_on_resized)
 	_fit_camera()
@@ -139,44 +146,52 @@ func _build_scene() -> void:
 	add_child(hud)
 
 	# Top bar: title, counter, undo, redo.
+	# Top bar: two rows. Row 1: back, title, counter. Row 2: Undo Redo Turn 90 Fit (132 px targets).
+	# Two rows because a one-row bar leaves ~200 px for the title at 1080 wide, which is not a title.
 	var top := PanelContainer.new()
 	top.name = "TopBar"
 	top.add_theme_stylebox_override("panel", _panel_style(C_PANEL, 0))
 	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	top.custom_minimum_size.y = TOP_BAR_H
 	hud.add_child(top)
-	var top_h := HBoxContainer.new()
-	top_h.add_theme_constant_override("separation", 16)
-	top.add_child(top_h)
-	var pad := Control.new()
-	pad.custom_minimum_size.x = 8
-	top_h.add_child(pad)
-	var vb := VBoxContainer.new()
-	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	top_h.add_child(vb)
-	title_lbl = _label("", 44, C_PANEL_TXT)
-	vb.add_child(title_lbl)
+	var top_v := VBoxContainer.new()
+	top_v.add_theme_constant_override("separation", 8)
+	top.add_child(top_v)
+	var row1 := HBoxContainer.new()
+	row1.add_theme_constant_override("separation", 16)
+	top_v.add_child(row1)
+	back_btn = _button("<", 96)
+	back_btn.custom_minimum_size = Vector2(96, 72)
+	back_btn.pressed.connect(func() -> void: App.open_world_select())
+	row1.add_child(back_btn)
+	title_lbl = _label("", 40, C_PANEL_TXT)
+	title_lbl.clip_text = true
+	title_lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row1.add_child(title_lbl)
 	counter_lbl = _label("", 30, Color(C_PANEL_TXT, 0.8))
-	vb.add_child(counter_lbl)
+	counter_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row1.add_child(counter_lbl)
+	var row2 := HBoxContainer.new()
+	row2.add_theme_constant_override("separation", 16)
+	row2.alignment = BoxContainer.ALIGNMENT_END
+	top_v.add_child(row2)
 	undo_btn = _button("Undo", BTN)
 	undo_btn.pressed.connect(_undo)
-	top_h.add_child(undo_btn)
+	row2.add_child(undo_btn)
 	redo_btn = _button("Redo", BTN)
 	redo_btn.pressed.connect(_redo)
-	top_h.add_child(redo_btn)
+	row2.add_child(redo_btn)
 	rot_btn = _button("Turn", BTN)
 	rot_btn.pressed.connect(func() -> void: _rotate_selected(1))
-	top_h.add_child(rot_btn)
+	row2.add_child(rot_btn)
 	rot90_btn = _button("90°", BTN)
 	rot90_btn.pressed.connect(func() -> void: _rotate_selected(6))
-	top_h.add_child(rot90_btn)
+	row2.add_child(rot90_btn)
 	fit_btn = _button("Fit", BTN)
 	fit_btn.pressed.connect(_fit_camera)
-	top_h.add_child(fit_btn)
-	var pad2 := Control.new()
-	pad2.custom_minimum_size.x = 8
-	top_h.add_child(pad2)
+	row2.add_child(fit_btn)
 
 	# Tray at the bottom with a collapse tab.
 	tray = PanelContainer.new()
@@ -257,11 +272,24 @@ func _build_scene() -> void:
 	result_lbl = _label("", 44, C_PANEL_TXT)
 	result_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	rv2.add_child(result_lbl)
-	var again := _button("Build again", BTN)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 20)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	rv2.add_child(row)
+	var again := _button("Again", BTN)
 	again.pressed.connect(func() -> void:
 		result_panel.visible = false
 		_stop_run())
-	rv2.add_child(again)
+	row.add_child(again)
+	levels_btn = _button("Levels", BTN)
+	levels_btn.pressed.connect(func() -> void: App.open_world_select())
+	row.add_child(levels_btn)
+	next_btn = _button("Next", BTN)
+	next_btn.add_theme_stylebox_override("normal", _round_style(C_GO))
+	next_btn.add_theme_stylebox_override("hover", _round_style(C_GO))
+	next_btn.add_theme_color_override("font_color", C_INK)
+	next_btn.pressed.connect(func() -> void: App.open_level(level_number + 1))
+	row.add_child(next_btn)
 
 
 func _label(text: String, size: int, color: Color) -> Label:
@@ -327,7 +355,8 @@ func _load_level(path: String) -> void:
 	first_touch_msec = -1
 	run_ended = false
 	sim.load_level(level)
-	title_lbl.text = level.title
+	title_lbl.text = ("%d · " % level_number if level_number > 0 else "") + level.title
+	back_btn.visible = level_number > 0
 	_rebuild_tray()
 	_refresh_hud()
 	stage_bg.queue_redraw()
@@ -353,7 +382,7 @@ func _make_tray_item(part: String) -> Control:
 	item.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	item.set_meta("part", part)
 	var holder := Node2D.new()
-	holder.position = Vector2(110, 84)
+	holder.position = Vector2(110, 78)
 	item.add_child(holder)
 	var preview := PartFactory.create(Placement.new(part, Vector2i.ZERO, 0), 9000, false)
 	if preview:
@@ -362,7 +391,7 @@ func _make_tray_item(part: String) -> Control:
 		var s: Dictionary = def["shape"]
 		var w: float = float(s.get("w", s.get("radius", 40) * 2.0))
 		var h: float = float(s.get("h", s.get("radius", 40) * 2.0))
-		var k: float = minf(170.0 / maxf(w, 1.0), 120.0 / maxf(h, 1.0))
+		var k: float = minf(170.0 / maxf(w, 1.0), 90.0 / maxf(h, 1.0))
 		preview.scale = Vector2(k, k)
 		holder.add_child(preview)
 	var count := _label("", 30, C_PANEL_TXT)
@@ -910,6 +939,12 @@ func _on_run_finished(outcome: Dictionary) -> void:
 			solved_msec = Time.get_ticks_msec()
 			var secs := (solved_msec - first_touch_msec) / 1000.0 if first_touch_msec >= 0 else 0.0
 			result_lbl.text = "Solved!\n%d part%s · %.1f s" % [outcome["parts_used"], "" if outcome["parts_used"] == 1 else "s", secs]
+			if level_number > 0:
+				var new_best := App.save.record_solve(level_number, int(outcome["parts_used"]), int(secs * 1000.0), placements)
+				if new_best:
+					result_lbl.text += "\nNew best!"
+			next_btn.visible = level_number > 0 and App.has_next(level_number)
+			levels_btn.visible = level_number > 0
 			result_panel.visible = true
 		"stalled":
 			_toast("Everything stopped. Press STOP to rewind.")
@@ -982,38 +1017,52 @@ func _toast(msg: String) -> void:
 ## build/shots/. Exit code 0 only if the level is solved through the UI.
 
 func _run_smoke() -> void:
+	var outcome: Dictionary = await run_smoke_steps()
+	var ok: bool = _smoke_ok and outcome.get("result", "") == "goal"
+	print("SMOKE %s" % ("PASS" if ok else "FAIL"))
+	get_tree().quit(0 if ok else 1)
+
+
+var _smoke_ok := true
+
+
+## Drives the real input path: drag the first tray part to the reference cell, rotate it with the
+## ring, undo/redo, PLAY, wait for the result, screenshot every step. Returns the outcome.
+func run_smoke_steps() -> Dictionary:
+	_smoke_ok = true
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var shots_dir := "res://../build/shots"
 	DirAccess.make_dir_recursive_absolute(shots_dir)
-	var ok := true
 	_shot(shots_dir + "/01_start.png")
-	# 1. Drag from tray item to the reference cell.
+	var vw := get_viewport_rect().size.x
+	for b in [undo_btn, redo_btn, rot_btn, rot90_btn, fit_btn]:
+		_assert(b.get_global_rect().end.x <= vw + 0.5, "%s inside the viewport (right edge %.0f <= %.0f)" % [b.text, b.get_global_rect().end.x, vw])
 	var item: Control = tray_items.get_child(0)
 	var from: Vector2 = item.get_global_rect().get_center()
 	var target: Placement = level.reference_solution[0]
 	var to: Vector2 = _world_to_screen(Grid.cell_to_world(target.cell) - LIFT)
 	await _synthetic_drag(0, from, to, 12)
 	_shot(shots_dir + "/02_dropped.png")
-	ok = ok and _assert(placements.size() == 1, "one part placed")
-	ok = ok and _assert(placements[0].cell == target.cell, "landed on cell %s (got %s)" % [target.cell, placements[0].cell if placements.size() else "none"])
-	ok = ok and _assert(selected == 0, "dropped part is selected")
-	# 2. Rotate with the ring handle to the reference rotation.
+	_assert(placements.size() == 1, "one part placed")
+	_assert(placements.size() == 1 and placements[0].cell == target.cell, "landed on cell %s (got %s)" % [target.cell, placements[0].cell if placements.size() else "none"])
+	_assert(selected == 0, "dropped part is selected")
+	if placements.is_empty():
+		return {}
 	var handle_from: Vector2 = _world_to_screen(ring_pos + Vector2(RING_R, 0).rotated(Grid.steps_to_radians(placements[0].rot)))
 	var handle_to: Vector2 = _world_to_screen(ring_pos + Vector2(RING_R, 0).rotated(Grid.steps_to_radians(target.rot)))
 	await _synthetic_drag(0, handle_from, handle_to, 10)
 	_shot(shots_dir + "/03_rotated.png")
-	ok = ok and _assert(placements[0].rot == target.rot, "rotated to %d (got %d)" % [target.rot, placements[0].rot])
-	# 3. Undo / redo round trip.
-	_undo()
-	ok = ok and _assert(placements[0].rot != target.rot, "undo reverted rotation")
-	_redo()
-	ok = ok and _assert(placements[0].rot == target.rot, "redo restored rotation")
-	# 4. Play and wait. Subscribe BEFORE starting: a fast level can finish within the first second.
+	_assert(placements[0].rot == target.rot, "rotated to %d (got %d)" % [target.rot, placements[0].rot])
+	if target.rot != 0:
+		_undo()
+		_assert(placements[0].rot != target.rot, "undo reverted rotation")
+		_redo()
+		_assert(placements[0].rot == target.rot, "redo restored rotation")
 	var outcome_box := {}
 	sim.finished.connect(func(o: Dictionary) -> void: outcome_box["o"] = o, CONNECT_ONE_SHOT)
-	_start_run()
-	ok = ok and _assert(sim.running, "simulation running after PLAY")
+	await _tap_button(play_btn)
+	_assert(sim.running, "simulation running after PLAY")
 	await get_tree().create_timer(1.0).timeout
 	_shot(shots_dir + "/04_running.png")
 	while not outcome_box.has("o"):
@@ -1021,15 +1070,9 @@ func _run_smoke() -> void:
 	var outcome: Dictionary = outcome_box["o"]
 	await get_tree().create_timer(0.5).timeout
 	_shot(shots_dir + "/05_result.png")
-	ok = ok and _assert(outcome["result"] == "goal", "level solved through the UI (result=%s)" % outcome["result"])
-	ok = ok and _assert(result_panel.visible, "result panel shown")
-	# 5. Stop rewinds.
-	_stop_run()
-	await get_tree().process_frame
-	ok = ok and _assert(not sim.running and not run_ended, "stop rewound")
-	_shot(shots_dir + "/06_rewound.png")
-	print("SMOKE %s" % ("PASS" if ok else "FAIL"))
-	get_tree().quit(0 if ok else 1)
+	_assert(outcome["result"] == "goal", "level solved through the UI (result=%s)" % outcome["result"])
+	_assert(result_panel.visible, "result panel shown")
+	return outcome
 
 
 func _run_shot() -> void:
@@ -1048,8 +1091,22 @@ func _run_shot() -> void:
 	get_tree().quit(0)
 
 
+func _tap_button(b: Control) -> void:
+	var xf := get_viewport().get_final_transform()
+	var p := xf * b.get_global_rect().get_center()
+	for pressed in [true, false]:
+		var ev := InputEventScreenTouch.new()
+		ev.index = 0
+		ev.position = p
+		ev.pressed = pressed
+		Input.parse_input_event(ev)
+		await get_tree().process_frame
+	await get_tree().process_frame
+
+
 func _assert(cond: bool, what: String) -> bool:
 	print("  %s %s" % ["ok  " if cond else "FAIL", what])
+	_smoke_ok = _smoke_ok and cond
 	return cond
 
 

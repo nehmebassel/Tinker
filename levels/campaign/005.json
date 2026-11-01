@@ -1,0 +1,70 @@
+{
+  "id": "c005",
+  "world": 1,
+  "number": 5,
+  "title": "Long way round",
+  "hint": "Small errors compound. Chain the fans.",
+  "teaches": "chains",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 5,
+      "y": 14,
+      "rot": 0
+    },
+    {
+      "part": "ball",
+      "x": 5,
+      "y": 12,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 18,
+      "y": 34,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 31,
+      "y": 50,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "fan",
+      "count": 2
+    },
+    {
+      "part": "plank",
+      "count": 1
+    }
+  ],
+  "slots": 3,
+  "reference_solution": [
+    {
+      "part": "fan",
+      "x": 0,
+      "y": 12,
+      "rot": 0
+    },
+    {
+      "part": "fan",
+      "x": 12,
+      "y": 32,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 28,
+      "y": 42,
+      "rot": 3
+    }
+  ],
+  "expect": "goal"
+}

@@ -65,9 +65,11 @@ func _physics_process(_delta: float) -> void:
 	if dir != 0 and grounded:
 		var target := dir * speed
 		var dv := clampf(target - linear_velocity.x, -accel / 60.0, accel / 60.0)
-		linear_velocity.x += dv
+		# Impulses, never a direct velocity write: writing linear_velocity would discard impulses
+		# other parts applied this tick (a conveyor belt dragging the mouse the other way).
+		apply_central_impulse(Vector2(dv * mass, 0))
 		if _blocked_ahead() and _hop_cooldown == 0:
-			linear_velocity.y = -hop
+			apply_central_impulse(Vector2(0, (-hop - linear_velocity.y) * mass))
 			_hop_cooldown = 30
 	queue_redraw()
 
@@ -77,14 +79,19 @@ func decide() -> int:
 	return 0
 
 
+## Three rays (left foot, centre, right foot): a body hanging over a ledge edge is still supported
+## by that edge and must keep steering, otherwise it stalls there forever.
 func _grounded() -> bool:
 	var space := get_world_2d().direct_space_state
-	var from := global_position
-	var to := global_position + Vector2(0, size.y / 2.0 + 6.0)
-	var q := PhysicsRayQueryParameters2D.create(from, to)
-	q.exclude = [get_rid()]
-	q.collide_with_areas = false
-	return not space.intersect_ray(q).is_empty()
+	for fx in [-size.x * 0.4, 0.0, size.x * 0.4]:
+		var from := global_position + Vector2(fx, 0)
+		var to := from + Vector2(0, size.y / 2.0 + 6.0)
+		var q := PhysicsRayQueryParameters2D.create(from, to)
+		q.exclude = [get_rid()]
+		q.collide_with_areas = false
+		if not space.intersect_ray(q).is_empty():
+			return true
+	return false
 
 
 func _blocked_ahead() -> bool:

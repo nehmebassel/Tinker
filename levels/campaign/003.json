@@ -1,0 +1,54 @@
+{
+  "id": "c003",
+  "world": 1,
+  "number": 3,
+  "title": "Up and over",
+  "hint": "A spring throws whatever lands on it. Angle it.",
+  "teaches": "vertical launch, angle",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "ball",
+      "x": 10,
+      "y": 28,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 10,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 26,
+      "y": 34,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 26,
+      "y": 30,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "spring",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "spring",
+      "x": 10,
+      "y": 41,
+      "rot": 1
+    }
+  ],
+  "expect": "goal"
+}

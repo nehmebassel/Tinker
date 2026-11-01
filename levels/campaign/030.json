@@ -1,0 +1,85 @@
+{
+  "id": "c030",
+  "world": 3,
+  "number": 30,
+  "title": "Grand finale",
+  "hint": "Everything you know. Two slots.",
+  "teaches": "world 3 finale",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "ball",
+      "x": 3,
+      "y": 8,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 6,
+      "y": 30,
+      "rot": 1
+    },
+    {
+      "part": "ball",
+      "x": 6,
+      "y": 28,
+      "rot": 0
+    },
+    {
+      "part": "motor",
+      "x": 15,
+      "y": 36,
+      "rot": 0,
+      "state": {
+        "on": false
+      }
+    },
+    {
+      "part": "plank",
+      "x": 15,
+      "y": 36,
+      "rot": 6
+    },
+    {
+      "part": "basket",
+      "x": 28,
+      "y": 50,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "switch",
+      "count": 1
+    },
+    {
+      "part": "plank",
+      "count": 1
+    },
+    {
+      "part": "fan",
+      "count": 1
+    },
+    {
+      "part": "spring",
+      "count": 1
+    },
+    {
+      "part": "rope",
+      "count": 1
+    }
+  ],
+  "slots": 2,
+  "reference_solution": [
+    {
+      "part": "switch",
+      "x": 3,
+      "y": 26,
+      "rot": 0
+    }
+  ],
+  "expect": "goal"
+}

@@ -1,0 +1,88 @@
+{
+  "id": "c027",
+  "world": 3,
+  "number": 27,
+  "title": "Pop the right one",
+  "hint": "Two balloons. Only one carries the cheese.",
+  "teaches": "read the setup",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 10,
+      "y": 12,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 22,
+      "y": 12,
+      "rot": 0
+    },
+    {
+      "part": "balloon",
+      "x": 10,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 10,
+      "y": 42,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 10,
+      "y": 42,
+      "rot": 18
+    },
+    {
+      "part": "balloon",
+      "x": 22,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "ball",
+      "x": 22,
+      "y": 42,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 22,
+      "y": 42,
+      "rot": 18
+    },
+    {
+      "part": "basket",
+      "x": 10,
+      "y": 50,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "candle",
+      "count": 1
+    },
+    {
+      "part": "fan",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "candle",
+      "x": 10,
+      "y": 20,
+      "rot": 12
+    }
+  ],
+  "expect": "goal"
+}

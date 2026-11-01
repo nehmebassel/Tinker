@@ -1,0 +1,79 @@
+{
+  "id": "c017",
+  "world": 2,
+  "number": 17,
+  "title": "Guard cat",
+  "hint": "The cat sleeps by the cheese. Scare it off before the mouse arrives.",
+  "teaches": "actors + slots",
+  "goal": {
+    "type": "cheese"
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 5,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 12,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 17,
+      "y": 46,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 27,
+      "y": 46,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 27,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "mouse",
+      "x": 3,
+      "y": 42,
+      "rot": 0
+    },
+    {
+      "part": "cat",
+      "x": 12,
+      "y": 42,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "candle",
+      "count": 1
+    },
+    {
+      "part": "fan",
+      "count": 1
+    },
+    {
+      "part": "switch",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "candle",
+      "x": 12,
+      "y": 38,
+      "rot": 0
+    }
+  ],
+  "expect": "goal"
+}
