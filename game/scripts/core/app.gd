@@ -15,6 +15,7 @@ var level_number: int = 0
 ## The Daily currently open: {"date": String, "day": int, "level": Dictionary} or {} for campaign play.
 var daily: Dictionary = {}
 var board_date: String = ""
+var _nav_gen := 0  # bumped by every navigation; a slow async navigation checks it before switching
 var flow_test: bool = false
 var daily_test: String = ""  # --daily-flow=<solution.json>: CI test of the whole daily loop
 
@@ -47,21 +48,25 @@ func _ready() -> void:
 ## Scene changes are deferred so the input event that triggered them (a button release) finishes
 ## before its scene is freed.
 func open_level(number: int) -> void:
+	_nav_gen += 1
 	level_number = number
 	get_tree().change_scene_to_file.call_deferred(LEVEL)
 
 
 func open_world_select() -> void:
+	_nav_gen += 1
 	level_number = 0
 	daily = {}
 	get_tree().change_scene_to_file.call_deferred(WORLD_SELECT)
 
 
 func open_settings() -> void:
+	_nav_gen += 1
 	get_tree().change_scene_to_file.call_deferred(SETTINGS)
 
 
 func open_board(date: String) -> void:
+	_nav_gen += 1
 	board_date = date
 	get_tree().change_scene_to_file.call_deferred(BOARD)
 
@@ -73,7 +78,11 @@ func open_daily() -> String:
 	if daily_store.is_submitted(today):
 		open_board(today)
 		return ""
+	_nav_gen += 1
+	var my_gen := _nav_gen
 	var r: Dictionary = await api.get_json("/daily/" + today)
+	if my_gen != _nav_gen:
+		return ""  # the player went somewhere else while this was loading: don't yank them away
 	if not r["ok"]:
 		return "Daily unavailable: " + str(r["error"])
 	var body: Dictionary = r["body"]
@@ -99,13 +108,13 @@ func sync_push() -> void:
 
 
 ## Submits today's solution (once). Returns the server's answer.
-func submit_daily(placements: Array) -> Dictionary:
+func submit_daily(placements: Array, solve_ms: int) -> Dictionary:
 	var date: String = daily.get("date", "")
 	var sol := []
 	for p in placements:
 		sol.append({"part": p.part, "x": p.cell.x, "y": p.cell.y, "rot": p.rot})
 	var body := {"device_id": settings.device_id, "date": date, "solution": sol,
-		"elapsed_ms": daily_store.elapsed_ms(date), "country": Settings.country(), "name": settings.name}
+		"elapsed_ms": solve_ms, "country": Settings.country(), "name": settings.name}
 	var r: Dictionary = await api.post_json("/score", body)
 	if r["ok"] or r["status"] == 409:
 		var b: Dictionary = r["body"] if r["body"] is Dictionary else {}

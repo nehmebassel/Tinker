@@ -7,6 +7,11 @@ import { readFile } from "node:fs/promises";
 import { createApp, db, publicId } from "../src/app.js";
 import { todayUtc } from "../src/config.js";
 
+// SAFETY: these tests delete whole collections. They must never touch a real Firestore. Refuse to run
+// unless the emulator is configured, before the app (and its Firestore client) is even used.
+if (!process.env.FIRESTORE_EMULATOR_HOST) {
+  throw new Error("Refusing to run: FIRESTORE_EMULATOR_HOST is not set. These tests wipe collections and must only run against the Firestore emulator.");
+}
 process.env.ADMIN_TOKEN = process.env.ADMIN_TOKEN || "test-admin";
 const ADMIN = process.env.ADMIN_TOKEN;
 const campaign = new URL("../../levels/campaign/001.json", import.meta.url).pathname;
@@ -21,6 +26,7 @@ const fakeFcm = {
 const fakeGenerate = async (date) => ({ ok: true, level: { ...level1, id: "d-" + date, title: "Daily " + date }, info: { template: "fake" } });
 
 before(async () => {
+  assert.ok(process.env.FIRESTORE_EMULATOR_HOST, "emulator required");
   level1 = JSON.parse(await readFile(campaign, "utf8"));
   // Wipe emulator state for the collections we touch.
   for (const c of ["daily", "scores", "levels", "devices", "push"]) {
@@ -210,4 +216,63 @@ test("ties share a rank on the board and in the submission response (1, 1, 3)", 
   assert.deepEqual(b.body.rows.map((r) => r.rank), [1, 1, 3]);
   assert.equal(b.body.me.rank, 1);
   assert.equal(b.body.rows.find((r) => r.is_me).rank, b.body.me.rank, "my row and me agree");
+});
+
+test("notify: two overlapping calls send exactly once", async () => {
+  const D = "2026-12-01";
+  await db.collection("daily").doc(D).set({ date: D, level: { ...level1, id: "d-" + D } });
+  const before = fcmCalls.filter((c) => c[0] === "send" && c[3] === false).length;
+  const [a, b] = await Promise.all([
+    j("POST", `/admin/notify?date=${D}`, null, { "x-admin-token": ADMIN }),
+    j("POST", `/admin/notify?date=${D}`, null, { "x-admin-token": ADMIN }),
+  ]);
+  assert.equal(a.status, 200); assert.equal(b.status, 200);
+  assert.equal(fcmCalls.filter((c) => c[0] === "send" && c[3] === false).length - before, 1);
+  assert.equal([a.body, b.body].filter((x) => x.skipped === "already sent").length, 1);
+});
+
+test("notify: a failed send releases the claim so a retry can send", async () => {
+  const D = "2026-12-02";
+  await db.collection("daily").doc(D).set({ date: D, level: { ...level1, id: "d-" + D } });
+  let fail = true;
+  const flaky = { ...fakeFcm, async sendTopic(...a) { if (fail) throw new Error("fcm down"); return fakeFcm.sendTopic(...a); } };
+  const s3 = createApp({ fcm: flaky }).listen(0);
+  const b3 = `http://127.0.0.1:${s3.address().port}`;
+  try {
+    const r1 = await fetch(`${b3}/admin/notify?date=${D}`, { method: "POST", headers: { "x-admin-token": ADMIN } });
+    assert.equal(r1.status, 500);
+    fail = false;
+    const r2 = await fetch(`${b3}/admin/notify?date=${D}`, { method: "POST", headers: { "x-admin-token": ADMIN } });
+    assert.equal((await r2.json()).dry_run, false, "retry actually sent");
+  } finally { s3.close(); }
+});
+
+test("country board never mixes in my entry from another country", async () => {
+  const D = "2026-10-30";
+  await db.collection("scores").doc(`${D}_cc-dev-0001`).set({ date: D, device_id: "cc-dev-0001", country: "FR", parts: 1, ms: 100, name: "" });
+  await db.collection("scores").doc(`${D}_cc-dev-0002`).set({ date: D, device_id: "cc-dev-0002", country: "LB", parts: 1, ms: 200, name: "" });
+  const r = await j("GET", `/board/${D}?scope=country&country=LB&device_id=cc-dev-0001`);
+  assert.equal(r.body.country, "LB");
+  assert.equal(r.body.rows.length, 1);
+  assert.equal(r.body.me, null, "my FR entry is not on the LB board");
+});
+
+test("generate never overwrites a level curated while it was generating", async () => {
+  const D = (await import("../src/config.js")).todayUtc();
+  await db.collection("daily").doc(D).delete();
+  let release;
+  const gate = new Promise((r) => (release = r));
+  const slowGen = async (date) => { await gate; return { ok: true, level: { ...level1, id: "d-" + date, title: "Generated" }, info: { template: "slow" } }; };
+  const s4 = createApp({ generateFn: slowGen, fcm: fakeFcm }).listen(0);
+  const b4 = `http://127.0.0.1:${s4.address().port}`;
+  try {
+    const gen = fetch(`${b4}/admin/generate?days=1`, { method: "POST", headers: { "x-admin-token": ADMIN } });
+    await new Promise((r) => setTimeout(r, 300));
+    const cur = await j("PUT", `/admin/daily/${D}`, { level: { ...level1, title: "Curated wins" } }, { "x-admin-token": ADMIN });
+    assert.equal(cur.status, 200);
+    release();
+    const g = await (await gen).json();
+    assert.deepEqual(g.skipped, [D]);
+    assert.equal((await j("GET", `/daily/${D}`)).body.level.title, "Curated wins");
+  } finally { s4.close(); }
 });

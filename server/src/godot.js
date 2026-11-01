@@ -27,10 +27,12 @@ function run(args, timeoutMs) {
     const t = setTimeout(() => p.kill("SIGKILL"), timeoutMs);
     p.stdout.on("data", (d) => (out += d));
     p.stderr.on("data", (d) => (err += d));
-    p.on("close", (code) => {
-      clearTimeout(t);
-      resolve({ code, out, err });
-    });
+    let done = false;
+    const finish = (r) => { if (!done) { done = true; clearTimeout(t); resolve(r); } };
+    // Spawn failures (missing binary, EAGAIN...) arrive as 'error', not 'close': unhandled, they
+    // would crash the server. Resolve as a failed run instead.
+    p.on("error", (e) => finish({ code: -1, out, err: err + "\nspawn error: " + e.message }));
+    p.on("close", (code) => finish({ code, out, err }));
   });
 }
 

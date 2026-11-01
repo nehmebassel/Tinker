@@ -129,6 +129,8 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
       if (s.exists) { mine = s.data(); if (!country) country = mine.country; }
     }
     if (scope === "country" && !country) return res.status(400).json({ error: "country required for country scope" });
+    // One leaderboard per response: on a country board, my row only appears if my entry is in it.
+    if (scope === "country" && mine && mine.country !== country) mine = null;
     let q = col.scores().where("date", "==", date);
     if (scope === "country") q = q.where("country", "==", country);
     q = q.orderBy("parts", "asc").orderBy("ms", "asc").limit(config.boardSize);
@@ -238,8 +240,14 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
         failed.push({ date, error: g.error, detail: (g.detail || "").slice(-800) });
         continue;
       }
-      await ref.set({ date, level: g.level, curated: false, source: "generator", info: g.info, created_at: new Date().toISOString() });
-      made.push(date);
+      // create(), not set(): a level curated while this one was generating must win.
+      try {
+        await ref.create({ date, level: g.level, curated: false, source: "generator", info: g.info, created_at: new Date().toISOString() });
+        made.push(date);
+      } catch (err) {
+        if (err?.code === 6) { skipped.push(date); continue; }
+        throw err;
+      }
     }
     res.json({ made, skipped, failed });
   });
@@ -270,10 +278,27 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     const daily = await col.daily().doc(date).get();
     if (!daily.exists) return res.status(409).json({ error: "no level for " + date + " (generate first)" });
     const ref = col.push().doc(date);
-    if (!dry && (await ref.get()).exists) return res.json({ ok: true, skipped: "already sent", date });
-    const r = await fcm.sendTopic(config.pushTopic, dailyMessage(date, dayNumber(date)), dry);
-    if (!dry) await ref.set({ date, topic: config.pushTopic, id: r.id, sent_at: new Date().toISOString() });
-    res.json({ ok: true, date, dry_run: dry, id: r.id });
+    if (dry) {
+      const r = await fcm.sendTopic(config.pushTopic, dailyMessage(date, dayNumber(date)), true);
+      return res.json({ ok: true, date, dry_run: true, id: r.id });
+    }
+    // Claim the day atomically BEFORE sending: of two overlapping calls only one creates the claim.
+    // If the send fails, the claim is released so the scheduler's retry can try again.
+    try {
+      await ref.create({ date, topic: config.pushTopic, status: "sending", claimed_at: new Date().toISOString() });
+    } catch (err) {
+      if (err?.code === 6) return res.json({ ok: true, skipped: "already sent", date });
+      throw err;
+    }
+    let r;
+    try {
+      r = await fcm.sendTopic(config.pushTopic, dailyMessage(date, dayNumber(date)), false);
+    } catch (err) {
+      await ref.delete().catch(() => {});
+      throw err;
+    }
+    await ref.update({ status: "sent", id: r.id, sent_at: new Date().toISOString() });
+    res.json({ ok: true, date, dry_run: false, id: r.id });
   });
   admin.get("/daily/:date/full", async (req, res) => {
     const snap = await col.daily().doc(req.params.date).get();

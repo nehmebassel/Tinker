@@ -40,6 +40,7 @@ var levels_btn: Button
 var back_btn: Button
 var submit_btn: Button
 var daily: Dictionary = {}  # set when playing the Daily (see App.daily)
+var _solve_ms := 0  # Daily: time from first touch to THIS solve, frozen when the run reached the goal
 
 var level: LevelData
 var sim: Simulation
@@ -969,7 +970,8 @@ func _on_run_finished(outcome: Dictionary) -> void:
 			next_btn.visible = level_number > 0 and App.has_next(level_number)
 			levels_btn.visible = level_number > 0
 			if not daily.is_empty():
-				var ms: int = App.daily_store.elapsed_ms(daily["date"])
+				_solve_ms = App.daily_store.elapsed_ms(daily["date"])
+				var ms: int = _solve_ms
 				result_lbl.text = "Solved!\n%d part%s · %s\nSubmit is final: one entry per day." % [outcome["parts_used"], "" if outcome["parts_used"] == 1 else "s", _fmt_ms(ms)]
 			submit_btn.visible = not daily.is_empty()
 			result_panel.visible = true
@@ -1029,7 +1031,7 @@ static func _fmt_ms(ms: int) -> String:
 func _submit_daily() -> void:
 	submit_btn.disabled = true
 	submit_btn.text = "Checking…"
-	var r: Dictionary = await App.submit_daily(placements)
+	var r: Dictionary = await App.submit_daily(placements, _solve_ms)
 	if r["ok"] or r["status"] == 409:
 		App.open_board(daily["date"])
 		return
