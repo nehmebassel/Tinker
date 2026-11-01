@@ -406,7 +406,7 @@ class RopeLine:
 		length = start_length
 
 	func is_winching() -> bool:
-		if winch == null or not winch.on:
+		if winch == null or not winch.on or is_slack():
 			return false
 		# Still counts as motion only while the length can still change.
 		return (winch.direction > 0 and length > MIN_LENGTH) or (winch.direction < 0 and length < start_length * 2.0)
@@ -420,7 +420,22 @@ class RopeLine:
 	static func _dynamic(n: Node2D) -> bool:
 		return n is RigidBody2D and not n.freeze
 
+	## An endpoint that left play (popped balloon, eaten cheese, caught mouse, fell off the stage)
+	## no longer holds the rope: the line goes slack instead of acting as an invisible anchor.
+	static func _gone(n: Node2D) -> bool:
+		if n.get_meta("out", false):
+			return true
+		for key in ["popped", "eaten", "caught"]:
+			if n.get(key) == true:
+				return true
+		return false
+
+	func is_slack() -> bool:
+		return _gone(chain[0]) or _gone(chain[-1])
+
 	func enforce() -> void:
+		if is_slack():
+			return
 		if winch != null and winch.on:
 			length = clampf(length - winch.direction * winch.winch_speed / 60.0, MIN_LENGTH, start_length * 2.0)
 		var d := current_length()

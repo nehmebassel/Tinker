@@ -756,11 +756,27 @@ func _overlaps(cell: Vector2i, rot: int) -> bool:
 	q.collide_with_areas = false
 	q.margin = -2.0
 	var hits := space.intersect_shape(q, 8)
+	var part_id: String = ghost.get_meta("part_id")
 	for h in hits:
 		var node: Node = h["collider"]
-		if node.has_meta("part_index") and int(node.get_meta("part_index")) < 9000:
-			return true
+		if not node.has_meta("part_index") or int(node.get_meta("part_index")) >= 9000:
+			continue
+		if _attaches(part_id, cell, node):
+			continue  # same-cell attachment (plank/conveyor/pulley on a motor), not an overlap
+		return true
 	return false
+
+
+## A motor and a plank/conveyor/pulley on the SAME cell are an attachment, which the editor must
+## allow even though their shapes intersect (see docs/DESIGN.md "Parts").
+const ATTACHES_TO_MOTOR := ["plank", "conveyor", "pulley"]
+
+
+func _attaches(part_id: String, cell: Vector2i, other: Node) -> bool:
+	if Vector2i(other.get_meta("cell")) != cell:
+		return false
+	var other_id: String = other.get_meta("part_id")
+	return (part_id == "motor" and other_id in ATTACHES_TO_MOTOR) or (other_id == "motor" and part_id in ATTACHES_TO_MOTOR)
 
 
 # ------------------------------------------------------------------ pinch / pan
@@ -993,12 +1009,16 @@ func _run_smoke() -> void:
 	ok = ok and _assert(placements[0].rot != target.rot, "undo reverted rotation")
 	_redo()
 	ok = ok and _assert(placements[0].rot == target.rot, "redo restored rotation")
-	# 4. Play and wait.
+	# 4. Play and wait. Subscribe BEFORE starting: a fast level can finish within the first second.
+	var outcome_box := {}
+	sim.finished.connect(func(o: Dictionary) -> void: outcome_box["o"] = o, CONNECT_ONE_SHOT)
 	_start_run()
 	ok = ok and _assert(sim.running, "simulation running after PLAY")
 	await get_tree().create_timer(1.0).timeout
 	_shot(shots_dir + "/04_running.png")
-	var outcome: Dictionary = await sim.finished
+	while not outcome_box.has("o"):
+		await get_tree().process_frame
+	var outcome: Dictionary = outcome_box["o"]
 	await get_tree().create_timer(0.5).timeout
 	_shot(shots_dir + "/05_result.png")
 	ok = ok and _assert(outcome["result"] == "goal", "level solved through the UI (result=%s)" % outcome["result"])

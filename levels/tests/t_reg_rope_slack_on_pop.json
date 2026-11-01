@@ -1,0 +1,41 @@
+{
+  "id": "t_reg_rope_slack_on_pop",
+  "title": "Cheese falls when its balloon pops",
+  "hint": "popped balloon must not anchor the rope",
+  "test": true,
+  "goal": {
+    "type": "displaced",
+    "index": 2,
+    "min_dy": 150
+  },
+  "fixed": [
+    {
+      "part": "candle",
+      "x": 20,
+      "y": 14,
+      "rot": 12
+    },
+    {
+      "part": "balloon",
+      "x": 20,
+      "y": 34,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 20,
+      "y": 46,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 20,
+      "y": 46,
+      "rot": 18
+    }
+  ],
+  "tray": [],
+  "slots": 0,
+  "reference_solution": [],
+  "expect": "goal"
+}

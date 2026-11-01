@@ -20,6 +20,7 @@ t_motor_winch ea6cabd32ce08ea44814bafea31a74e3 goal 67
 t_mouse_cheese f8092cfa0d19f7b302120f86702aa1b8 goal 158
 t_pulley_plank_bucket 14aa726441875ddc68c99a642796c7cd goal 78
 t_reg_plank_not_caught 1c67f527cdda57dc7dda998eda062c49 stalled 150
+t_reg_rope_slack_on_pop a6752547bb70536007f67092ae187304 goal 228
 t_reg_switch_before_conveyor 40507b7972cd7925535aed40e21792a4 goal 135
 t_rope_balloon_cheese 73225c0f5b50d6d13d45bf7b85e85963 goal 78
 t_rope_plank_hangs e0e2995695609056845ea60d54dca93a goal 37
@@ -32,3 +33,4 @@ t_switch_balloon_fan 8da987700c8e1b5b58b7bb04b99926cb goal 98
 t_switch_bucket_conveyor d26e2121bd2439d0c2beef224c825f05 goal 53
 t_switch_cat_motor 8a21da269fac124e3f016887c6b0fb82 goal 69
 t_switch_mouse_fan 758b625794ffd4b37bf526aecbb6a29b goal 73
+t_ui_attach 5ee3fa3470cb666a8b8837b163fabaae goal 34

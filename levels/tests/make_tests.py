@@ -155,6 +155,10 @@ level("t_reg_switch_before_conveyor", "Switch created before the motor-powered c
       [P("switch", 8, 44, 0), P("ball", 8, 36), P("conveyor", 14, 30, 0), P("motor", 14, 30, 0, on=False), P("ball", 14, 28), P("basket", 28, 36)],
       {"type": "basket", "count": 1}, note="switch -> motor regardless of creation order")
 
+level("t_reg_rope_slack_on_pop", "Cheese falls when its balloon pops",
+      [P("candle", 20, 14, 12), P("balloon", 20, 34), P("cheese", 20, 46), P("rope", 20, 46, 18)],
+      {"type": "displaced", "index": 2, "min_dy": 150}, note="popped balloon must not anchor the rope")
+
 for l in levels:
     with open(os.path.join(OUT, l["id"] + ".json"), "w") as f:
         json.dump(l, f, indent=2)

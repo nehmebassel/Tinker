@@ -57,11 +57,13 @@ jobs:
           unzip -q godot.zip && sudo mv Godot_v${GODOT_VERSION}_linux.x86_64 /usr/local/bin/godot
       - name: Import project
         run: godot --headless --path game --import || true
-      - name: UI smoke test (synthetic touches, screenshots)
+      - name: UI smoke tests (synthetic touches, screenshots)
         run: |
           mkdir -p build/shots
-          timeout 120 xvfb-run -a -s "-screen 0 1200x2100x24" godot --path game --rendering-driver opengl3 --resolution 540x960 --quit-after 1800 -- --smoke 2>&1 | tee build/smoke.log
-          grep -q "SMOKE PASS" build/smoke.log
+          for L in res://levels/campaign/001.json res://levels/tests/t_ui_attach.json; do
+            timeout 120 xvfb-run -a -s "-screen 0 1200x2100x24" godot --path game --rendering-driver opengl3 --resolution 540x960 --quit-after 1800 -- --smoke --level=$L 2>&1 | tee -a build/smoke.log
+          done
+          [ "$(grep -c 'SMOKE PASS' build/smoke.log)" = "2" ]
       - uses: actions/upload-artifact@v4
         if: always()
         with:

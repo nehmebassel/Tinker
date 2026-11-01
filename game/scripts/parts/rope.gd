@@ -63,6 +63,8 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
+	if line != null and line.is_slack():
+		modulate.a = 0.35  # an end is gone: show the rope hanging limp
 	var pa := Vector2.ZERO
 	var pb := to_local(end_b.global_position) if end_b else Vector2(rope_length_px(), 0)
 	if end_a:
