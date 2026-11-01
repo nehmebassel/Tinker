@@ -10,6 +10,7 @@ server/node_modules/
 tools/*
 !tools/ci_daily.sh
 !tools/build_clients.sh
+!tools/android_prepare.py
 !tools/setup.sh
 # OS
 .DS_Store
