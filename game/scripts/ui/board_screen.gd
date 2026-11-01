@@ -76,7 +76,7 @@ func _load(s: String) -> void:
 	_status.text = "%d player%s" % [rows.size(), "" if rows.size() == 1 else "s"] if rows.size() < 100 else "Top 100"
 	var me_in_top := false
 	for row in rows:
-		var is_me: bool = row["device_id"] == App.settings.device_id
+		var is_me: bool = bool(row.get("is_me", false))
 		me_in_top = me_in_top or is_me
 		_list.add_child(_row(row, is_me))
 	var me: Variant = b.get("me")
@@ -98,7 +98,7 @@ func _row(row: Dictionary, is_me: bool) -> Control:
 	h.add_child(rank)
 	var who := str(row.get("name", ""))
 	if who == "":
-		who = "Player " + str(row["device_id"]).substr(0, 4)
+		who = "Player " + str(row.get("player", "")).substr(0, 4)
 	var n := UiKit.label("%s  %s" % [who, str(row.get("country", ""))], 34)
 	n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	n.clip_text = true

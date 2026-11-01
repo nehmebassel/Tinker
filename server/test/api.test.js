@@ -4,7 +4,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { createApp, db } from "../src/app.js";
+import { createApp, db, publicId } from "../src/app.js";
 import { todayUtc } from "../src/config.js";
 
 process.env.ADMIN_TOKEN = process.env.ADMIN_TOKEN || "test-admin";
@@ -92,7 +92,9 @@ test("score: the real solution is accepted once per device per day, then boards 
   assert.equal(b.body.rank, 1, "same parts, faster => rank 1");
   const board = await j("GET", `/board/${today}?device_id=${DEV_A}`);
   assert.equal(board.status, 200);
-  assert.deepEqual(board.body.rows.map((r) => r.device_id), [DEV_B, DEV_A]);
+  assert.deepEqual(board.body.rows.map((r) => r.is_me), [false, true]);
+  assert.ok(!JSON.stringify(board.body).includes(DEV_A) && !JSON.stringify(board.body).includes(DEV_B), "device ids (credentials) never appear on a board");
+  assert.notEqual(board.body.rows[0].player, board.body.rows[1].player);
   assert.equal(board.body.me.rank, 2);
   const country = await j("GET", `/board/${today}?scope=country&device_id=${DEV_A}`);
   assert.equal(country.body.country, "LB");
@@ -164,4 +166,36 @@ test("push: daily notify needs a level, sends once per day, dry run does not rec
 test("daily carries the day number", async () => {
   const r = await j("GET", `/daily/${today}`);
   assert.ok(Number.isInteger(r.body.day) && r.body.day >= 1);
+});
+
+test("score: two concurrent submissions for one device and day -> exactly one 201, one 409", async () => {
+  const DEV_C = "device-cccc-0003";
+  const sol = level1.reference_solution;
+  const body = { device_id: DEV_C, date: today, solution: sol, elapsed_ms: 9000, country: "LB" };
+  const [r1, r2] = await Promise.all([j("POST", "/score", body), j("POST", "/score", { ...body, elapsed_ms: 1 })]);
+  assert.deepEqual([r1.status, r2.status].sort(), [201, 409]);
+  const stored = (await db.collection("scores").doc(`${today}_${DEV_C}`).get()).data();
+  const winner = r1.status === 201 ? 9000 : 1;
+  assert.equal(stored.ms, winner, "the first accepted entry is not overwritten");
+});
+
+test("errors in async handlers return JSON 500 and the server keeps serving", async () => {
+  const boom = createApp({ replayFn: async () => { throw new Error("replay exploded"); }, fcm: fakeFcm });
+  const s2 = boom.listen(0);
+  const b2 = `http://127.0.0.1:${s2.address().port}`;
+  try {
+    const r = await fetch(b2 + "/score", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ device_id: "device-dddd-0004", date: today, solution: level1.reference_solution, elapsed_ms: 1 }) });
+    assert.equal(r.status, 500);
+    assert.deepEqual(await r.json(), { error: "internal" });
+    assert.equal((await fetch(b2 + "/health")).status, 200, "still alive after the failure");
+  } finally {
+    s2.close();
+  }
+});
+
+test("public player id is stable and does not reveal the device id", () => {
+  assert.equal(publicId(DEV_A), publicId(DEV_A));
+  assert.notEqual(publicId(DEV_A), publicId(DEV_B));
+  assert.ok(!publicId(DEV_A).includes("aaaa"));
 });

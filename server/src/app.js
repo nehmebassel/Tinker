@@ -1,5 +1,5 @@
 import express from "express";
-import { randomBytes } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 import { config, todayUtc, addDays, dayNumber } from "./config.js";
 import { fcm as realFcm, isFcmToken, dailyMessage } from "./push.js";
 import { col, db } from "./db.js";
@@ -16,6 +16,10 @@ function rateLimited(key) {
   buckets.set(key, b);
   if (buckets.size > 50000) buckets.clear();
   return b.n > config.rateLimitPerMin;
+}
+
+export function publicId(deviceId) {
+  return createHash("sha256").update("tinker-player:" + deviceId).digest("base64url").slice(0, 10);
 }
 
 function shortId() {
@@ -75,7 +79,16 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
       name: typeof name === "string" ? name.slice(0, 24) : "",
       solution, created_at: new Date().toISOString(),
     };
-    await col.scores().doc(scoreId).set(entry);
+    // Atomic: create() fails if another request for this device+day won the race during the replay.
+    try {
+      await col.scores().doc(scoreId).create(entry);
+    } catch (err) {
+      if (err?.code === 6 /* ALREADY_EXISTS */) {
+        const first = (await col.scores().doc(scoreId).get()).data();
+        return res.status(409).json({ error: "already submitted", entry: first });
+      }
+      throw err;
+    }
     await col.devices().doc(device_id).set({ country: ctry, last_seen: entry.created_at, name: entry.name }, { merge: true });
     const rank = await rankOf(date, "global", entry);
     res.status(201).json({ ok: true, parts: entry.parts, ms: entry.ms, rank });
@@ -99,15 +112,17 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     if (scope === "country") q = q.where("country", "==", country);
     q = q.orderBy("parts", "asc").orderBy("ms", "asc").limit(config.boardSize);
     const snap = await q.get();
-    const rows = snap.docs.map((d, i) => row(d.data(), i + 1));
+    const rows = snap.docs.map((d, i) => row(d.data(), i + 1, deviceId));
     let own = null;
-    if (mine) own = row(mine, await rankOf(date, scope, mine));
+    if (mine) own = row(mine, await rankOf(date, scope, mine), deviceId);
     res.set("Cache-Control", "public, max-age=30");
     res.json({ date, scope, country: scope === "country" ? country : null, rows, me: own });
   });
 
-  function row(e, rank) {
-    return { rank, device_id: e.device_id, name: e.name || "", country: e.country, parts: e.parts, ms: e.ms };
+  // device_id is the device's private credential (it authorises /score and /push/register), so it is
+  // never published. Boards carry a one-way public id and an is_me flag for the caller's own row.
+  function row(e, rank, callerId) {
+    return { rank, player: publicId(e.device_id), is_me: callerId === e.device_id, name: e.name || "", country: e.country, parts: e.parts, ms: e.ms };
   }
 
   async function rankOf(date, scope, entry) {
