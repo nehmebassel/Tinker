@@ -345,3 +345,17 @@ test("large web files are streamed chunked to clients that refuse gzip", async (
     assert.equal((await raw("/play/..%2F..%2Fetc%2Fpasswd")).status, 404);
   } finally { s6.close(); config.webDir = prev; await rm(dir, { recursive: true, force: true }); }
 });
+
+test("elapsed time may span the whole submission window, but not more", async () => {
+  const { todayUtc: t, addDays } = await import("../src/config.js");
+  const today = t(), yesterday = addDays(today, -1);
+  const sol = [{ part: "plank", x: 2, y: 2, rot: 0 }];
+  const H = 3600000, sinceMidnight = Date.now() - Date.parse(today + "T00:00:00Z");
+  // Started early yesterday, submitted today: more than 24 h, still valid.
+  const y = await j("POST", "/score", { device_id: "dev-elapsed-0001", date: yesterday, solution: sol, elapsed_ms: 24 * H + sinceMidnight });
+  assert.notEqual(y.body.error, "bad elapsed_ms");
+  // Longer than today has existed: impossible.
+  const z = await j("POST", "/score", { device_id: "dev-elapsed-0002", date: today, solution: sol, elapsed_ms: sinceMidnight + 2 * H });
+  assert.equal(z.status, 400);
+  assert.equal(z.body.error, "bad elapsed_ms");
+});

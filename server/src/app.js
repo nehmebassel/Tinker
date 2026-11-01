@@ -123,7 +123,10 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     if (date !== today && date !== addDays(today, -1)) return res.status(400).json({ error: "date not open for submission" });
     const e = validSolution(solution);
     if (e) return res.status(400).json({ error: e });
-    if (!Number.isInteger(elapsed_ms) || elapsed_ms < 0 || elapsed_ms > 86400000) return res.status(400).json({ error: "bad elapsed_ms" });
+    // A run can't have lasted longer than the time since its day began (00:00 UTC): up to ~48 h for
+    // yesterday's puzzle, which stays open until today ends. +1 h slack for device clock skew.
+    const maxMs = Date.now() - Date.parse(date + "T00:00:00Z") + 3600000;
+    if (!Number.isInteger(elapsed_ms) || elapsed_ms < 0 || elapsed_ms > maxMs) return res.status(400).json({ error: "bad elapsed_ms" });
     const ctry = isCountry(country) ? country : "ZZ";
     const dailySnap = await col.daily().doc(date).get();
     if (!dailySnap.exists) return res.status(404).json({ error: "no level for this date" });
