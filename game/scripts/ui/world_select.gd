@@ -15,6 +15,7 @@ var _scroll: ScrollContainer
 
 
 func _ready() -> void:
+	App.audio.play_music("menu")
 	var bg := ColorRect.new()
 	bg.color = C_BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)

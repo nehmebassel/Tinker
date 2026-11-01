@@ -44,6 +44,7 @@ var _solve_ms := 0  # Daily: time from first touch to THIS solve, frozen when th
 
 var level: LevelData
 var sim: Simulation
+var sounds: SoundWatcher
 var placements: Array[Placement] = []
 var history: Array = []  # Array of Array[Placement] snapshots
 var future: Array = []
@@ -111,6 +112,7 @@ func _ready() -> void:
 		_load_level(level_path)
 	get_viewport().size_changed.connect(_on_resized)
 	_fit_camera()
+	_music("build")
 	if smoke_mode:
 		_run_smoke()
 	elif shot_path != "":
@@ -137,6 +139,10 @@ func _build_scene() -> void:
 	sim.name = "Simulation"
 	sim.finished.connect(_on_run_finished)
 	world.add_child(sim)
+	sounds = SoundWatcher.new()
+	sounds.name = "SoundWatcher"
+	sounds.watch(sim)
+	add_child(sounds)
 	overlay = Node2D.new()
 	overlay.name = "Overlay"
 	overlay.z_index = 10
@@ -243,6 +249,7 @@ func _build_scene() -> void:
 	play_btn.add_theme_stylebox_override("hover", _round_style(C_GO))
 	play_btn.add_theme_color_override("font_color", C_INK)
 	play_btn.pressed.connect(_toggle_play)
+	play_btn.set_meta("no_tap", true)  # has its own start / rewind sound
 	side.add_child(play_btn)
 
 	toast_lbl = _label("", 36, C_PANEL_TXT)
@@ -618,6 +625,7 @@ func _touch_down(index: int, pos: Vector2, double_tap: bool) -> void:
 func _begin_tray_drag(part: String, index: int, pos: Vector2) -> void:
 	drag = {"kind": "tray", "index": index, "start": pos, "part": part}
 	_spawn_floating(Placement.new(part, Vector2i.ZERO, 0))
+	_snd("pick")
 	_update_drag(index, pos)
 
 
@@ -634,6 +642,7 @@ func _update_drag(_index: int, pos: Vector2) -> void:
 				_remove_placement_silent(drag["pidx"])
 				selected = -1
 				_spawn_floating(drag["lifted"])
+				_snd("pick")
 			if drag["moved"]:
 				_move_floating(pos)
 		"rotate":
@@ -643,6 +652,7 @@ func _update_drag(_index: int, pos: Vector2) -> void:
 			if steps != placements[selected].rot:
 				placements[selected].rot = steps
 				sim.set_player_parts(placements)
+				_snd("rotate", -6.0)
 				_refresh_hud()
 
 
@@ -772,6 +782,7 @@ func _drop_floating(pos: Vector2, part: String, lifted: Placement) -> void:
 	placements.append(Placement.new(part, cell, drag["rot"]))
 	selected = placements.size() - 1
 	sim.set_player_parts(placements)
+	_snd("place")
 	_refresh_hud()
 
 
@@ -903,6 +914,7 @@ func _rotate_selected(steps: int) -> void:
 	_push_history()
 	placements[selected].rot = Grid.wrap_steps(placements[selected].rot + steps)
 	sim.set_player_parts(placements)
+	_snd("rotate")
 	_refresh_hud()
 
 
@@ -944,20 +956,30 @@ func _start_run() -> void:
 	run_ended = false
 	result_panel.visible = false
 	sim.set_player_parts(placements)
+	sounds.reset()
 	sim.start()
+	_snd("play")
+	_music("run")
 	_refresh_hud()
 
 
 func _stop_run() -> void:
 	run_ended = false
 	result_panel.visible = false
+	var was_live := sim.running or run_ended
 	sim.stop()
 	sim.rebuild()
+	sounds.reset()
+	if was_live:
+		_snd("rewind")
+	_music("build")
 	_refresh_hud()
 
 
 func _on_run_finished(outcome: Dictionary) -> void:
 	run_ended = true
+	sounds.reset()
+	_snd("goal" if outcome["result"] == "goal" else "fail")
 	match outcome["result"]:
 		"goal":
 			solved_msec = Time.get_ticks_msec()
@@ -1021,6 +1043,17 @@ func _draw_overlay() -> void:
 		var c := Color(C_INK, 0.5) if ghost_valid else C_BAD
 		overlay.draw_line(p + Vector2(-20, 0), p + Vector2(20, 0), c, 3.0)
 		overlay.draw_line(p + Vector2(0, -20), p + Vector2(0, 20), c, 3.0)
+
+
+## Sounds go through App.audio; level scenes opened without App (tools, shots) stay silent.
+func _snd(sound: String, gain_db: float = 0.0) -> void:
+	if has_node("/root/App") and App.audio:
+		App.audio.sfx(sound, gain_db)
+
+
+func _music(track: String) -> void:
+	if has_node("/root/App") and App.audio:
+		App.audio.play_music(track)
 
 
 static func _fmt_ms(ms: int) -> String:

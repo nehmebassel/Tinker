@@ -12,6 +12,7 @@ var settings: Settings
 var daily_store: DailyStore
 var api: Api
 var push: Push
+var audio: Audio
 var level_number: int = 0
 ## The Daily currently open: {"date": String, "day": int, "level": Dictionary} or {} for campaign play.
 var daily: Dictionary = {}
@@ -30,6 +31,8 @@ func _ready() -> void:
 	push = Push.new()
 	push.name = "Push"
 	add_child(push)
+	audio = Audio.new()
+	add_child(audio)
 	for a in OS.get_cmdline_user_args():
 		if a == "--reset-save":
 			save.reset()
