@@ -30,7 +30,9 @@ func rope_length_px() -> float:
 
 
 func on_attach(sim: Node) -> void:
-	var tieable := func(p): return p.get_meta("part_id") != "rope"
+	# Ropes never tie to another rope or to a motor: a motor is a power source that shares a cell
+	# with the pulley/plank it drives, so it must not shadow that part whatever the creation order.
+	var tieable := func(p): return not (p.get_meta("part_id") in ["rope", "motor"])
 	end_a = sim.part_at_cell(get_meta("cell"), self, 2, tieable)
 	end_b = sim.part_at_cell(cell_b(), self, 2, tieable)
 	if end_a == end_b:

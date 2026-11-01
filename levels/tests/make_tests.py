@@ -159,6 +159,10 @@ level("t_reg_rope_slack_on_pop", "Cheese falls when its balloon pops",
       [P("candle", 20, 14, 12), P("balloon", 20, 34), P("cheese", 20, 46), P("rope", 20, 46, 18)],
       {"type": "displaced", "index": 2, "min_dy": 150}, note="popped balloon must not anchor the rope")
 
+level("t_reg_winch_motor_first", "Winch works when the motor is created before the pulley",
+      [P("motor", 20, 10, 0), P("pulley", 20, 10), P("bucket", 20, 22), P("rope", 20, 22, 18)],
+      {"type": "displaced", "index": 2, "min_dy": -100}, note="rope must tie to the pulley, not the co-located motor")
+
 for l in levels:
     with open(os.path.join(OUT, l["id"] + ".json"), "w") as f:
         json.dump(l, f, indent=2)
