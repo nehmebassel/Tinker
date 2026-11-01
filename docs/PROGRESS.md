@@ -65,7 +65,8 @@ Session log at the bottom tells the next agent exactly where things stand.
 - [x] Determinism bug found and fixed: reused physics space changed solver order (see DESIGN.md "Two Godot physics findings")
 - [x] Conveyor and paddle re-implemented after Godot's static surface velocity / joint motor proved unusable
 - [x] Switch link lines drawn while building; `--shot=` render mode for docs/CI
-- [ ] Bassel: play the parts on the phone (new APK from the PR's CI artifact)
+- [x] Codex review: 6 findings over 3 rounds, all real, all fixed with regression levels (basket/plank, flame & cheese while building, switch→motor order, rope slack on pop, editor same-cell attach, rope never ties to motor); 4th pass clean
+- [ ] Bassel: merge PR #1 and play the parts on the phone (APK from the PR's CI artifact)
 
 ### M3 Campaign (not started)
 - [ ] Levels 2–30, world select, progress save
