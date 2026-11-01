@@ -63,9 +63,11 @@ func _draw() -> void:
 	draw_arc(Vector2(0, -hy), hx * 0.8, PI, TAU, 24, o, 6.0)
 	# Body: slightly tapered bucket.
 	var poly := PackedVector2Array([Vector2(-hx, -hy), Vector2(hx, -hy), Vector2(hx * 0.85, hy), Vector2(-hx * 0.85, hy)])
+	Art.shadow_poly(self, poly)
 	draw_colored_polygon(poly, o)
 	var inner := PackedVector2Array([Vector2(-hx + k, -hy + k), Vector2(hx - k, -hy + k), Vector2(hx * 0.85 - k, hy - k), Vector2(-hx * 0.85 + k, hy - k)])
 	draw_colored_polygon(inner, fill)
+	draw_line(inner[0] + Vector2(4, 4), inner[3] + Vector2(4, -4), Color(fill.lightened(0.5), 0.7), 4.0)
 	# Hollow interior.
 	var hollow := PackedVector2Array([Vector2(-hx + wall, -hy - 1), Vector2(hx - wall, -hy - 1), Vector2(hx * 0.85 - wall, hy - wall), Vector2(-hx * 0.85 + wall, hy - wall)])
 	draw_colored_polygon(hollow, Color("fbf6ea"))

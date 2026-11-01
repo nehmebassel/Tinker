@@ -64,6 +64,7 @@ func _draw() -> void:
 	var f := float(facing)
 	var r := Rect2(-hx, -hy, size.x, size.y)
 	# Body.
+	draw_rect(Rect2(r.position + Art.shadow_off(self), r.size), Art.SHADOW)
 	draw_rect(r, o)
 	draw_rect(r.grow(-5), fill)
 	# Head.

@@ -99,8 +99,13 @@ func set_ghost(on: bool) -> void:
 
 func _draw() -> void:
 	var r := Rect2(-size / 2.0, size)
-	draw_rect(r, PartFactory.OUTLINE_COLOR)
-	draw_rect(r.grow(-PartFactory.OUTLINE_W), fill)
-	draw_line(Vector2(-size.x * 0.4, 0), Vector2(size.x * 0.4, 0), Color(fill.r * 0.7, fill.g * 0.7, fill.b * 0.7), 3.0)
+	Art.rect(self, r, fill)
+	# Wood grain and two nails.
+	var grain := Color(fill.darkened(0.3), 0.6)
+	draw_line(Vector2(-size.x * 0.42, -1), Vector2(-size.x * 0.05, -1), grain, 2.0)
+	draw_line(Vector2(size.x * 0.02, 2), Vector2(size.x * 0.4, 2), grain, 2.0)
+	for sx in [-1.0, 1.0]:
+		draw_circle(Vector2(sx * (size.x / 2.0 - 14.0), 0), 2.5, Color(Art.INK, 0.6))
 	if mode == Mode.PIVOT:
-		draw_circle(Vector2.ZERO, 9.0, PartFactory.OUTLINE_COLOR)
+		draw_circle(Vector2.ZERO, 11.0, Art.INK)
+		draw_circle(Vector2.ZERO, 5.0, Color("c9c2b6"))

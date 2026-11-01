@@ -97,9 +97,9 @@ func set_ghost(p_on: bool) -> void:
 
 func _draw() -> void:
 	var base := Rect2(-size.x / 2.0, size.y / 2.0 - 10.0, size.x, 10.0)
-	draw_rect(base, PartFactory.OUTLINE_COLOR)
-	draw_rect(base.grow(-3.0), Color("4a4670"))
+	Art.rect(self, base, Color("4a4670"), true, 3.0)
 	var h := 5.0 if pressed else 12.0
 	var plate := Rect2(-size.x / 2.0 + 10.0, size.y / 2.0 - 10.0 - h, size.x - 20.0, h)
-	draw_rect(plate, PartFactory.OUTLINE_COLOR)
-	draw_rect(plate.grow(-3.0), fill)
+	Art.rect(self, plate, fill if not pressed else fill.darkened(0.2), false, 3.0)
+	# Indicator light: green when pressed.
+	draw_circle(Vector2(size.x / 2.0 - 6.0, size.y / 2.0 - 5.0), 3.0, Color("7bd389") if pressed else Color("ff5d73"))

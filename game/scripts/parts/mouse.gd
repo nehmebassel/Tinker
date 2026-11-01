@@ -55,6 +55,7 @@ func _draw() -> void:
 		var a := i * TAU / 24.0
 		var rx := hx * (1.0 if cos(a) * f < 0 else 1.15)
 		pts.append(Vector2(cos(a) * rx, sin(a) * hy))
+	Art.shadow_poly(self, pts)
 	draw_colored_polygon(pts, o)
 	var inner := PackedVector2Array()
 	for i in range(24):

@@ -24,8 +24,12 @@ const RING_HANDLE_R := 34.0
 const RING_GRAB := 70.0
 
 const C_BG := Color("fbf6ea")
-const C_STAGE := Color("fffdf7")
-const C_GRID := Color("e6dfd0")
+const C_STAGE := Color("fdfaf1")
+const C_GRID := Color("e2ebf3")
+const C_GRID_MAJOR := Color("bfd3e6")
+const C_WALL := Color("cfb48a")
+const C_WALL_HOLE := Color("a88d64")
+const C_WOOD := Color("b07a45")
 const C_INK := Color("1f1a2e")
 const C_ACCENT := Color("ff5d73")
 const C_GO := Color("7bd389")
@@ -347,6 +351,7 @@ func _round_style(c: Color) -> StyleBoxFlat:
 	s.set_border_width_all(5)
 	s.content_margin_left = 20
 	s.content_margin_right = 20
+	UiKit.key_shadow(s)
 	return s
 
 
@@ -1006,14 +1011,51 @@ func _on_run_finished(outcome: Dictionary) -> void:
 
 # ------------------------------------------------------------------ drawing
 
+## Workbench look: pegboard wall, a wooden frame, and a blueprint-ruled sheet (minor line every
+## tile, major every 4 tiles) so the snap grid reads as engineering paper. Drawn once per level.
 func _draw_stage() -> void:
 	var r := Rect2(Vector2.ZERO, Vector2(Grid.STAGE_PX))
-	stage_bg.draw_rect(r.grow(8), C_INK)
+	# Pegboard wall around the stage (visible when zoomed out / at the edges).
+	var wall := r.grow(1400)
+	stage_bg.draw_rect(wall, C_WALL)
+	var step := Grid.TILE
+	var y := wall.position.y
+	while y < wall.end.y:
+		var x := wall.position.x
+		while x < wall.end.x:
+			if not r.grow(40).has_point(Vector2(x, y)):
+				stage_bg.draw_circle(Vector2(x, y), 7.0, C_WALL_HOLE)
+			x += step
+		y += step
+	# Frame: shadow, wood, ink edges, highlight, corner screws.
+	stage_bg.draw_rect(Rect2(r.position + Vector2(14, 18), r.size).grow(30), Color(0, 0, 0, 0.18))
+	stage_bg.draw_rect(r.grow(34), C_INK)
+	stage_bg.draw_rect(r.grow(28), C_WOOD)
+	stage_bg.draw_rect(Rect2(r.position - Vector2(24, 24), Vector2(r.size.x + 48, 8)), C_WOOD.lightened(0.25))
+	for i in 6:
+		var gy := -20.0 + i * (r.size.y + 40.0) / 5.0
+		stage_bg.draw_line(Vector2(-26, gy), Vector2(-4, gy + 30), C_WOOD.darkened(0.2), 2.0)
+		stage_bg.draw_line(Vector2(r.size.x + 4, gy), Vector2(r.size.x + 26, gy + 30), C_WOOD.darkened(0.2), 2.0)
+	stage_bg.draw_rect(r.grow(6), C_INK)
+	for c in [r.position + Vector2(-17, -17), Vector2(r.end.x + 17, r.position.y - 17), Vector2(r.position.x - 17, r.end.y + 17), r.end + Vector2(17, 17)]:
+		stage_bg.draw_circle(c, 8.0, C_INK)
+		stage_bg.draw_circle(c, 5.0, Color("c9c2b6"))
+		stage_bg.draw_line(c + Vector2(-4, -4), c + Vector2(4, 4), C_INK, 2.0)
+	# Sheet.
 	stage_bg.draw_rect(r, C_STAGE)
-	# Quarter-tile dots at tile corners so the snap grid is visible but quiet.
-	for y in range(0, Grid.STAGE_CELLS.y + 1, 4):
-		for x in range(0, Grid.STAGE_CELLS.x + 1, 4):
-			stage_bg.draw_circle(Grid.cell_to_world(Vector2i(x, y)), 3.0, C_GRID)
+	var cells := Grid.STAGE_CELLS
+	for gx in range(0, cells.x + 1, 4):
+		var px := Grid.cell_to_world(Vector2i(gx, 0)).x
+		var major := gx % 16 == 0
+		stage_bg.draw_line(Vector2(px, 0), Vector2(px, r.size.y), C_GRID_MAJOR if major else C_GRID, 2.5 if major else 1.5)
+	for gy in range(0, cells.y + 1, 4):
+		var py := Grid.cell_to_world(Vector2i(0, gy)).y
+		var major := gy % 16 == 0
+		stage_bg.draw_line(Vector2(0, py), Vector2(r.size.x, py), C_GRID_MAJOR if major else C_GRID, 2.5 if major else 1.5)
+	# Title-block corner, like a drawing sheet.
+	var tb := Rect2(r.end - Vector2(300, 64), Vector2(300, 64))
+	stage_bg.draw_rect(tb, Color(C_GRID_MAJOR, 0.35))
+	stage_bg.draw_rect(tb, C_GRID_MAJOR, false, 2.0)
 
 
 func _process(_delta: float) -> void:
