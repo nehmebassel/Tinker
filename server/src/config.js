@@ -15,6 +15,8 @@ export const config = {
   daysAhead: Number(env.DAILY_DAYS_AHEAD || 7),
   maxLevelBytes: Number(env.MAX_LEVEL_BYTES || 32768),
   emulator: Boolean(env.FIRESTORE_EMULATOR_HOST),
+  webDir: env.WEB_DIR || "",
+  downloadDir: env.DOWNLOAD_DIR || "",
   pushEnabled: (env.PUSH_ENABLED || "true") === "true",
   pushTopic: env.PUSH_TOPIC || "tinker-daily",
   pushTitle: env.PUSH_TITLE || "Today's Tinker is ready",

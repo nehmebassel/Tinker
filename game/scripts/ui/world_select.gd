@@ -44,7 +44,8 @@ func _ready() -> void:
 	solved.add_theme_color_override("font_color", Color(C_PANEL_TXT, 0.8))
 	solved.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	h.add_child(solved)
-	var gear := UiKit.button("⚙", UiKit.MUTED, UiKit.PANEL_TXT, 112)
+	var gear := UiKit.button("Settings", UiKit.MUTED, UiKit.PANEL_TXT, 112)
+	gear.add_theme_font_size_override("font_size", 28)
 	gear.name = "SettingsButton"
 	gear.pressed.connect(func() -> void: App.open_settings())
 	h.add_child(gear)

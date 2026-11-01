@@ -23,7 +23,11 @@ COPY server/package.json server/package-lock.json /app/server/
 RUN cd /app/server && npm ci --omit=dev
 COPY server/src/ /app/server/src/
 
-ENV NODE_ENV=production GAME_DIR=/app/game GODOT_BIN=/usr/local/bin/godot HOME=/tmp
+# Player-facing builds, exported by tools/build_clients.sh before the image is built.
+COPY build/web/ /app/web/
+COPY build/download/ /app/download/
+
+ENV NODE_ENV=production GAME_DIR=/app/game GODOT_BIN=/usr/local/bin/godot HOME=/tmp WEB_DIR=/app/web DOWNLOAD_DIR=/app/download
 USER node
 WORKDIR /app/server
 CMD ["node", "src/index.js"]

@@ -1,10 +1,11 @@
 .git
-build
+build/*
+!build/web
+!build/download
 tools
 game/.godot
 game/android
 server/node_modules
 docs
-*.apk
 *_SA.json
 *.key.json

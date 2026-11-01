@@ -9,6 +9,7 @@ server/node_modules/
 # Local tool installs
 tools/*
 !tools/ci_daily.sh
+!tools/build_clients.sh
 !tools/setup.sh
 # OS
 .DS_Store

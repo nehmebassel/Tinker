@@ -50,3 +50,9 @@ common/physics_interpolation=true
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+
+[tinker]
+
+; Initial backend URL for fresh installs. Players/testers change it in the in-game Settings screen;
+; the browser build ignores it when served by the backend (it uses its own origin).
+server_url="https://tinker-api-1053857179342.europe-west1.run.app"

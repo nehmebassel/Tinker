@@ -50,6 +50,9 @@ if ! $G secrets describe tinker-admin-token >/dev/null 2>&1; then
 fi
 $G secrets add-iam-policy-binding tinker-admin-token --member="serviceAccount:$RUNTIME_SA" --role=roles/secretmanager.secretAccessor >/dev/null
 
+step "Client builds (web PWA + Android APK)"
+bash tools/build_clients.sh
+
 step "Artifact Registry + image $IMAGE"
 $G artifacts repositories describe "$REPO" --location="$REGION" >/dev/null 2>&1 || \
   $G artifacts repositories create "$REPO" --location="$REGION" --repository-format=docker
@@ -57,7 +60,7 @@ $G builds submit --region="$REGION" --config server/cloudbuild.yaml --substituti
 
 step "Cloud Run $SERVICE"
 $G run deploy "$SERVICE" --region="$REGION" --image="$IMAGE" --service-account="$RUNTIME_SA" \
-  --allow-unauthenticated --cpu=2 --memory=2Gi --concurrency=4 --timeout=3600 --min-instances=0 --max-instances=5 \
+  --allow-unauthenticated --execution-environment=gen2 --cpu=2 --memory=2Gi --concurrency=4 --timeout=3600 --min-instances=0 --max-instances=5 \
   --set-env-vars="GOOGLE_CLOUD_PROJECT=$PROJECT,FIRESTORE_DATABASE=$DB" \
   --update-secrets="ADMIN_TOKEN=tinker-admin-token:latest"
 URL=$($G run services describe "$SERVICE" --region="$REGION" --format='value(status.url)')
