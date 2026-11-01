@@ -1,0 +1,16 @@
+# What `gcloud builds submit` uploads (without this file it would apply .gitignore and drop build/).
+.git
+.gitignore
+build/*
+!build/web
+!build/web/**
+!build/download
+!build/download/**
+tools/*
+game/.godot
+game/android
+server/node_modules
+docs
+*_SA.json
+*.key.json
+*.keystore
