@@ -6,10 +6,22 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { config } from "./config.js";
 
+// Godot needs a writable user data dir (user://). In a container the user's HOME may not be writable,
+// and Godot crashes (SIGSEGV) when it cannot create user://logs — so point every XDG dir at tmp.
+const GODOT_HOME = join(tmpdir(), "tinker-godot-home");
+const godotEnv = {
+  ...process.env,
+  HOME: GODOT_HOME,
+  XDG_DATA_HOME: join(GODOT_HOME, "data"),
+  XDG_CONFIG_HOME: join(GODOT_HOME, "config"),
+  XDG_CACHE_HOME: join(GODOT_HOME, "cache"),
+};
+
 function run(args, timeoutMs) {
   return new Promise((resolve) => {
     const p = spawn(config.godotBin, ["--headless", "--fixed-fps", "60", "--path", config.gameDir, ...args], {
       stdio: ["ignore", "pipe", "pipe"],
+      env: godotEnv,
     });
     let out = "", err = "";
     const t = setTimeout(() => p.kill("SIGKILL"), timeoutMs);

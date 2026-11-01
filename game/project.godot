@@ -16,6 +16,11 @@ config/icon="res://assets/icons/icon.svg"
 
 App="*res://scripts/core/app.gd"
 
+[debug]
+
+; No log files: nothing reads them, and creating user://logs fails in read-only containers.
+file_logging/enable_file_logging.pc=false
+
 [display]
 
 ; Portrait only at launch. 1080x1920 design resolution, canvas_items stretch, expand vertically.
