@@ -1690,7 +1690,7 @@ func run_smoke_steps() -> Dictionary:
 	if info_card != null and is_instance_valid(info_card):
 		await get_tree().create_timer(1.5).timeout
 		var demo: Simulation = info_card._sim
-		_assert(demo.running and demo.parts.size() > 0, "info card demo is running (%d parts)" % demo.parts.size())
+		_assert((demo.running or demo.ticks > 0) and demo.parts.size() > 0, "info card demo started (%d parts, %d ticks)" % [demo.parts.size(), demo.ticks])  # a short demo may already rest on its goal
 		_assert(demo.get_viewport() != get_viewport(), "info card demo has its own viewport/world")
 		_shot(shots_dir + "/00_info_card.png")
 		await _tap_button(info_card.find_child("CloseInfo", true, false))
@@ -1707,12 +1707,13 @@ func run_smoke_steps() -> Dictionary:
 	_assert(selected == 0, "dropped part is selected")
 	if placements.is_empty():
 		return {}
+	var rot_before: int = placements[0].rot  # a rope is auto-aimed on drop: the drag may be a no-op
 	var handle_from: Vector2 = _world_to_screen(ring_pos + Vector2(RING_R, 0).rotated(Grid.steps_to_radians(placements[0].rot)))
 	var handle_to: Vector2 = _world_to_screen(ring_pos + Vector2(RING_R, 0).rotated(Grid.steps_to_radians(target.rot)))
 	await _synthetic_drag(0, handle_from, handle_to, 10)
 	_shot(shots_dir + "/03_rotated.png")
 	_assert(placements[0].rot == target.rot, "rotated to %d (got %d)" % [target.rot, placements[0].rot])
-	if target.rot != 0:
+	if target.rot != 0 and rot_before != target.rot:
 		_undo()
 		_assert(placements[0].rot != target.rot, "undo reverted rotation")
 		_redo()

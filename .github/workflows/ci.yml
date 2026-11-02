@@ -61,10 +61,10 @@ jobs:
       - name: UI smoke tests (synthetic touches, screenshots)
         run: |
           mkdir -p build/shots
-          for L in res://levels/campaign/001.json res://levels/tests/t_ui_attach.json; do
+          for L in res://levels/campaign/001.json res://levels/tests/t_ui_attach.json res://levels/campaign/031.json res://levels/campaign/034.json; do
             timeout 120 xvfb-run -a -s "-screen 0 1200x2100x24" godot --path game --rendering-driver opengl3 --resolution 540x960 --quit-after 1800 res://scenes/level.tscn -- --smoke --level=$L 2>&1 | tee -a build/smoke.log
           done
-          [ "$(grep -c 'SMOKE PASS' build/smoke.log)" = "2" ]
+          [ "$(grep -c 'SMOKE PASS' build/smoke.log)" = "4" ]
       - name: Campaign flow test (world select -> level 1 -> Next -> back, save persisted)
         run: |
           timeout 180 xvfb-run -a -s "-screen 0 1200x2100x24" godot --path game --rendering-driver opengl3 --resolution 540x960 --quit-after 3000 -- --flow 2>&1 | tee build/flow.log

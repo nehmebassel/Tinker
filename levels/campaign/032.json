@@ -1,0 +1,66 @@
+{
+  "id": "c032",
+  "world": 4,
+  "number": 32,
+  "title": "Mirror swing",
+  "hint": "Same idea, other side. Where does the rope start?",
+  "teaches": "rope pendulum (mirrored)",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 38,
+      "y": 18,
+      "rot": 23
+    },
+    {
+      "part": "ball",
+      "x": 36,
+      "y": 16,
+      "rot": 0
+    },
+    {
+      "part": "pulley",
+      "x": 26,
+      "y": 6,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 17,
+      "y": 26,
+      "rot": 0
+    },
+    {
+      "part": "ball",
+      "x": 20,
+      "y": 24,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 11,
+      "y": 44,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "rope",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "rope",
+      "x": 38,
+      "y": 18,
+      "rot": 14
+    }
+  ],
+  "expect": "goal"
+}

@@ -126,7 +126,22 @@ Session log at the bottom tells the next agent exactly where things stand.
 - [x] Live check 2026-11-02: web audio measured on production (WEB AUDIO PASS), /config serves 3 tries / 6 h, APK full download
 - [ ] Bassel's ears: music and sounds were checked by spectrogram/waveform only (no listening possible here) — swap any you dislike (files in game/assets/audio, prompts in docs/DESIGN.md)
 
-### M5 Sandbox · M7 Store (not started)
+### M5 Sandbox — code complete, PR open
+- [x] Editor (every part, unlimited; layout = fixed parts; free TEST runs), setup (name, goal, player parts, slots)
+- [x] Solve-to-publish: the author must solve it; server replays the solution and refuses self-solving levels; 8-char code
+- [x] Link `/l/CODE` opens the browser build on the level; Play a code / pasted link in the app
+- [x] My levels (edit / test / link / delete), Community list (`GET /levels/recent`), Remix of any shared level
+- [x] **Acceptance**: CI runs phone A (build + publish) and phone B (separate install: open code, solve, remix) against a real server — SANDBOX PASS
+- [ ] Share GIF (brief: Daily share card with a 6 s GIF) — not started
+- [ ] Moderation / reporting of shared levels — not started
+
+### Map screen + World 4 (2026-11-02, Bassel's request)
+- [x] Engineering map: gears on a marble-run track built as you progress, marble rolls to the next level, per-world animated decor, soothing Lyria music
+- [x] World 4 "Rigging": levels 31-40 (rope pendulums, place-your-own pulley, candle pops a balloon to drop cheese, motor winch lifts a tethered balloon into a flame). Designed with `game/tests/design_levels.gd` (brute-force search; every reference solution is robust: >= 3 of 4 neighbouring cells also solve; none solves itself empty). 4 of the 10 are mirrored variants (32, 35, 37, 38) with different distractor parts; 11 other designs were rejected by the harness.
+- [x] Fixed: smoke test assumed rotating always adds an undo step (false for auto-aimed ropes); info-card demo check too strict for demos that finish fast (candle). CI smokes now also cover levels 31 (rope) and 34 (candle).
+- [x] Map: world name plates drawn over the rails (rails used to cross the name)
+
+### M7 Store (not started)
 
 ## Decisions
 

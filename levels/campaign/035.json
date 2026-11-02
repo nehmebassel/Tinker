@@ -1,0 +1,76 @@
+{
+  "id": "c035",
+  "world": 4,
+  "number": 35,
+  "title": "Pop and drop II",
+  "hint": "Fire goes up, cheese comes down.",
+  "teaches": "candle pops balloon (mirrored)",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 14,
+      "y": 10,
+      "rot": 0
+    },
+    {
+      "part": "balloon",
+      "x": 14,
+      "y": 24,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 14,
+      "y": 34,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 14,
+      "y": 34,
+      "rot": 18
+    },
+    {
+      "part": "basket",
+      "x": 14,
+      "y": 47,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 32,
+      "y": 30,
+      "rot": 22
+    },
+    {
+      "part": "ball",
+      "x": 34,
+      "y": 27,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "candle",
+      "count": 1
+    },
+    {
+      "part": "spring",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "candle",
+      "x": 14,
+      "y": 14,
+      "rot": 12
+    }
+  ],
+  "expect": "goal"
+}

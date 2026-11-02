@@ -1,0 +1,70 @@
+{
+  "id": "c033",
+  "world": 4,
+  "number": 33,
+  "title": "Rig it yourself",
+  "hint": "No pulley this time. Hang one, then tie the ball to it.",
+  "teaches": "place pulley + rope",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 6,
+      "y": 18,
+      "rot": 1
+    },
+    {
+      "part": "ball",
+      "x": 8,
+      "y": 16,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 27,
+      "y": 26,
+      "rot": 0
+    },
+    {
+      "part": "ball",
+      "x": 24,
+      "y": 24,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 33,
+      "y": 44,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "pulley",
+      "count": 1
+    },
+    {
+      "part": "rope",
+      "count": 1
+    }
+  ],
+  "slots": 2,
+  "reference_solution": [
+    {
+      "part": "pulley",
+      "x": 22,
+      "y": 6,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 8,
+      "y": 16,
+      "rot": 21
+    }
+  ],
+  "expect": "goal"
+}

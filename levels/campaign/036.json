@@ -1,0 +1,81 @@
+{
+  "id": "c036",
+  "world": 4,
+  "number": 36,
+  "title": "Dinner from above",
+  "hint": "The mouse waits below. Send the cheese down.",
+  "teaches": "pop + actor",
+  "goal": {
+    "type": "cheese"
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 26,
+      "y": 10,
+      "rot": 0
+    },
+    {
+      "part": "balloon",
+      "x": 26,
+      "y": 26,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 26,
+      "y": 36,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 26,
+      "y": 36,
+      "rot": 18
+    },
+    {
+      "part": "plank",
+      "x": 10,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 20,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 30,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "mouse",
+      "x": 6,
+      "y": 42,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "candle",
+      "count": 1
+    },
+    {
+      "part": "fan",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "candle",
+      "x": 26,
+      "y": 16,
+      "rot": 12
+    }
+  ],
+  "expect": "goal"
+}

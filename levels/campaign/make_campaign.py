@@ -190,6 +190,50 @@ level(30, "Grand finale", "Everything you know. Two slots.",
       [("switch", 1), ("plank", 1), ("fan", 1), ("spring", 1), ("rope", 1)], [S("switch", 3, 26, 0)], slots=2,
       teaches="world 3 finale")
 
+# ================================================================ World 4 — Rigging (ropes, pulleys, pops, winches)
+# Designed and brute-force verified with game/tests/design_levels.gd (every reference solution has
+# >= 3 of 4 neighbouring cells that also solve, and no level solves itself with nothing placed).
+
+level(31, 'Wrecking line', 'Tie the ball to the pulley. Let it swing.',
+      [P("plank", 6, 18, 1), P("ball", 8, 16, 0), P("pulley", 18, 6, 0), P("plank", 27, 26, 0), P("ball", 24, 24, 0), P("basket", 33, 44, 0)],
+      [("rope", 1)], [S("rope", 6, 18, 20)], slots=1, goal={"type": "basket", "count": 1}, teaches='rope pendulum')
+
+level(32, 'Mirror swing', 'Same idea, other side. Where does the rope start?',
+      [P("plank", 38, 18, 23), P("ball", 36, 16, 0), P("pulley", 26, 6, 0), P("plank", 17, 26, 0), P("ball", 20, 24, 0), P("basket", 11, 44, 0)],
+      [("rope", 1)], [S("rope", 38, 18, 14)], slots=1, goal={"type": "basket", "count": 1}, teaches='rope pendulum (mirrored)')
+
+level(33, 'Rig it yourself', 'No pulley this time. Hang one, then tie the ball to it.',
+      [P("plank", 6, 18, 1), P("ball", 8, 16, 0), P("plank", 27, 26, 0), P("ball", 24, 24, 0), P("basket", 33, 44, 0)],
+      [("pulley", 1), ("rope", 1)], [S("pulley", 22, 6, 0), S("rope", 8, 16, 21)], slots=2, goal={"type": "basket", "count": 1}, teaches='place pulley + rope')
+
+level(34, 'Pop and drop', 'A balloon holds the cheese up. Make it let go.',
+      [P("plank", 30, 10, 0), P("balloon", 30, 24, 0), P("cheese", 30, 34, 0), P("rope", 30, 34, 18), P("basket", 30, 47, 0), P("plank", 12, 30, 2), P("ball", 10, 27, 0)],
+      [("candle", 1), ("fan", 1)], [S("candle", 30, 14, 12)], slots=1, goal={"type": "basket", "count": 1}, teaches='candle pops balloon')
+
+level(35, 'Pop and drop II', 'Fire goes up, cheese comes down.',
+      [P("plank", 14, 10, 0), P("balloon", 14, 24, 0), P("cheese", 14, 34, 0), P("rope", 14, 34, 18), P("basket", 14, 47, 0), P("plank", 32, 30, 22), P("ball", 34, 27, 0)],
+      [("candle", 1), ("spring", 1)], [S("candle", 14, 14, 12)], slots=1, goal={"type": "basket", "count": 1}, teaches='candle pops balloon (mirrored)')
+
+level(36, 'Dinner from above', 'The mouse waits below. Send the cheese down.',
+      [P("plank", 26, 10, 0), P("balloon", 26, 26, 0), P("cheese", 26, 36, 0), P("rope", 26, 36, 18), P("plank", 10, 44, 0), P("plank", 20, 44, 0), P("plank", 30, 44, 0), P("mouse", 6, 42, 0)],
+      [("candle", 1), ("fan", 1)], [S("candle", 26, 16, 12)], slots=1, goal={"type": "cheese"}, teaches='pop + actor')
+
+level(37, 'Dinner from above II', 'One part pops, one part distracts.',
+      [P("plank", 18, 10, 0), P("balloon", 18, 26, 0), P("cheese", 18, 36, 0), P("rope", 18, 36, 18), P("plank", 34, 44, 0), P("plank", 24, 44, 0), P("plank", 14, 44, 0), P("mouse", 38, 42, 0)],
+      [("candle", 1), ("plank", 1)], [S("candle", 18, 13, 12)], slots=1, goal={"type": "cheese"}, teaches='pop + distractor')
+
+level(38, 'Winch it up', 'A ball on the switch starts the winch. Get it there.',
+      [P("pulley", 22, 8, 0), P("motor", 22, 8, 0, on=False), P("bucket", 22, 34, 0), P("rope", 22, 29, 18), P("balloon", 16, 30, 0), P("rope", 16, 32, 23), P("candle", 14, 16, 12), P("plank", 38, 24, 22), P("ball", 40, 21, 0), P("switch", 32, 43, 0), P("plank", 32, 45, 0)],
+      [("plank", 1), ("ball", 1)], [S("plank", 32, 30, 0)], slots=1, goal={"type": "pop"}, teaches='switch + motor winch')
+
+level(39, 'Winch it up II', 'The ball needs a ramp to reach the switch.',
+      [P("pulley", 22, 8, 0), P("motor", 22, 8, 0, on=False), P("bucket", 22, 34, 0), P("rope", 22, 29, 18), P("balloon", 28, 30, 0), P("rope", 28, 32, 13), P("candle", 30, 16, 12), P("plank", 6, 24, 2), P("ball", 4, 21, 0), P("switch", 12, 43, 0), P("plank", 12, 45, 0)],
+      [("plank", 1)], [S("plank", 12, 30, 1)], slots=1, goal={"type": "pop"}, teaches='winch with ramp')
+
+level(40, 'Master rigger', 'Pulley, rope and timing. Two slots.',
+      [P("plank", 38, 18, 23), P("ball", 36, 16, 0), P("plank", 17, 26, 0), P("ball", 20, 24, 0), P("basket", 11, 44, 0)],
+      [("pulley", 1), ("rope", 1), ("spring", 1)], [S("pulley", 22, 4, 0), S("rope", 36, 16, 14)], slots=2, goal={"type": "basket", "count": 1}, teaches='world 4 finale')
+
 # PLAY corner rule: nothing fixed may extend into x > 35.5 and y > 48 (the PLAY button).
 HALF = {"ball": (1.5, 1.5), "plank": (5, 0.5), "basket": (4.5, 3.2), "fan": (1.25, 2), "conveyor": (6, 0.75),
         "spring": (2, 1), "motor": (0.9, 0.9), "rope": (0, 0), "pulley": (1.25, 1.25), "switch": (2, 0.5),
@@ -211,7 +255,7 @@ for l in levels:
 worlds = {}
 for l in levels:
     worlds.setdefault(l["world"], []).append({"number": l["number"], "id": l["id"], "title": l["title"], "file": "%03d.json" % l["number"]})
-index = {"worlds": [{"number": w, "name": {1: "Workshop", 2: "Tight squeeze", 3: "Menagerie"}.get(w, "World %d" % w), "levels": worlds[w]} for w in sorted(worlds)]}
+index = {"worlds": [{"number": w, "name": {1: "Workshop", 2: "Tight squeeze", 3: "Menagerie", 4: "Rigging"}.get(w, "World %d" % w), "levels": worlds[w]} for w in sorted(worlds)]}
 with open(os.path.join(OUT, "index.json"), "w") as f:
     json.dump(index, f, indent=2)
     f.write("\n")

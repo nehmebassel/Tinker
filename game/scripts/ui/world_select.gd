@@ -293,9 +293,9 @@ func _draw_map() -> void:
 		c.draw_line(Vector2(0, y), Vector2(size.x, y), C_SHEET_GRID_MAJOR if k % 4 == 0 else C_SHEET_GRID, 1.0)
 		y += step
 		k += 1
-	for band in _world_bands:
-		_draw_world_band(c, band)
 	_draw_track(c)
+	for band in _world_bands:  # signs over the rails, so a world's name is never crossed out
+		_draw_world_band(c, band)
 
 
 func _draw_world_band(c: Control, band: Dictionary) -> void:

@@ -1,0 +1,66 @@
+{
+  "id": "c031",
+  "world": 4,
+  "number": 31,
+  "title": "Wrecking line",
+  "hint": "Tie the ball to the pulley. Let it swing.",
+  "teaches": "rope pendulum",
+  "goal": {
+    "type": "basket",
+    "count": 1
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 6,
+      "y": 18,
+      "rot": 1
+    },
+    {
+      "part": "ball",
+      "x": 8,
+      "y": 16,
+      "rot": 0
+    },
+    {
+      "part": "pulley",
+      "x": 18,
+      "y": 6,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 27,
+      "y": 26,
+      "rot": 0
+    },
+    {
+      "part": "ball",
+      "x": 24,
+      "y": 24,
+      "rot": 0
+    },
+    {
+      "part": "basket",
+      "x": 33,
+      "y": 44,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "rope",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "rope",
+      "x": 6,
+      "y": 18,
+      "rot": 20
+    }
+  ],
+  "expect": "goal"
+}
