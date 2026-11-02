@@ -187,6 +187,9 @@ from a link.
 * **Editor** = the level screen in mode `edit` (`App.sandbox = {mode, index}`): tray holds every part,
   unlimited (∞); what is placed is the level's FIXED layout; TEST runs it for free (no tries, toast only).
   Saved to `user://sandbox.json` (`SandboxStore`) on leaving. Changing the layout clears the solution.
+* **Start states**: selecting a candle / motor / fan / conveyor in the editor shows a Light/Unlit or On/Off
+  button; the state is stored on the layout placement. `Simulation.keep_player_state` (editor only) makes TEST
+  honour it, since the layout is loaded as player placements. A candle goal needs an unlit candle in the layout.
 * **Next** → `SandboxSetup`: name, goal (ball in basket / light the candle / mouse gets cheese / pop a
   balloon), parts the player gets (0-5 each), slots. `SandboxStore.problem()` blocks obvious dead ends
   (no layout, no player parts, goal part missing, cheese without a mouse).

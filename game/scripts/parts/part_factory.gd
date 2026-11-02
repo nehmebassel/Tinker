@@ -7,7 +7,9 @@ const OUTLINE_W := 6.0
 const OUTLINE_COLOR := Color("1f1a2e")
 
 
-static func create(placement: Placement, index: int, is_fixed: bool) -> Node2D:
+## keep_state: honour placement.state even for a player part (the sandbox editor, whose "player" parts
+## are really the author's fixed layout). Campaign, Daily and server replays never set it.
+static func create(placement: Placement, index: int, is_fixed: bool, keep_state: bool = false) -> Node2D:
 	var def: Dictionary = PartRegistry.get_def(placement.part)
 	if def.is_empty():
 		push_error("Unknown part '%s'" % placement.part)
@@ -22,7 +24,7 @@ static func create(placement: Placement, index: int, is_fixed: bool) -> Node2D:
 	node.set_meta("is_fixed", is_fixed)
 	node.set_meta("cell", placement.cell)
 	node.set_meta("rot", placement.rot)
-	node.set_meta("state", placement.state if is_fixed else {})
+	node.set_meta("state", placement.state if (is_fixed or keep_state) else {})
 	node.add_to_group("parts")
 	if node.has_method("configure"):
 		node.configure(def)

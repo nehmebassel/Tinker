@@ -102,6 +102,15 @@ static func problem(d: Dictionary) -> String:
 			has = true
 	if not has:
 		return "The goal needs a %s on the board or in the player's parts." % need.get(g, g)
+	if g == "candle":
+		# Player parts always start in their default state (a lit candle), so the goal needs an UNLIT
+		# candle in the layout (select it in the editor and tap Unlit).
+		var unlit := false
+		for p in fixed:
+			if str(p.get("part", "")) == "candle" and p.get("state", {}).get("lit", true) == false:
+				unlit = true
+		if not unlit:
+			return "A candle goal needs an unlit candle on the board: select a candle and tap Unlit."
 	if g == "cheese":
 		var mouse := false
 		for p in fixed:

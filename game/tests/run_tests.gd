@@ -48,6 +48,7 @@ func _run_all() -> void:
 	_test_bus_layout()
 	_test_tries()
 	await _test_rope_snap()
+	await _test_editor_state()
 	await _test_levels()
 	await _test_sound_watcher()
 
@@ -58,6 +59,33 @@ func _run_all() -> void:
 		_log("FAIL: " + f)
 	_write_files()
 	quit(0 if failures.is_empty() else 1)
+
+
+## Sandbox editor: the layout is loaded as player placements, but must keep its start states (Codex PR #8):
+## an unlit candle / stopped motor must stay so in TEST, and a candle goal needs an unlit candle.
+func _test_editor_state() -> void:
+	var sim := Simulation.new()
+	root.add_child(sim)
+	sim.load_level(LevelData.from_dict({"id": "t-editor", "title": "t", "goal": {"type": "candle"}, "fixed": [], "tray": [], "slots": 0, "reference_solution": []}))
+	var c := Placement.new("candle", Vector2i(10, 10), 0)
+	c.state = {"lit": false}
+	var m := Placement.new("motor", Vector2i(20, 10), 0)
+	m.state = {"on": false}
+	sim.set_player_parts([c, m])
+	_check("editor off: player candle ignores state (campaign rule)", sim.parts[0].lit_at_start == true)
+	sim.keep_player_state = true
+	sim.set_player_parts([c, m])
+	_check("editor on: unlit candle stays unlit", sim.parts[0].lit_at_start == false)
+	_check("editor on: stopped motor stays stopped", bool(PartFactory.state_of(sim.parts[1], "on", true)) == false)
+	sim.queue_free()
+	await process_frame
+	var d := SandboxStore.new_draft()
+	d["goal"] = {"type": "candle"}
+	d["tray"] = [{"part": "candle", "count": 1}]
+	d["fixed"] = [{"part": "candle", "x": 10, "y": 10, "rot": 0}]
+	_check("setup: candle goal without an unlit candle is refused", SandboxStore.problem(d).contains("unlit"))
+	d["fixed"] = [{"part": "candle", "x": 10, "y": 10, "rot": 0, "state": {"lit": false}}]
+	_check("setup: candle goal with an unlit candle is accepted", SandboxStore.problem(d) == "")
 
 
 ## Rope snap points + auto-aim (the editor and the simulation share these helpers).

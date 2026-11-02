@@ -85,6 +85,7 @@ var redo_btn: Button
 var fit_btn: Button
 var rot_btn: Button
 var rot90_btn: Button
+var state_btn: Button
 var title_lbl: Label
 var counter_lbl: Label
 var toast_lbl: Label
@@ -255,6 +256,11 @@ func _build_scene() -> void:
 	rot90_btn = _button("90°", BTN)
 	rot90_btn.pressed.connect(func() -> void: _rotate_selected(6))
 	row2.add_child(rot90_btn)
+	state_btn = _button("Off", BTN)  # editor only: switch a candle / motor / fan / conveyor off or on
+	state_btn.name = "StateButton"
+	state_btn.pressed.connect(_toggle_selected_state)
+	state_btn.visible = false
+	row2.add_child(state_btn)
 	fit_btn = _button("Fit", BTN)
 	fit_btn.pressed.connect(_fit_camera)
 	row2.add_child(fit_btn)
@@ -595,6 +601,11 @@ func _refresh_hud() -> void:
 	rot_btn.disabled = selected < 0 or not editing
 	rot90_btn.disabled = rot_btn.disabled
 	setup_btn.visible = mode == "edit" and editing
+	var sk := _state_key(placements[selected].part) if selected >= 0 and selected < placements.size() else ""
+	state_btn.visible = mode == "edit" and editing and sk != ""
+	if state_btn.visible:
+		var on := _state_value(placements[selected], sk)
+		state_btn.text = ("Unlit" if on else "Light") if sk == "lit" else ("Off" if on else "On")
 	tries_badge.visible = mode in ["campaign", "daily"]
 	tries_lbl.visible = tries_badge.visible
 	play_btn.text = "STOP" if (sim.running or run_ended) else ("TEST" if mode == "edit" else "RUN")
@@ -1118,6 +1129,36 @@ func _rotate_selected(steps: int) -> void:
 	_refresh_hud()
 
 
+## The boolean start-state a part has (candle "lit", motor / fan / conveyor "on"), or "".
+func _state_key(part: String) -> String:
+	var st: Dictionary = PartRegistry.get_def(part).get("state", {})
+	for k in st:
+		if st[k] is bool:
+			return k
+	return ""
+
+
+func _state_value(p: Placement, key: String) -> bool:
+	return bool(p.state.get(key, PartRegistry.get_def(p.part).get("state", {}).get(key, true)))
+
+
+func _toggle_selected_state() -> void:
+	if mode != "edit" or selected < 0 or sim.running or run_ended:
+		return
+	var key := _state_key(placements[selected].part)
+	if key == "":
+		return
+	_push_history()
+	var on := not _state_value(placements[selected], key)
+	if on == bool(PartRegistry.get_def(placements[selected].part).get("state", {}).get(key, true)):
+		placements[selected].state.erase(key)  # back to the default: keep the JSON minimal
+	else:
+		placements[selected].state[key] = on
+	sim.set_player_parts(placements)
+	_snd("place")
+	_refresh_hud()
+
+
 func _toggle_tray() -> void:
 	tray_collapsed = not tray_collapsed
 	tray.custom_minimum_size.y = TRAY_TAB_H + 24 if tray_collapsed else TRAY_H
@@ -1415,6 +1456,7 @@ func _load_sandbox(sb: Dictionary) -> void:
 				tray.append({"part": id, "count": 99})
 			var lv := {"id": "editor", "title": str(d.get("title", "My machine")), "goal": d.get("goal", {"type": "basket"}),
 				"fixed": [], "tray": tray, "slots": 99, "reference_solution": []}
+			sim.keep_player_state = true  # the layout keeps its lit / on states, as it will once published
 			_load_level_data(LevelData.from_dict(lv))
 			for f in d.get("fixed", []):
 				placements.append(Placement.from_dict(f))

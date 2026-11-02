@@ -140,6 +140,7 @@ Session log at the bottom tells the next agent exactly where things stand.
 - [x] World 4 "Rigging": levels 31-40 (rope pendulums, place-your-own pulley, candle pops a balloon to drop cheese, motor winch lifts a tethered balloon into a flame). Designed with `game/tests/design_levels.gd` (brute-force search; every reference solution is robust: >= 3 of 4 neighbouring cells also solve; none solves itself empty). 4 of the 10 are mirrored variants (32, 35, 37, 38) with different distractor parts; 11 other designs were rejected by the harness.
 - [x] Fixed: smoke test assumed rotating always adds an undo step (false for auto-aimed ropes); info-card demo check too strict for demos that finish fast (candle). CI smokes now also cover levels 31 (rope) and 34 (candle).
 - [x] Map: world name plates drawn over the rails (rails used to cross the name)
+- [x] Codex PR #8: editor TEST ignored start states (unlit candle / stopped motor came alive); candle goal was unsolvable from scratch → editor Light/Unlit, On/Off button + `keep_player_state` + setup check + tests
 
 ### M7 Store (not started)
 

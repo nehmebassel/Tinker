@@ -32,6 +32,8 @@ var running: bool = false
 var ticks: int = 0
 var outcome: Dictionary = {}
 var rope_lines: Array = []  # Array[RopeLine]
+## Sandbox editor only: player placements keep their initial state (lit / on), see PartFactory.create.
+var keep_player_state: bool = false
 
 var _still_ticks: int = 0
 var _goal_hit_tick: int = -1
@@ -89,7 +91,7 @@ func rebuild() -> void:
 
 
 func _spawn(pl: Placement, index: int, is_fixed: bool) -> void:
-	var node := PartFactory.create(pl, index, is_fixed)
+	var node := PartFactory.create(pl, index, is_fixed, keep_player_state and not is_fixed)
 	if node == null:
 		return
 	add_child(node)
