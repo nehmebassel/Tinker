@@ -1,0 +1,81 @@
+{
+  "id": "c037",
+  "world": 4,
+  "number": 37,
+  "title": "Dinner from above II",
+  "hint": "One part pops, one part distracts.",
+  "teaches": "pop + distractor",
+  "goal": {
+    "type": "cheese"
+  },
+  "fixed": [
+    {
+      "part": "plank",
+      "x": 18,
+      "y": 10,
+      "rot": 0
+    },
+    {
+      "part": "balloon",
+      "x": 18,
+      "y": 26,
+      "rot": 0
+    },
+    {
+      "part": "cheese",
+      "x": 18,
+      "y": 36,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 18,
+      "y": 36,
+      "rot": 18
+    },
+    {
+      "part": "plank",
+      "x": 34,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 24,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 14,
+      "y": 44,
+      "rot": 0
+    },
+    {
+      "part": "mouse",
+      "x": 38,
+      "y": 42,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "candle",
+      "count": 1
+    },
+    {
+      "part": "plank",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "candle",
+      "x": 18,
+      "y": 13,
+      "rot": 12
+    }
+  ],
+  "expect": "goal"
+}

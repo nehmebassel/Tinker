@@ -6,6 +6,7 @@ const WORLD_SELECT := "res://scenes/world_select.tscn"
 const LEVEL := "res://scenes/level.tscn"
 const BOARD := "res://scenes/board.tscn"
 const SETTINGS := "res://scenes/settings.tscn"
+const SANDBOX := "res://scenes/sandbox.tscn"
 
 var save: SaveData
 var settings: Settings
@@ -14,13 +15,19 @@ var api: Api
 var push: Push
 var audio: Audio
 var tries: Tries
+var sandbox_store: SandboxStore
+## Sandbox context for the level screen: {} for campaign/daily, else
+## {"mode": "edit"|"verify", "index": draft} or {"mode": "shared", "code", "level", "author_parts"}.
+var sandbox: Dictionary = {}
+var map_last_node: int = -1  # level the map's marble sat on when the map was last shown (session only)
 var level_number: int = 0
 ## The Daily currently open: {"date": String, "day": int, "level": Dictionary} or {} for campaign play.
 var daily: Dictionary = {}
 var board_date: String = ""
 var _nav_gen := 0  # bumped by every navigation; a slow async navigation checks it before switching
 var flow_test: bool = false
-var daily_test: String = ""  # --daily-flow=<solution.json>: CI test of the whole daily loop
+var daily_test: String = ""
+var sandbox_test: String = ""  # "publish:<file to write the code>" or "play:<code>" (CI, two installs)  # --daily-flow=<solution.json>: CI test of the whole daily loop
 
 
 func _ready() -> void:
@@ -35,6 +42,7 @@ func _ready() -> void:
 	audio = Audio.new()
 	add_child(audio)
 	tries = Tries.load_or_new()
+	sandbox_store = SandboxStore.load_or_new()
 	_fetch_rules.call_deferred()
 	for a in OS.get_cmdline_user_args():
 		if a == "--reset-save":
@@ -47,14 +55,33 @@ func _ready() -> void:
 			settings.save()
 		elif a.begins_with("--daily-flow="):
 			daily_test = a.trim_prefix("--daily-flow=")
+		elif a.begins_with("--sandbox-publish="):
+			sandbox_test = "publish:" + a.trim_prefix("--sandbox-publish=")
+		elif a.begins_with("--sandbox-play="):
+			sandbox_test = "play:" + a.trim_prefix("--sandbox-play=")
 		elif a.begins_with("--shot-ws="):
 			_shot_ws(a.trim_prefix("--shot-ws="))
+	if OS.has_feature("web") and not flow_test and daily_test == "" and sandbox_test == "":
+		_open_link_level.call_deferred()
 	if flow_test:
 		save.reset()
 		tries.reset()
 		_run_flow()
+	elif sandbox_test != "":
+		_run_sandbox_flow.call_deferred()
 	elif daily_test != "":
 		_run_daily_flow.call_deferred()
+
+
+## Browser build opened from a share link (/l/CODE -> /play/?level=CODE): go straight to that level.
+func _open_link_level() -> void:
+	var code := str(JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('level') || ''", true))
+	if code == "" or code == "null":
+		return
+	await get_tree().process_frame
+	var err: String = await open_shared(code)
+	if err != "":
+		push_warning(err)
 
 
 ## Tries rules from the backend (GET /config); offline the cached / project-setting values stay.
@@ -71,6 +98,8 @@ func _fetch_rules() -> void:
 func open_level(number: int) -> void:
 	_nav_gen += 1
 	level_number = number
+	daily = {}
+	sandbox = {}
 	get_tree().change_scene_to_file.call_deferred(LEVEL)
 
 
@@ -78,7 +107,50 @@ func open_world_select() -> void:
 	_nav_gen += 1
 	level_number = 0
 	daily = {}
+	sandbox = {}
 	get_tree().change_scene_to_file.call_deferred(WORLD_SELECT)
+
+
+func open_sandbox() -> void:
+	_nav_gen += 1
+	level_number = 0
+	daily = {}
+	sandbox = {}
+	get_tree().change_scene_to_file.call_deferred(SANDBOX)
+
+
+## Sandbox editor ("edit": build the layout) or author play-test ("verify": solve it to publish).
+func open_sandbox_level(mode: String, index: int) -> void:
+	_nav_gen += 1
+	level_number = 0
+	daily = {}
+	sandbox = {"mode": mode, "index": index}
+	get_tree().change_scene_to_file.call_deferred(LEVEL)
+
+
+## Fetch a shared level by its code and play it. Returns "" or an error message.
+func open_shared(code: String) -> String:
+	code = code.strip_edges().to_lower()
+	_nav_gen += 1
+	var my_gen := _nav_gen
+	var r: Dictionary = await api.get_json("/level/" + code.uri_encode())
+	if my_gen != _nav_gen:
+		return ""
+	if not r["ok"]:
+		return "Level %s: %s" % [code, str(r["error"])]
+	var lv: Dictionary = r["body"]["level"]
+	if LevelData.validate(lv) != "":
+		return "That level is invalid"
+	level_number = 0
+	daily = {}
+	sandbox = {"mode": "shared", "code": code, "level": lv, "author_parts": int(r["body"].get("author_parts", 0))}
+	get_tree().change_scene_to_file.call_deferred(LEVEL)
+	return ""
+
+
+## Public link for a published level (opens the browser build on it; see server GET /l/:id).
+func share_link(code: String) -> String:
+	return settings.base_url() + "/l/" + code
 
 
 func open_settings() -> void:
@@ -111,6 +183,7 @@ func open_daily() -> String:
 	if LevelData.validate(lv) != "":
 		return "Daily level is invalid"
 	daily = {"date": today, "day": int(body.get("day", 0)), "level": lv}
+	sandbox = {}
 	level_number = 0
 	get_tree().change_scene_to_file.call_deferred(LEVEL)
 	return ""
@@ -267,4 +340,72 @@ func _run_daily_flow() -> void:
 
 func _finish_daily_flow() -> void:
 	print("DAILY %s" % ("PASS" if _flow_ok else "FAIL"))
+	get_tree().quit(0 if _flow_ok else 1)
+
+
+# ------------------------------------------------------------------ sandbox test (CI): phone A -> phone B
+## A (--sandbox-publish=FILE): map -> Sandbox -> New level -> build campaign level 1's layout ->
+##   Next -> player gets 1 plank, 1 slot -> Solve it -> solve -> Publish -> code written to FILE.
+## B (--sandbox-play=CODE, a different install): open the code (what the share link does) -> solve
+##   -> Remix opens the editor with the same layout. Prints SANDBOX PASS / FAIL.
+func _run_sandbox_flow() -> void:
+	var kind := sandbox_test.get_slice(":", 0)
+	var arg := sandbox_test.substr(kind.length() + 1)
+	var ref := LevelData.load_from_file(Campaign.path_for(1))
+	if kind == "publish":
+		var ws := await _wait_scene("WorldSelect")
+		await _tap(ws.find_child("SandboxButton", true, false))
+		var sb := await _wait_scene("SandboxScreen")
+		_flow_assert(sb != null, "map -> Sandbox")
+		await _tap(sb.find_child("NewLevel", true, false))
+		var ed := await _wait_scene("LevelScreen")
+		_flow_assert(ed != null and ed.mode == "edit", "New level opens the editor")
+		for pl in ref.fixed:
+			ed.placements.append(pl.duplicate_placement())
+		ed.sim.set_player_parts(ed.placements)
+		ed._refresh_hud()
+		await _tap(ed.setup_btn)
+		await get_tree().process_frame
+		var su: Node = ed.hud.get_node_or_null("SandboxSetup")
+		_flow_assert(su != null, "Next opens the level setup")
+		su._title.text = "CI machine"
+		su._set_count("plank", 1)
+		su._set_slots(1)
+		await _tap(su.find_child("SolveToPublish", true, false))
+		var vf := await _wait_scene("LevelScreen")
+		_flow_assert(vf != null and vf != ed and vf.mode == "verify", "Solve it opens the author test")
+		_flow_assert(vf.level.fixed.size() == ref.fixed.size(), "test level has the built layout")
+		for pl in ref.reference_solution:
+			vf.placements.append(pl.duplicate_placement())
+		vf.sim.set_player_parts(vf.placements)
+		vf._start_run()
+		var o: Dictionary = await vf.sim.finished
+		await get_tree().process_frame
+		_flow_assert(o["result"] == "goal" and vf.publish_btn.visible, "author solves it; Publish offered")
+		await _tap(vf.publish_btn)
+		for i in 600:
+			if vf._published_code != "":
+				break
+			await get_tree().process_frame
+		_flow_assert(vf._published_code.length() == 8, "published with code '%s'" % vf._published_code)
+		var f := FileAccess.open(arg, FileAccess.WRITE)
+		f.store_string(vf._published_code)
+		f.close()
+	else:
+		var err: String = await open_shared(arg)
+		_flow_assert(err == "", "phone B opens code %s (%s)" % [arg, err])
+		var ls := await _wait_scene("LevelScreen")
+		_flow_assert(ls != null and ls.mode == "shared", "shared level opened")
+		for pl in ref.reference_solution:
+			ls.placements.append(pl.duplicate_placement())
+		ls.sim.set_player_parts(ls.placements)
+		ls._start_run()
+		var o: Dictionary = await ls.sim.finished
+		await get_tree().process_frame
+		_flow_assert(o["result"] == "goal", "phone B solves the shared level")
+		_flow_assert(ls.remix_btn.visible, "Remix offered")
+		await _tap(ls.remix_btn)
+		var ed := await _wait_scene("LevelScreen")
+		_flow_assert(ed != null and ed != ls and ed.mode == "edit" and ed.placements.size() == ref.fixed.size(), "Remix opens the editor with the layout")
+	print("SANDBOX %s" % ("PASS" if _flow_ok else "FAIL"))
 	get_tree().quit(0 if _flow_ok else 1)

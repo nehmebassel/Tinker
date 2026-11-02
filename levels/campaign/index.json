@@ -197,6 +197,72 @@
           "file": "030.json"
         }
       ]
+    },
+    {
+      "number": 4,
+      "name": "Rigging",
+      "levels": [
+        {
+          "number": 31,
+          "id": "c031",
+          "title": "Wrecking line",
+          "file": "031.json"
+        },
+        {
+          "number": 32,
+          "id": "c032",
+          "title": "Mirror swing",
+          "file": "032.json"
+        },
+        {
+          "number": 33,
+          "id": "c033",
+          "title": "Rig it yourself",
+          "file": "033.json"
+        },
+        {
+          "number": 34,
+          "id": "c034",
+          "title": "Pop and drop",
+          "file": "034.json"
+        },
+        {
+          "number": 35,
+          "id": "c035",
+          "title": "Pop and drop II",
+          "file": "035.json"
+        },
+        {
+          "number": 36,
+          "id": "c036",
+          "title": "Dinner from above",
+          "file": "036.json"
+        },
+        {
+          "number": 37,
+          "id": "c037",
+          "title": "Dinner from above II",
+          "file": "037.json"
+        },
+        {
+          "number": 38,
+          "id": "c038",
+          "title": "Winch it up",
+          "file": "038.json"
+        },
+        {
+          "number": 39,
+          "id": "c039",
+          "title": "Winch it up II",
+          "file": "039.json"
+        },
+        {
+          "number": 40,
+          "id": "c040",
+          "title": "Master rigger",
+          "file": "040.json"
+        }
+      ]
     }
   ]
 }

@@ -1,0 +1,102 @@
+{
+  "id": "c038",
+  "world": 4,
+  "number": 38,
+  "title": "Winch it up",
+  "hint": "A ball on the switch starts the winch. Get it there.",
+  "teaches": "switch + motor winch",
+  "goal": {
+    "type": "pop"
+  },
+  "fixed": [
+    {
+      "part": "pulley",
+      "x": 22,
+      "y": 8,
+      "rot": 0
+    },
+    {
+      "part": "motor",
+      "x": 22,
+      "y": 8,
+      "rot": 0,
+      "state": {
+        "on": false
+      }
+    },
+    {
+      "part": "bucket",
+      "x": 22,
+      "y": 34,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 22,
+      "y": 29,
+      "rot": 18
+    },
+    {
+      "part": "balloon",
+      "x": 16,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 16,
+      "y": 32,
+      "rot": 23
+    },
+    {
+      "part": "candle",
+      "x": 14,
+      "y": 16,
+      "rot": 12
+    },
+    {
+      "part": "plank",
+      "x": 38,
+      "y": 24,
+      "rot": 22
+    },
+    {
+      "part": "ball",
+      "x": 40,
+      "y": 21,
+      "rot": 0
+    },
+    {
+      "part": "switch",
+      "x": 32,
+      "y": 43,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 32,
+      "y": 45,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "plank",
+      "count": 1
+    },
+    {
+      "part": "ball",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "plank",
+      "x": 32,
+      "y": 30,
+      "rot": 0
+    }
+  ],
+  "expect": "goal"
+}

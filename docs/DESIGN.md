@@ -175,6 +175,55 @@ The smoke test synthesises touch events (converted to window coordinates with `g
 
 `game/export_presets.cfg` has the "Android" preset (arm64-v8a + x86_64, debug signing). Godot reads the SDK/JDK paths from `~/.config/godot/editor_settings-4.5.tres` and the debug keystore from `GODOT_ANDROID_KEYSTORE_DEBUG_PATH/USER/PASSWORD`. See `tools/setup.sh` for the full local setup and `.github/workflows/ci.yml` for the CI version.
 
+## Sandbox (M5)
+
+Brief: build any level from all parts, set a goal, play-test it, publish as a link; others play and remix;
+the server replays the author's solution before accepting. Acceptance: built on phone A, played on phone B
+from a link.
+
+* **Sandbox home** (`scripts/ui/sandbox_screen.gd`, from the map's Sandbox button): New level; Play a code
+  or pasted link; My levels (Edit / Test / Link / Delete); Community = newest published levels
+  (`GET /levels/recent`).
+* **Editor** = the level screen in mode `edit` (`App.sandbox = {mode, index}`): tray holds every part,
+  unlimited (∞); what is placed is the level's FIXED layout; TEST runs it for free (no tries, toast only).
+  Saved to `user://sandbox.json` (`SandboxStore`) on leaving. Changing the layout clears the solution.
+* **Start states**: selecting a candle / motor / fan / conveyor in the editor shows a Light/Unlit or On/Off
+  button; the state is stored on the layout placement. `Simulation.keep_player_state` (editor only) makes TEST
+  honour it, since the layout is loaded as player placements. A candle goal needs an unlit candle in the layout.
+* **Next** → `SandboxSetup`: name, goal (ball in basket / light the candle / mouse gets cheese / pop a
+  balloon), parts the player gets (0-5 each), slots. `SandboxStore.problem()` blocks obvious dead ends
+  (no layout, no player parts, goal part missing, cheese without a mouse).
+* **Solve it to publish** → mode `verify`: the author plays the level exactly as players will. On a solve,
+  **Publish** → `POST /level` with the author's placements as the reference solution. The server validates,
+  replays it (must reach the goal) and replays an EMPTY solution (must NOT reach it: "the level solves
+  itself"). Returns an 8-character code.
+* **Link**: `https://<server>/l/CODE` → 302 `/play/?level=CODE`; the browser build reads `?level=` at start
+  (`App._open_link_level`) and opens it. In the app: Sandbox → Play a code (accepts the link too).
+* **Shared levels** (mode `shared`): play, see the author's part count after solving, **Remix** = editable
+  copy in My levels. Tries apply to the campaign and the Daily only.
+* **Test**: `tools/ci_daily.sh` runs two installs with separate data dirs: A builds campaign level 1's
+  layout through the editor, sets up, solves, publishes; B opens the code, solves it, remixes it.
+
+## Map screen (2026-11-02)
+
+`scripts/ui/world_select.gd` (scene name unchanged). Blueprint sheet; levels are gears on a marble-run track
+(Curve2D through the nodes, sine-snaking, a gap and a riveted name plate per world). The track is BUILT
+(brass rails, wooden sleepers) up to the current level and dashed blueprint beyond. A marble perches on the
+current gear; `App.map_last_node` remembers where it was, so after a solve it rolls along the rails to the
+next gear while the rail is laid. Animated decor per world (pendulum, meshing gears, Newton's cradle,
+pulley with counterweight). Music: `music_map.ogg` (Lyria, soothing, seed 411), also on the Sandbox screens.
+
+## World 4 "Rigging" and the level-design harness (2026-11-02)
+
+`game/tests/design_levels.gd` (not exported) takes a JSON list of candidate levels, checks each does NOT
+solve with nothing placed, then brute-forces placements of one part over a region (ropes are auto-aimed with
+`Rope.best_rot`, exactly like the editor; `rope_cell` mode also places a pulley). A placement is "robust" when
+>= 3 of its 4 neighbouring cells also solve; reference solutions are only taken from robust hits, so a level
+does not depend on pixel-perfect placement. Results append to `<designs>.out` one JSON line per design.
+Levels 31-40: 31/32 rope pendulum (mirrored), 33 place the pulley AND the rope, 34/35 candle pops the balloon
+that holds the cheese over a basket, 36/37 same onto a mouse, 38/39 ball hits a switch, motor winches a
+bucket, tethered balloon rises into a candle (pop goal), 40 pulley + rope with a spring distractor.
+
 ## Ropes and pulleys (M6 rework, 2026-11-02)
 
 Requested by Bassel: clearer, more realistic, visible snap points, auto-snap.

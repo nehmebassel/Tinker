@@ -1,0 +1,98 @@
+{
+  "id": "c039",
+  "world": 4,
+  "number": 39,
+  "title": "Winch it up II",
+  "hint": "The ball needs a ramp to reach the switch.",
+  "teaches": "winch with ramp",
+  "goal": {
+    "type": "pop"
+  },
+  "fixed": [
+    {
+      "part": "pulley",
+      "x": 22,
+      "y": 8,
+      "rot": 0
+    },
+    {
+      "part": "motor",
+      "x": 22,
+      "y": 8,
+      "rot": 0,
+      "state": {
+        "on": false
+      }
+    },
+    {
+      "part": "bucket",
+      "x": 22,
+      "y": 34,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 22,
+      "y": 29,
+      "rot": 18
+    },
+    {
+      "part": "balloon",
+      "x": 28,
+      "y": 30,
+      "rot": 0
+    },
+    {
+      "part": "rope",
+      "x": 28,
+      "y": 32,
+      "rot": 13
+    },
+    {
+      "part": "candle",
+      "x": 30,
+      "y": 16,
+      "rot": 12
+    },
+    {
+      "part": "plank",
+      "x": 6,
+      "y": 24,
+      "rot": 2
+    },
+    {
+      "part": "ball",
+      "x": 4,
+      "y": 21,
+      "rot": 0
+    },
+    {
+      "part": "switch",
+      "x": 12,
+      "y": 43,
+      "rot": 0
+    },
+    {
+      "part": "plank",
+      "x": 12,
+      "y": 45,
+      "rot": 0
+    }
+  ],
+  "tray": [
+    {
+      "part": "plank",
+      "count": 1
+    }
+  ],
+  "slots": 1,
+  "reference_solution": [
+    {
+      "part": "plank",
+      "x": 12,
+      "y": 30,
+      "rot": 1
+    }
+  ],
+  "expect": "goal"
+}
