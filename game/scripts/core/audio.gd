@@ -138,6 +138,15 @@ func sfx(sound: String, gain_db: float = 0.0, pitch: float = 1.0) -> void:
 	p.play()
 
 
+## Short vibration for touch feedback (phones and phone browsers; iOS Safari has no vibration API).
+## Off when the player turned Vibration off in Settings.
+func buzz(ms: int) -> void:
+	if not get_parent().settings.haptics:
+		return
+	if OS.has_feature("mobile") or OS.has_feature("web"):
+		Input.vibrate_handheld(ms)
+
+
 func set_loop(loop: String, on: bool) -> void:
 	var p: AudioStreamPlayer = _loops.get(loop)
 	if p == null:

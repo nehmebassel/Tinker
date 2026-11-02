@@ -50,6 +50,8 @@ var level: LevelData
 var sim: Simulation
 var sounds: SoundWatcher
 var info_card: PartInfoCard = null
+var tutorial: Tutorial = null
+var last_result: String = ""  # result of the last finished run ("" while editing / running)
 var placements: Array[Placement] = []
 var history: Array = []  # Array of Array[Placement] snapshots
 var future: Array = []
@@ -121,6 +123,10 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_on_resized)
 	_fit_camera()
 	_music("build")
+	if level_number == 1 and daily.is_empty() and has_node("/root/App") and not App.settings.tutorial_done and not smoke_mode and shot_path == "":
+		tutorial = Tutorial.start(hud, self)
+		tutorial.top_offset = TOP_BAR_H
+		tutorial.bottom_offset = TRAY_H
 	if smoke_mode:
 		_run_smoke()
 	elif shot_path != "":
@@ -1021,6 +1027,7 @@ func _start_run() -> void:
 	result_panel.visible = false
 	sim.set_player_parts(placements)
 	sounds.reset()
+	last_result = ""
 	sim.start()
 	_snd("play")
 	_music("run")
@@ -1042,8 +1049,11 @@ func _stop_run() -> void:
 
 func _on_run_finished(outcome: Dictionary) -> void:
 	run_ended = true
+	last_result = str(outcome["result"])
 	sounds.reset()
 	_snd("goal" if outcome["result"] == "goal" else "fail")
+	if outcome["result"] == "goal":
+		_confetti()
 	match outcome["result"]:
 		"goal":
 			solved_msec = Time.get_ticks_msec()
@@ -1146,10 +1156,48 @@ func _draw_overlay() -> void:
 		overlay.draw_line(p + Vector2(0, -20), p + Vector2(0, 20), c, 3.0)
 
 
+const HAPTIC_MS := {"pick": 10, "place": 18, "rotate": 6, "goal": 60}
+
+
+## Celebration burst from the top of the screen when a run reaches the goal. HUD layer only:
+## it cannot touch the simulation. CPUParticles2D so it works in the web (Compatibility) build.
+func _confetti() -> void:
+	var vs := get_viewport_rect().size
+	var colors := [C_ACCENT, C_GO, Color("6ec6ff"), Color("ffd43b"), Color("b35fd1"), Color("e8833a")]
+	for i in 2:
+		var p := CPUParticles2D.new()
+		p.name = "Confetti%d" % i
+		p.position = Vector2(vs.x * (0.3 + 0.4 * i), TOP_BAR_H - 20)
+		p.amount = 70
+		p.one_shot = true
+		p.explosiveness = 0.9
+		p.lifetime = 2.6
+		p.direction = Vector2(0, 1)
+		p.spread = 70.0
+		p.initial_velocity_min = 380.0
+		p.initial_velocity_max = 900.0
+		p.gravity = Vector2(0, 900)
+		p.angular_velocity_min = -420.0
+		p.angular_velocity_max = 420.0
+		p.scale_amount_min = 10.0
+		p.scale_amount_max = 18.0
+		var g := Gradient.new()
+		g.offsets = PackedFloat32Array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+		g.colors = PackedColorArray(colors)
+		g.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CONSTANT
+		p.color_initial_ramp = g
+		hud.add_child(p)
+		p.emitting = true
+		get_tree().create_timer(3.5).timeout.connect(p.queue_free)
+
+
 ## Sounds go through App.audio; level scenes opened without App (tools, shots) stay silent.
 func _snd(sound: String, gain_db: float = 0.0) -> void:
 	if has_node("/root/App") and App.audio:
 		App.audio.sfx(sound, gain_db)
+		var ms: int = HAPTIC_MS.get(sound, 0)
+		if ms > 0:
+			App.audio.buzz(ms)
 
 
 func _music(track: String) -> void:

@@ -8,6 +8,8 @@ extends RefCounted
 ##   name         : optional display name for boards (24 chars max).
 ##   push_enabled : daily reminder notification on/off.
 ##   music_volume / sfx_volume : 0..1 sliders on the Settings screen (0 = off).
+##   haptics      : short vibrations on pick / place / solve (phones; ignored elsewhere).
+##   tutorial_done: the level-1 walkthrough has been completed (Settings can show it again).
 
 const PATH := "user://settings.json"
 
@@ -17,6 +19,8 @@ var name: String = ""
 var push_enabled: bool = true
 var music_volume: float = 0.6
 var sfx_volume: float = 0.8
+var haptics: bool = true
+var tutorial_done: bool = false
 var _path := PATH
 var _saved_url := false  # true when the player saved a server URL in Settings
 
@@ -38,6 +42,8 @@ static func load_or_new(path: String = PATH) -> Settings:
 			s.push_enabled = bool(d.get("push_enabled", true))
 			s.music_volume = clampf(float(d.get("music_volume", s.music_volume)), 0.0, 1.0)
 			s.sfx_volume = clampf(float(d.get("sfx_volume", s.sfx_volume)), 0.0, 1.0)
+			s.haptics = bool(d.get("haptics", true))
+			s.tutorial_done = bool(d.get("tutorial_done", false))
 	# In the browser build the game is served by the backend itself (/play/), so the page's own origin
 	# is the server: zero setup for testers. A value typed in Settings still wins.
 	if OS.has_feature("web") and not s._saved_url:
@@ -60,7 +66,8 @@ func save() -> void:
 	var f := FileAccess.open(_path, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify({"server_url": server_url, "device_id": device_id, "name": name, "push_enabled": push_enabled,
-			"music_volume": music_volume, "sfx_volume": sfx_volume}, "  "))
+			"music_volume": music_volume, "sfx_volume": sfx_volume,
+			"haptics": haptics, "tutorial_done": tutorial_done}, "  "))
 
 
 func base_url() -> String:

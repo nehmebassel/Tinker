@@ -184,6 +184,11 @@ pegboard wall; menus use `WorkshopBg` (pegboard). Animations live in each part's
 advance a visual phase + redraw; they never touch bodies, so `levels/hashes.txt` is unchanged.
 
 **Sound.** `App.audio` (`scripts/core/audio.gd`): buses Music and SFX, volumes = Settings sliders.
+The buses are declared in `game/default_bus_layout.tres` and must stay there: the web build plays sounds
+as Web Audio samples through a bus graph built at boot, and buses added at run time are never connected to
+the output (this made the browser build completely silent until 2026-11-02). `tools/web_audio_check.js`
+(CI, android job) fails unless real signal reaches the speakers in headless Chromium. On iPhone the page
+sets `navigator.audioSession.type = "playback"` (export head include) so the silent switch does not mute it.
 Music crossfades between `menu` (menus), `build` (editing) and `run` (machine running).
 `SoundWatcher` (`scripts/ui/sound_watcher.gd`) reads the running simulation after each physics tick and
 plays effects for state changes (popped, lit, caught_count, spring launches, switch pressed, cat awake,
@@ -207,6 +212,13 @@ fixed part. It shows the part JSON's `name`, `description` and `interacts_with`,
 scene (`levels/demos/<id>.json`, copied from a CI-verified test scene by `levels/demos/make_demos.py`)
 in a SubViewport with its own physics world, restarting every `demo_seconds`. The demo camera widens
 smoothly to everything that moves. `--shot-cards=dir` renders all cards (`docs/screenshots/m6_info_cards.png`).
+
+**Feedback.** Vibration (`App.audio.buzz`) on pick 10 ms, place 18 ms, rotate 6 ms, solve 60 ms; Settings
+toggle. Confetti (`CPUParticles2D`, HUD layer) on solve.
+
+**Tutorial.** `scripts/ui/tutorial.gd`, campaign level 1 only, while `settings.tutorial_done` is false:
+bubble inside the tray (never over the board) + bouncing arrow (first tray part, then PLAY); reads the
+level screen only; finishes on the first solve or Skip; Settings → "Show tutorial again".
 
 ## Backend (M4)
 
