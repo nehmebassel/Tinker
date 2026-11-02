@@ -79,6 +79,8 @@ func _process(delta: float) -> void:
 	var left := 24.0 + 220.0 + 24.0
 	_bubble.size = Vector2(vs.x - left - 24.0, 0)
 	_bubble.position = Vector2(left, vs.y - bottom_offset + 76.0)
+	# The bubble lives in the tray: hide it while the tray is collapsed (that space is board then).
+	_bubble.visible = not screen.tray_collapsed
 	var placed: bool = screen.placements.size() > 0
 	match _step:
 		0:

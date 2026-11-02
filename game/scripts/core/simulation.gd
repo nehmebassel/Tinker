@@ -477,8 +477,10 @@ class RopeLine:
 		var pb := pt(n - 1)
 		var dir_a := (pt(1) - pa).normalized()
 		var dir_b := (pt(n - 2) - pb).normalized()
-		var wa: float = (1.0 / a.mass) if _dynamic(a) else 0.0
-		var wb: float = (1.0 / b.mass) if _dynamic(b) else 0.0
+		# Effective inverse mass at each snap point along the rope: linear part plus the rotational
+		# part (an off-centre pull also spins the body), so the correction is not overshot.
+		var wa: float = _eff_inv_mass(a, pa - a.global_position, dir_a) if _dynamic(a) else 0.0
+		var wb: float = _eff_inv_mass(b, pb - b.global_position, dir_b) if _dynamic(b) else 0.0
 		var wsum: float = wa + wb
 		if wsum <= 0.0:
 			return
@@ -496,6 +498,14 @@ class RopeLine:
 			a.apply_impulse(dir_a * j, pa - a.global_position)
 		if wb > 0.0:
 			b.apply_impulse(dir_b * j, pb - b.global_position)
+
+	static func _eff_inv_mass(body: RigidBody2D, r: Vector2, d: Vector2) -> float:
+		var inv_i := 0.0
+		var st := PhysicsServer2D.body_get_direct_state(body.get_rid())
+		if st:
+			inv_i = st.inverse_inertia
+		var rc := r.cross(d)
+		return 1.0 / body.mass + rc * rc * inv_i
 
 	static func _spin_vel(body: Node2D, p: Vector2) -> Vector2:
 		if not (body is RigidBody2D):

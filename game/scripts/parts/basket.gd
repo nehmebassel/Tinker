@@ -107,15 +107,16 @@ func _is_goal() -> bool:
 	return str(sim.level.goal.get("type", "")) == "basket"
 
 
+## Confirmed by the simulation (the goal held for its hold time and the run ended on it), never the
+## instant a body touches the sensor: a ball bouncing straight out must not show the check.
 func _goal_met() -> bool:
 	var sim := get_parent()
-	return _is_goal() and caught_count >= int(sim.level.goal.get("count", 1))
+	return _is_goal() and str(sim.outcome.get("result", "")) == "goal"
 
 
 func _process(delta: float) -> void:
 	_t += delta
-	# Latched: once the goal is met this run the check stays (freezing bodies at the end of a run can
-	# briefly report them as leaving the sensor). The node is rebuilt on rewind, which clears it.
+	# Latched once the run ended on the goal; the node is rebuilt on rewind, which clears it.
 	if _won_t >= 0.0 or _goal_met():
 		_won_t = maxf(_won_t, 0.0) + delta
 	_marker.queue_redraw()
