@@ -25,19 +25,19 @@
     {
       "part": "plank",
       "x": 25,
-      "y": 32,
+      "y": 36,
       "rot": 0
     },
     {
       "part": "ball",
-      "x": 24,
-      "y": 30,
+      "x": 22,
+      "y": 34,
       "rot": 0
     },
     {
       "part": "basket",
       "x": 31,
-      "y": 46,
+      "y": 50,
       "rot": 0
     }
   ],
@@ -55,15 +55,15 @@
   "reference_solution": [
     {
       "part": "pulley",
-      "x": 20,
-      "y": 20,
+      "x": 22,
+      "y": 16,
       "rot": 0
     },
     {
       "part": "rope",
       "x": 12,
       "y": 30,
-      "rot": 21
+      "rot": 20
     }
   ],
   "expect": "goal"

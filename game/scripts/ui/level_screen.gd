@@ -50,6 +50,8 @@ var level: LevelData
 var sim: Simulation
 var sounds: SoundWatcher
 var info_card: PartInfoCard = null
+var tutorial: Tutorial = null
+var last_result: String = ""  # result of the last finished run ("" while editing / running)
 var placements: Array[Placement] = []
 var history: Array = []  # Array of Array[Placement] snapshots
 var future: Array = []
@@ -78,6 +80,14 @@ var counter_lbl: Label
 var toast_lbl: Label
 var result_panel: PanelContainer
 var result_lbl: Label
+var result_face: Control  # sad face, failure only
+var again_btn: Button
+var tries_badge: Control  # hearts in the top bar
+var tries_lbl: Label  # refill countdown next to the hearts
+var _out_of_tries := false
+var _rope_preview: Dictionary = {}  # while dragging a rope: {"a": snap point, "b": target} (see rope.gd)
+const RopeScript := preload("res://scripts/parts/rope.gd")
+const ROPE_MAGNET_CELLS := 3.0  # a dragged rope end jumps to a snap point this close
 
 # Touch state
 var touches: Dictionary = {}  # index -> screen position
@@ -121,6 +131,10 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_on_resized)
 	_fit_camera()
 	_music("build")
+	if level_number == 1 and daily.is_empty() and has_node("/root/App") and not App.settings.tutorial_done and not smoke_mode and shot_path == "":
+		tutorial = Tutorial.start(hud, self)
+		tutorial.top_offset = TOP_BAR_H
+		tutorial.bottom_offset = TRAY_H
 	if smoke_mode:
 		_run_smoke()
 	elif shot_path != "":
@@ -136,6 +150,7 @@ func _build_scene() -> void:
 	bg.color = C_BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg.z_index = -100  # below the board (z -10) and the parts' back layers (z -1)
 	add_child(bg)
 
 	world = Node2D.new()
@@ -144,6 +159,7 @@ func _build_scene() -> void:
 	stage_bg = Node2D.new()
 	stage_bg.name = "StageBackground"
 	stage_bg.draw.connect(_draw_stage)
+	stage_bg.z_index = -10  # behind parts' own back layers (e.g. the inside of the basket, z -1)
 	world.add_child(stage_bg)
 	sim = Simulation.new()
 	sim.name = "Simulation"
@@ -193,6 +209,17 @@ func _build_scene() -> void:
 	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row1.add_child(title_lbl)
+	tries_badge = Control.new()
+	tries_badge.name = "TriesBadge"
+	tries_badge.custom_minimum_size = Vector2(130, 72)
+	tries_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tries_badge.draw.connect(func() -> void:
+		if _has_app():
+			FailArt.hearts(tries_badge, Vector2(0, 20), App.tries.left(_now()), App.tries.limit, 34.0))
+	row1.add_child(tries_badge)
+	tries_lbl = _label("", 24, Color(C_PANEL_TXT, 0.75))
+	tries_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row1.add_child(tries_lbl)
 	counter_lbl = _label("", 30, Color(C_PANEL_TXT, 0.8))
 	counter_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row1.add_child(counter_lbl)
@@ -252,11 +279,20 @@ func _build_scene() -> void:
 	side.offset_right = -24
 	side.offset_bottom = -TRAY_H - 24
 	hud.add_child(side)
-	play_btn = _button("PLAY", BTN * 1.5)
+	play_btn = _button("RUN", BTN * 1.5)
+	play_btn.name = "RunButton"
 	play_btn.add_theme_font_size_override("font_size", 40)
-	play_btn.add_theme_stylebox_override("normal", _round_style(C_GO))
-	play_btn.add_theme_stylebox_override("pressed", _round_style(C_GO.darkened(0.2)))
-	play_btn.add_theme_stylebox_override("hover", _round_style(C_GO))
+	play_btn.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Drawn icon (play triangle / stop square) above the label, and a glossy highlight.
+	var run_icon := Control.new()
+	run_icon.name = "RunIcon"
+	run_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	run_icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	run_icon.draw.connect(func() -> void: _draw_run_icon(run_icon))
+	play_btn.add_child(run_icon)
+	play_btn.add_theme_stylebox_override("normal", _run_style(C_GO))
+	play_btn.add_theme_stylebox_override("pressed", _run_style(C_GO.darkened(0.2)))
+	play_btn.add_theme_stylebox_override("hover", _run_style(C_GO))
 	play_btn.add_theme_color_override("font_color", C_INK)
 	play_btn.pressed.connect(_toggle_play)
 	play_btn.set_meta("no_tap", true)  # has its own start / rewind sound
@@ -293,6 +329,13 @@ func _build_scene() -> void:
 	var rv2 := VBoxContainer.new()
 	rv2.add_theme_constant_override("separation", 24)
 	mc.add_child(rv2)
+	result_face = Control.new()
+	result_face.name = "SadFace"
+	result_face.custom_minimum_size = Vector2(160, 150)
+	result_face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	result_face.draw.connect(func() -> void: FailArt.sad_face(result_face, result_face.size / 2.0, 66.0))
+	result_face.visible = false
+	rv2.add_child(result_face)
 	result_lbl = _label("", 44, C_PANEL_TXT)
 	result_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	rv2.add_child(result_lbl)
@@ -300,11 +343,20 @@ func _build_scene() -> void:
 	row.add_theme_constant_override("separation", 20)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	rv2.add_child(row)
-	var again := _button("Again", BTN)
+	var again := _button("      Try again", BTN)
+	again.name = "TryAgain"
+	again.custom_minimum_size.x = 300
+	var icon := Control.new()
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.position = Vector2(22, 34)
+	icon.size = Vector2(64, 64)
+	icon.draw.connect(func() -> void: FailArt.retry(icon, Vector2(32, 32), 22.0, C_PANEL_TXT if not again.disabled else Color(C_PANEL_TXT, 0.35)))
+	again.add_child(icon)
 	again.pressed.connect(func() -> void:
 		result_panel.visible = false
 		_stop_run())
 	row.add_child(again)
+	again_btn = again
 	levels_btn = _button("Levels", BTN)
 	levels_btn.pressed.connect(func() -> void: App.open_world_select())
 	row.add_child(levels_btn)
@@ -359,6 +411,18 @@ func _round_style(c: Color) -> StyleBoxFlat:
 	s.content_margin_right = 20
 	UiKit.key_shadow(s)
 	return s
+
+
+## RUN / STOP: label sits low (the icon is drawn above it), thicker ink border, deeper shadow.
+func _run_style(c: Color) -> StyleBoxFlat:
+	var st := _round_style(c)
+	st.content_margin_top = 84
+	st.content_margin_bottom = 8
+	st.set_border_width_all(6)
+	st.shadow_size = 4
+	st.shadow_offset = Vector2(0, 9)
+	st.set_corner_radius_all(36)
+	return st
 
 
 func _panel_style(c: Color, radius: int) -> StyleBoxFlat:
@@ -490,9 +554,11 @@ func _refresh_hud() -> void:
 	redo_btn.disabled = future.is_empty() or not editing
 	rot_btn.disabled = selected < 0 or not editing
 	rot90_btn.disabled = rot_btn.disabled
-	play_btn.text = "STOP" if (sim.running or run_ended) else "PLAY"
-	play_btn.add_theme_stylebox_override("normal", _round_style(C_ACCENT if (sim.running or run_ended) else C_GO))
-	play_btn.add_theme_stylebox_override("hover", _round_style(C_ACCENT if (sim.running or run_ended) else C_GO))
+	play_btn.text = "STOP" if (sim.running or run_ended) else "RUN"
+	play_btn.get_node("RunIcon").queue_redraw()
+	play_btn.add_theme_stylebox_override("normal", _run_style(C_ACCENT if (sim.running or run_ended) else C_GO))
+	play_btn.add_theme_stylebox_override("hover", _run_style(C_ACCENT if (sim.running or run_ended) else C_GO))
+	play_btn.add_theme_stylebox_override("pressed", _run_style((C_ACCENT if (sim.running or run_ended) else C_GO).darkened(0.2)))
 	tray.visible = editing and not tray_collapsed
 	tray_tab.text = "Show tray" if tray_collapsed else "Hide tray"
 	_refresh_tray_counts()
@@ -807,6 +873,9 @@ func _move_floating(pos: Vector2) -> void:
 	floating.rotation = Grid.steps_to_radians(drag["rot"])
 	var cell := Grid.world_to_cell(wp)
 	var over_tray := not _stage_viewport_rect().has_point(pos)
+	_rope_preview = {}
+	if ghost.get_meta("part_id") == "rope":
+		cell = _snap_rope(wp, cell)
 	ghost_valid = Grid.in_stage(cell) and not over_tray and not _overlaps(cell, drag["rot"])
 	ghost.visible = not over_tray
 	ghost.position = Grid.cell_to_world(cell)
@@ -818,6 +887,14 @@ func _move_floating(pos: Vector2) -> void:
 func _drop_floating(pos: Vector2, part: String, lifted: Placement) -> void:
 	var wp := _screen_to_world(pos) + LIFT / camera.zoom.x * fit_zoom
 	var cell := Grid.world_to_cell(wp)
+	if part == "rope":
+		cell = _snap_rope(wp, cell)
+		var will := _rope_preview.duplicate()
+		_rope_preview = {}
+		if will.get("a", {}).is_empty():
+			_toast("Drop the rope's end on a snap point (the rings)")
+		elif will.get("b", {}).is_empty():
+			_toast("Nothing to tie to in reach: point it at another snap point")
 	var over_tray := not _stage_viewport_rect().has_point(pos)
 	_clear_floating()
 	if over_tray:
@@ -848,6 +925,22 @@ func _drop_floating(pos: Vector2, part: String, lifted: Placement) -> void:
 	sim.set_player_parts(placements)
 	_snd("place")
 	_refresh_hud()
+
+
+## Rope auto-snap: the end jumps to the nearest snap point and the rope aims at the nearest target
+## (pulleys first). Returns the snapped cell; updates drag["rot"] and the preview drawn in the overlay.
+func _snap_rope(wp: Vector2, cell: Vector2i) -> Vector2i:
+	var maxc := int(PartRegistry.get_def("rope").get("max_length_cells", 30))
+	var a := RopeScript.snap_a(sim.parts, wp, ROPE_MAGNET_CELLS * Grid.CELL)
+	if not a.is_empty():
+		cell = Grid.world_to_cell(a["pos"])
+		var r := RopeScript.best_rot(sim.parts, cell, int(drag.get("rot", 0)), maxc)
+		if r >= 0:
+			drag["rot"] = r
+			if floating:
+				floating.rotation = Grid.steps_to_radians(r)
+	_rope_preview = RopeScript.resolve(sim.parts, cell, int(drag.get("rot", 0)), maxc)
+	return cell
 
 
 func _clear_floating() -> void:
@@ -1015,12 +1108,16 @@ func _start_run() -> void:
 	if placements.is_empty() and level.slots > 0:
 		_toast("Place a part first")
 		return
+	if _has_app() and App.tries.left(_now()) <= 0:
+		_show_out_of_tries()
+		return
 	_cancel_drag()
 	selected = -1
 	run_ended = false
 	result_panel.visible = false
 	sim.set_player_parts(placements)
 	sounds.reset()
+	last_result = ""
 	sim.start()
 	_snd("play")
 	_music("run")
@@ -1042,10 +1139,16 @@ func _stop_run() -> void:
 
 func _on_run_finished(outcome: Dictionary) -> void:
 	run_ended = true
+	last_result = str(outcome["result"])
 	sounds.reset()
 	_snd("goal" if outcome["result"] == "goal" else "fail")
+	if outcome["result"] == "goal":
+		_confetti()
 	match outcome["result"]:
 		"goal":
+			result_face.visible = false
+			again_btn.disabled = false
+			_out_of_tries = false
 			solved_msec = Time.get_ticks_msec()
 			var secs := (solved_msec - first_touch_msec) / 1000.0 if first_touch_msec >= 0 else 0.0
 			result_lbl.text = "Solved!\n%d part%s · %.1f s" % [outcome["parts_used"], "" if outcome["parts_used"] == 1 else "s", secs]
@@ -1061,11 +1164,57 @@ func _on_run_finished(outcome: Dictionary) -> void:
 				result_lbl.text = "Solved!\n%d part%s · %s\nSubmit is final: one entry per day." % [outcome["parts_used"], "" if outcome["parts_used"] == 1 else "s", _fmt_ms(ms)]
 			submit_btn.visible = not daily.is_empty()
 			result_panel.visible = true
-		"stalled":
-			_toast("Everything stopped. Press STOP to rewind.")
-		"timeout":
-			_toast("Time's up. Press STOP to rewind.")
+		"stalled", "timeout":
+			_show_failure(str(outcome["result"]))
 	_refresh_hud()
+
+
+## The machine stopped (or ran out of time) without reaching the goal: say so, cost one try.
+func _show_failure(why: String) -> void:
+	var left := 99
+	if _has_app():
+		left = App.tries.use(_now())
+	result_face.visible = true
+	next_btn.visible = false
+	submit_btn.visible = false
+	levels_btn.visible = level_number > 0
+	var head := "Everything stopped." if why == "stalled" else "Time's up."
+	if left > 0:
+		result_lbl.text = "%s\nThe goal wasn't reached.\n%d tr%s left" % [head, left, "y" if left == 1 else "ies"]
+		_out_of_tries = false
+		again_btn.disabled = false
+	else:
+		_out_of_tries = true
+		again_btn.disabled = false
+		_update_out_of_tries_text(head + "\nThe goal wasn't reached.")
+	result_panel.visible = true
+	again_btn.queue_redraw()
+	tries_badge.queue_redraw()
+
+
+func _show_out_of_tries() -> void:
+	result_face.visible = true
+	next_btn.visible = false
+	submit_btn.visible = false
+	levels_btn.visible = level_number > 0
+	_out_of_tries = true
+	again_btn.disabled = false
+	_update_out_of_tries_text("Out of tries.")
+	result_panel.visible = true
+
+
+func _update_out_of_tries_text(head: String) -> void:
+	var wait := App.tries.seconds_to_refill(_now()) if _has_app() else 0
+	result_lbl.set_meta("head", head)
+	result_lbl.text = "%s\nNew tries in %s\nYou can keep building meanwhile." % [head, Tries.fmt_wait(wait)]
+
+
+func _has_app() -> bool:
+	return has_node("/root/App") and App.tries != null
+
+
+static func _now() -> int:
+	return int(Time.get_unix_time_from_system())
 
 
 # ------------------------------------------------------------------ drawing
@@ -1117,8 +1266,32 @@ func _draw_stage() -> void:
 	stage_bg.draw_rect(tb, C_GRID_MAJOR, false, 2.0)
 
 
-func _process(_delta: float) -> void:
+var _tick_acc := 0.0
+
+
+func _process(delta: float) -> void:
 	overlay.queue_redraw()
+	# RUN breathes gently once there is something to run, so the next step is obvious.
+	var ready := not sim.running and not run_ended and not placements.is_empty()
+	play_btn.pivot_offset = play_btn.size / 2.0
+	var k := 1.0 + (0.045 * (0.5 + 0.5 * sin(Time.get_ticks_msec() / 260.0)) if ready else 0.0)
+	play_btn.scale = Vector2(k, k)
+	_tick_acc += delta
+	if _tick_acc < 0.5 or not _has_app():
+		return
+	_tick_acc = 0.0
+	var now := _now()
+	var wait := App.tries.seconds_to_refill(now)
+	tries_lbl.text = Tries.fmt_wait(wait) if wait > 0 else ""
+	tries_badge.queue_redraw()
+	if _out_of_tries and result_panel.visible:
+		if App.tries.left(now) > 0:
+			_out_of_tries = false
+			again_btn.disabled = false
+			result_lbl.text = "Tries refilled!"
+			again_btn.queue_redraw()
+		else:
+			_update_out_of_tries_text(str(result_lbl.get_meta("head", "Out of tries.")))
 
 
 func _draw_overlay() -> void:
@@ -1138,6 +1311,7 @@ func _draw_overlay() -> void:
 		for p in sim.parts:
 			if p.has_method("get_link_target") and p.get_link_target() != null:
 				_draw_dashed(overlay, p.global_position + Vector2(0, -14), p.get_link_target().global_position, Color(C_INK, 0.45))
+	_draw_rope_hints()
 	if ghost and ghost.visible:
 		# Landing crosshair.
 		var p := ghost.position
@@ -1146,15 +1320,115 @@ func _draw_overlay() -> void:
 		overlay.draw_line(p + Vector2(0, -20), p + Vector2(0, 20), c, 3.0)
 
 
+const HAPTIC_MS := {"pick": 10, "place": 18, "rotate": 6, "goal": 60}
+
+
+## RUN / STOP icon: a fat play triangle or a stop square, plus a glossy top highlight.
+func _draw_run_icon(n: Control) -> void:
+	var sz := n.size
+	var c := Vector2(sz.x / 2.0, sz.y * 0.36)
+	var stopping := sim != null and (sim.running or run_ended)
+	# Gloss band.
+	var gloss := StyleBoxFlat.new()
+	gloss.bg_color = Color(1, 1, 1, 0.22)
+	gloss.set_corner_radius_all(20)
+	n.draw_style_box(gloss, Rect2(Vector2(12, 9), Vector2(sz.x - 24, sz.y * 0.28)))
+	var r := minf(sz.x, sz.y) * 0.2
+	if stopping:
+		var q := Rect2(c - Vector2(r, r) * 0.8, Vector2(r, r) * 1.6)
+		n.draw_rect(q.grow(4.0), C_INK)
+		n.draw_rect(q, C_PANEL_TXT)
+	else:
+		var tri := PackedVector2Array([c + Vector2(-r * 0.75, -r), c + Vector2(r * 1.05, 0), c + Vector2(-r * 0.75, r)])
+		var big := PackedVector2Array()
+		for p in tri:
+			big.append(c + (p - c) * 1.22)
+		n.draw_colored_polygon(big, C_INK)
+		n.draw_colored_polygon(tri, C_PANEL_TXT)
+
+
+## Celebration burst from the top of the screen when a run reaches the goal. HUD layer only:
+## it cannot touch the simulation. CPUParticles2D so it works in the web (Compatibility) build.
+func _confetti() -> void:
+	var vs := get_viewport_rect().size
+	var colors := [C_ACCENT, C_GO, Color("6ec6ff"), Color("ffd43b"), Color("b35fd1"), Color("e8833a")]
+	for i in 2:
+		var p := CPUParticles2D.new()
+		p.name = "Confetti%d" % i
+		p.position = Vector2(vs.x * (0.3 + 0.4 * i), TOP_BAR_H - 20)
+		p.amount = 70
+		p.one_shot = true
+		p.explosiveness = 0.9
+		p.lifetime = 2.6
+		p.direction = Vector2(0, 1)
+		p.spread = 70.0
+		p.initial_velocity_min = 380.0
+		p.initial_velocity_max = 900.0
+		p.gravity = Vector2(0, 900)
+		p.angular_velocity_min = -420.0
+		p.angular_velocity_max = 420.0
+		p.scale_amount_min = 10.0
+		p.scale_amount_max = 18.0
+		var g := Gradient.new()
+		g.offsets = PackedFloat32Array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+		g.colors = PackedColorArray(colors)
+		g.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CONSTANT
+		p.color_initial_ramp = g
+		hud.add_child(p)
+		p.emitting = true
+		get_tree().create_timer(3.5).timeout.connect(p.queue_free)
+
+
 ## Sounds go through App.audio; level scenes opened without App (tools, shots) stay silent.
 func _snd(sound: String, gain_db: float = 0.0) -> void:
 	if has_node("/root/App") and App.audio:
 		App.audio.sfx(sound, gain_db)
+		var ms: int = HAPTIC_MS.get(sound, 0)
+		if ms > 0:
+			App.audio.buzz(ms)
 
 
 func _music(track: String) -> void:
 	if has_node("/root/App") and App.audio:
 		App.audio.play_music(track)
+
+
+## Snap points: rings on every part a rope can tie to, shown while a rope is dragged or selected;
+## the chosen end and target glow, joined by the rope it will make (green) or a red "no target".
+func _draw_rope_hints() -> void:
+	if sim.running or run_ended:
+		return
+	var dragging: bool = ghost != null and ghost.visible and ghost.get_meta("part_id") == "rope"
+	var sel_rope: bool = selected >= 0 and selected < placements.size() and placements[selected].part == "rope"
+	if not dragging and not sel_rope:
+		return
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 180.0)
+	for a in RopeScript.anchors_of(sim.parts):
+		overlay.draw_arc(a["pos"], 16.0, 0, TAU, 24, Color(C_INK, 0.55), 4.0, true)
+		overlay.draw_circle(a["pos"], 5.0, Color(C_INK, 0.55))
+	if not dragging:
+		return
+	var a: Dictionary = _rope_preview.get("a", {})
+	var b: Dictionary = _rope_preview.get("b", {})
+	if a.is_empty():
+		return
+	var ok := Color("2fbf71")
+	overlay.draw_circle(a["pos"], 14.0 + 4.0 * pulse, Color(ok, 0.45))
+	overlay.draw_arc(a["pos"], 18.0, 0, TAU, 24, ok, 5.0, true)
+	if b.is_empty():
+		var dir := RopeScript.dir_of(int(drag.get("rot", 0)))
+		var end: Vector2 = a["pos"] + dir * Grid.CELL * 6.0
+		_draw_dashed(overlay, a["pos"], end, C_BAD)
+		overlay.draw_line(end + Vector2(-10, -10), end + Vector2(10, 10), C_BAD, 5.0)
+		overlay.draw_line(end + Vector2(-10, 10), end + Vector2(10, -10), C_BAD, 5.0)
+		return
+	var bp: Vector2 = b["pos"]
+	if b["node"].get_meta("part_id") == "pulley":
+		bp = RopeScript.pulley_tangent(b["node"].global_position, b["node"].radius, a["pos"])
+	overlay.draw_line(a["pos"], bp, Color(C_INK, 0.8), 9.0)
+	overlay.draw_line(a["pos"], bp, Color("d9a066"), 5.0)
+	overlay.draw_circle(b["pos"], 14.0 + 4.0 * pulse, Color(ok, 0.45))
+	overlay.draw_arc(b["pos"], 18.0, 0, TAU, 24, ok, 5.0, true)
 
 
 static func _fmt_ms(ms: int) -> String:

@@ -8,6 +8,7 @@ var radius: float = 30.0
 var winch: Node2D = null
 var _spin: float = 0.0  # visual only
 var _rope_ref: float = -1.0
+const RopeScript := preload("res://scripts/parts/rope.gd")
 
 
 func configure(p_def: Dictionary) -> void:
@@ -67,3 +68,32 @@ func _draw() -> void:
 	Art.circle(self, Vector2.ZERO, radius, fill)
 	Art.wheel(self, Vector2.ZERO, radius - 7.0, _spin, fill.lightened(0.15), 4)
 	draw_arc(Vector2.ZERO, radius - 3.0, 0, TAU, 32, Color(Art.INK, 0.4), 2.0)
+	_draw_rope_wrap()
+
+
+## The rope runs OVER the wheel: from the tangent point facing one end, across the top, to the
+## tangent point facing the other end (drawn here because the wheel is under it).
+func _draw_rope_wrap() -> void:
+	var sim := get_parent()
+	if sim == null or sim.get("rope_lines") == null:
+		return
+	for rl in sim.rope_lines:
+		var i: int = rl.chain.find(self)
+		if i <= 0 or i >= rl.chain.size() - 1:
+			continue
+		var c := global_position
+		var t1 := RopeScript.pulley_tangent(c, radius, rl.pt(i - 1)) - c
+		var t2 := RopeScript.pulley_tangent(c, radius, rl.pt(i + 1)) - c
+		var a1 := t1.angle()
+		var a2 := t2.angle()
+		# Of the two ways round, take the one over the top (its midpoint has the smaller y).
+		var d := wrapf(a2 - a1, -PI, PI)
+		var mid := a1 + d / 2.0
+		if sin(mid) > 0.0:
+			d = d - TAU if d > 0.0 else d + TAU
+		var col: Color = rl.ropes[0].color if not rl.ropes.is_empty() else Color("d9a066")
+		var pts := PackedVector2Array()
+		for k in 17:
+			pts.append(Vector2.from_angle(a1 + d * k / 16.0) * radius)
+		draw_polyline(pts, Art.INK, 9.0)
+		draw_polyline(pts, col, 5.0)

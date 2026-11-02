@@ -44,6 +44,34 @@ func _ready() -> void:
 
 	v.add_child(_volume_row("Music", "music_volume", "MusicSlider"))
 	v.add_child(_volume_row("Sounds", "sfx_volume", "SoundSlider"))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 20)
+	v.add_child(row)
+	var vib := UiKit.button("", UiKit.GO, UiKit.INK, 100)
+	vib.name = "VibrationToggle"
+	vib.toggle_mode = true
+	vib.button_pressed = App.settings.haptics
+	vib.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var paint_vib := func() -> void:
+		vib.text = "Vibration: " + ("On" if vib.button_pressed else "Off")
+		for k in ["normal", "hover", "pressed"]:
+			vib.add_theme_stylebox_override(k, UiKit.style(UiKit.GO if vib.button_pressed else Color("c9c2b6")))
+	paint_vib.call()
+	vib.toggled.connect(func(on: bool) -> void:
+		App.settings.haptics = on
+		App.settings.save()
+		paint_vib.call()
+		App.audio.buzz(30))
+	row.add_child(vib)
+	var tut := UiKit.button("Show tutorial again", UiKit.MUTED, UiKit.PANEL_TXT, 100)
+	tut.name = "TutorialReset"
+	tut.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tut.add_theme_font_size_override("font_size", 28)
+	tut.pressed.connect(func() -> void:
+		App.settings.tutorial_done = false
+		App.settings.save()
+		_status.text = "The tutorial will show on level 1.")
+	row.add_child(tut)
 
 	var save := UiKit.button("Save", UiKit.GO, UiKit.INK, 120)
 	save.name = "SaveButton"

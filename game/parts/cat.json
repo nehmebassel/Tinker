@@ -23,5 +23,11 @@
     "candle",
     "conveyor",
     "switch"
+  ],
+  "anchors": [
+    [
+      0,
+      0
+    ]
   ]
 }

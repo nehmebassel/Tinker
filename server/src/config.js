@@ -26,7 +26,10 @@ export const config = {
   pushTopic: env.PUSH_TOPIC || "tinker-daily",
   pushTitle: env.PUSH_TITLE || "Today's Tinker is ready",
   pushBody: env.PUSH_BODY || "Day {day}: same parts for everyone. How few do you need?",
-  dailyEpoch: env.DAILY_EPOCH || "2026-11-01",       // day 1 of the Daily (for the day number)
+  dailyEpoch: env.DAILY_EPOCH || "2026-11-01",
+  // Game rules served to clients at GET /config (change in Cloud Run env, no app release needed).
+  triesLimit: Math.max(1, Number(env.TRIES_LIMIT || 3)),            // failed runs allowed per window
+  triesWindowHours: Math.max(0.01, Number(env.TRIES_WINDOW_HOURS || 6)), // window starts at the first failure       // day 1 of the Daily (for the day number)
 };
 
 function parseJson(s) {

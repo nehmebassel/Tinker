@@ -41,6 +41,11 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
   app.disable("x-powered-by");
 
   app.get("/health", (_req, res) => res.json({ ok: true, today: todayUtc(), emulator: config.emulator }));
+  // Game rules for clients (cached by the game; it falls back to its own defaults offline).
+  app.get("/config", (_req, res) => {
+    res.set("Cache-Control", "public, max-age=300");
+    res.json({ tries_limit: config.triesLimit, tries_window_hours: config.triesWindowHours });
+  });
 
   // ---------------------------------------------------------------- the game itself
   // /play/   : the browser (PWA) build — same origin as the API, so no CORS and no setup.

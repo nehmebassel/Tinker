@@ -2,6 +2,7 @@
 #
 # Jobs:
 #   test     : unit tests + 100-replay determinism harness; uploads the outcome hashes.
+#   android  : builds web + APK; the web build must be audible (tools/web_audio_check.js)
 #   smoke    : drives the real touch path under Xvfb (drag, snap, rotate, play, solve) with screenshots.
 #   android  : exports a signed debug APK (artifact "tinker-debug-apk").
 #   hashes   : fails if the determinism hash from `test` differs from the one recorded in
@@ -141,6 +142,16 @@ jobs:
           EOF
       - name: Build web + Android (TinkerPush plugin, Gradle) with placeholder Firebase values
         run: FIREBASE_DUMMY=1 GRADLE=gradle bash tools/build_clients.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Web build must be audible (music reaches the speakers in headless Chromium)
+        run: |
+          npm install --no-save --prefix /tmp/pw playwright@1.63.0
+          /tmp/pw/node_modules/.bin/playwright install --with-deps chromium
+          (cd build/web && python3 -m http.server 8080 >/dev/null 2>&1 &)
+          sleep 1
+          NODE_PATH=/tmp/pw/node_modules node tools/web_audio_check.js http://127.0.0.1:8080/index.html
       - uses: actions/upload-artifact@v4
         with:
           name: tinker-debug-apk

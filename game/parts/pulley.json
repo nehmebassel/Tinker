@@ -15,5 +15,11 @@
     "bucket",
     "plank",
     "motor"
+  ],
+  "anchors": [
+    [
+      0,
+      0
+    ]
   ]
 }

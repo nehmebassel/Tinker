@@ -23,5 +23,11 @@
     "spring",
     "bucket",
     "switch"
+  ],
+  "anchors": [
+    [
+      0,
+      0
+    ]
   ]
 }

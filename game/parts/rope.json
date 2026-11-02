@@ -2,14 +2,13 @@
   "id": "rope",
   "name": "Rope",
   "group": "connector",
-  "description": "Ties the two things at its ends. Over a pulley, pulling one end lifts the other.",
+  "description": "Ties two snap points together. Drop one end on a part: it snaps to the nearest point and aims at the next one. Over a pulley, pulling one end lifts the other.",
   "body": "none",
   "shape": {
     "type": "none",
     "w": 288,
     "h": 16
   },
-  "length_cells": 12,
   "color": "#d9a066",
   "script": "res://scripts/parts/rope.gd",
   "interacts_with": [
@@ -18,5 +17,6 @@
     "plank",
     "ball",
     "balloon"
-  ]
+  ],
+  "max_length_cells": 30
 }

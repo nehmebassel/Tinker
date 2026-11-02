@@ -13,6 +13,7 @@ var daily_store: DailyStore
 var api: Api
 var push: Push
 var audio: Audio
+var tries: Tries
 var level_number: int = 0
 ## The Daily currently open: {"date": String, "day": int, "level": Dictionary} or {} for campaign play.
 var daily: Dictionary = {}
@@ -33,9 +34,12 @@ func _ready() -> void:
 	add_child(push)
 	audio = Audio.new()
 	add_child(audio)
+	tries = Tries.load_or_new()
+	_fetch_rules.call_deferred()
 	for a in OS.get_cmdline_user_args():
 		if a == "--reset-save":
 			save.reset()
+			tries.reset()
 		elif a == "--flow":
 			flow_test = true
 		elif a.begins_with("--server="):
@@ -47,9 +51,19 @@ func _ready() -> void:
 			_shot_ws(a.trim_prefix("--shot-ws="))
 	if flow_test:
 		save.reset()
+		tries.reset()
 		_run_flow()
 	elif daily_test != "":
 		_run_daily_flow.call_deferred()
+
+
+## Tries rules from the backend (GET /config); offline the cached / project-setting values stay.
+func _fetch_rules() -> void:
+	if settings.base_url() == "":
+		return
+	var r: Dictionary = await api.get_json("/config")
+	if r.get("ok", false) and r["body"] is Dictionary and r["body"].has("tries_limit"):
+		tries.set_rules(int(r["body"]["tries_limit"]), float(r["body"].get("tries_window_hours", 6.0)))
 
 
 ## Scene changes are deferred so the input event that triggered them (a button release) finishes

@@ -19,5 +19,11 @@
     "candle",
     "switch",
     "rope"
+  ],
+  "anchors": [
+    [
+      0,
+      49
+    ]
   ]
 }

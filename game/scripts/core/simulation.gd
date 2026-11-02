@@ -340,8 +340,8 @@ func add_link_node(n: Node) -> void:
 var _rope_regs: Array = []
 
 
-func register_rope(rope: Node2D, a: Node2D, b: Node2D) -> void:
-	_rope_regs.append({"rope": rope, "a": a, "b": b})
+func register_rope(rope: Node2D, a: Node2D, b: Node2D, oa: Vector2 = Vector2.ZERO, ob: Vector2 = Vector2.ZERO) -> void:
+	_rope_regs.append({"rope": rope, "a": a, "b": b, "oa": oa, "ob": ob})
 
 
 func _build_rope_lines() -> void:
@@ -356,6 +356,7 @@ func _build_rope_lines() -> void:
 			continue
 		used[i] = true
 		var chain: Array = [reg["a"], reg["b"]]
+		var offs: Array = [reg["oa"], reg["ob"]]  # snap-point offset of each chain node (pulleys: centre)
 		var ropes: Array = [reg["rope"]]
 		var length: float = reg["rope"].rope_length_px()
 		# Extend through pulleys at either end.
@@ -372,10 +373,13 @@ func _build_rope_lines() -> void:
 					if r2["a"] == null or r2["b"] == null:
 						continue
 					var other: Node2D = null
+					var other_off := Vector2.ZERO
 					if r2["a"] == end:
 						other = r2["b"]
+						other_off = r2["ob"]
 					elif r2["b"] == end:
 						other = r2["a"]
+						other_off = r2["oa"]
 					if other == null:
 						continue
 					used[j] = true
@@ -383,13 +387,15 @@ func _build_rope_lines() -> void:
 					length += r2["rope"].rope_length_px()
 					if side == 0:
 						chain.push_front(other)
+						offs.push_front(other_off)
 					else:
 						chain.push_back(other)
+						offs.push_back(other_off)
 					grew = true
 					break
 			if not grew:
 				break
-		var line := RopeLine.new(chain, length, ropes)
+		var line := RopeLine.new(chain, offs, length, ropes)
 		rope_lines.append(line)
 		for r in ropes:
 			r.line = line
@@ -401,6 +407,7 @@ func _build_rope_lines() -> void:
 ## pulley winches the line (shortens it while on).
 class RopeLine:
 	var chain: Array  # [end_a, pulley..., end_b]
+	var offs: Array  # snap-point offset (local) for each chain node; pulleys use their centre
 	var length: float
 	var ropes: Array
 	var start_length: float
@@ -408,8 +415,9 @@ class RopeLine:
 	const BETA := 12.0  # position correction per second
 	const MIN_LENGTH := 24.0
 
-	func _init(p_chain: Array, p_length: float, p_ropes: Array) -> void:
+	func _init(p_chain: Array, p_offs: Array, p_length: float, p_ropes: Array) -> void:
 		chain = p_chain
+		offs = p_offs
 		length = p_length
 		start_length = p_length
 		ropes = p_ropes
@@ -426,10 +434,15 @@ class RopeLine:
 		# Still counts as motion only while the length can still change.
 		return (winch.direction > 0 and length > MIN_LENGTH) or (winch.direction < 0 and length < start_length * 2.0)
 
+	## World position of chain node i's snap point.
+	func pt(i: int) -> Vector2:
+		var n: Node2D = chain[i]
+		return n.to_global(offs[i]) if offs[i] != Vector2.ZERO else n.global_position
+
 	func current_length() -> float:
 		var d := 0.0
 		for i in range(chain.size() - 1):
-			d += chain[i].global_position.distance_to(chain[i + 1].global_position)
+			d += pt(i).distance_to(pt(i + 1))
 		return d
 
 	static func _dynamic(n: Node2D) -> bool:
@@ -459,24 +472,43 @@ class RopeLine:
 			return
 		var a: Node2D = chain[0]
 		var b: Node2D = chain[-1]
-		var na: Node2D = chain[1]
-		var nb: Node2D = chain[-2]
-		var dir_a := (na.global_position - a.global_position).normalized()
-		var dir_b := (nb.global_position - b.global_position).normalized()
-		var wa: float = (1.0 / a.mass) if _dynamic(a) else 0.0
-		var wb: float = (1.0 / b.mass) if _dynamic(b) else 0.0
+		var n := chain.size()
+		var pa := pt(0)
+		var pb := pt(n - 1)
+		var dir_a := (pt(1) - pa).normalized()
+		var dir_b := (pt(n - 2) - pb).normalized()
+		# Effective inverse mass at each snap point along the rope: linear part plus the rotational
+		# part (an off-centre pull also spins the body), so the correction is not overshot.
+		var wa: float = _eff_inv_mass(a, pa - a.global_position, dir_a) if _dynamic(a) else 0.0
+		var wb: float = _eff_inv_mass(b, pb - b.global_position, dir_b) if _dynamic(b) else 0.0
 		var wsum: float = wa + wb
 		if wsum <= 0.0:
 			return
 		# Rate at which the line is stretching (positive = getting longer).
 		var v_sep := 0.0
+		# Velocity of the snap point itself (includes spin when it is off-centre).
 		if wa > 0.0:
-			v_sep += -a.linear_velocity.dot(dir_a)
+			v_sep += -(a.linear_velocity + _spin_vel(a, pa)).dot(dir_a)
 		if wb > 0.0:
-			v_sep += -b.linear_velocity.dot(dir_b)
+			v_sep += -(b.linear_velocity + _spin_vel(b, pb)).dot(dir_b)
 		var dv: float = excess * BETA + maxf(0.0, v_sep)
 		var j: float = dv / wsum
+		# Pull at the snap point: an off-centre pull also turns the part (a bucket swings on its handle).
 		if wa > 0.0:
-			a.apply_central_impulse(dir_a * j)
+			a.apply_impulse(dir_a * j, pa - a.global_position)
 		if wb > 0.0:
-			b.apply_central_impulse(dir_b * j)
+			b.apply_impulse(dir_b * j, pb - b.global_position)
+
+	static func _eff_inv_mass(body: RigidBody2D, r: Vector2, d: Vector2) -> float:
+		var inv_i := 0.0
+		var st := PhysicsServer2D.body_get_direct_state(body.get_rid())
+		if st:
+			inv_i = st.inverse_inertia
+		var rc := r.cross(d)
+		return 1.0 / body.mass + rc * rc * inv_i
+
+	static func _spin_vel(body: Node2D, p: Vector2) -> Vector2:
+		if not (body is RigidBody2D):
+			return Vector2.ZERO
+		var r := p - body.global_position
+		return Vector2(-r.y, r.x) * body.angular_velocity
