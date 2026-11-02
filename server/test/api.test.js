@@ -120,6 +120,25 @@ test("shared levels: author solution must replay; fetch strips it", async () => 
   assert.equal(got.body.author_parts, 1);
   assert.equal((await j("GET", "/level/nope")).status, 400);
   assert.equal((await j("GET", "/level/zzzzzzzz")).status, 404);
+  // Recent list shows it (public fields only) and the share link opens the browser build on it.
+  const recent = await j("GET", "/levels/recent?limit=5");
+  assert.equal(recent.status, 200);
+  const row = recent.body.levels.find((x) => x.id === good.body.id);
+  assert.ok(row && row.title === level1.title && row.goal === level1.goal.type && row.author === undefined);
+  const link = await fetch(`${base}/l/${good.body.id}`, { redirect: "manual" });
+  assert.equal(link.status, 302);
+  assert.equal(link.headers.get("location"), `/play/?level=${good.body.id}`);
+});
+
+test("shared levels: a level that solves itself with no parts is refused", async () => {
+  // Basket right under a ball: it scores with nothing placed.
+  const selfSolving = { id: "x", title: "Too easy", goal: { type: "basket", count: 1 },
+    fixed: [{ part: "ball", x: 20, y: 20, rot: 0 }, { part: "basket", x: 20, y: 30, rot: 0 }],
+    tray: [{ part: "plank", count: 1 }], slots: 1,
+    reference_solution: [{ part: "plank", x: 5, y: 50, rot: 0 }] };
+  const r = await j("POST", "/level", { device_id: DEV_A, level: selfSolving });
+  assert.equal(r.status, 422);
+  assert.match(r.body.error, /solves itself/);
 });
 
 test("admin: queue lists upcoming days; curated swap replaces a day", async () => {

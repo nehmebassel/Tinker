@@ -245,15 +245,36 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     const r = await replayFn(level, level.reference_solution);
     if (!r.ok) return res.status(400).json({ error: "replay failed: " + r.error });
     if (r.result !== "goal") return res.status(422).json({ error: "author solution does not reach the goal", result: r.result });
+    // A level that finishes itself with no player parts is not a puzzle.
+    const empty = await replayFn(level, []);
+    if (empty.ok && empty.result === "goal") return res.status(422).json({ error: "the level solves itself with no parts placed" });
     let id = shortId();
     for (let i = 0; i < 5 && (await col.levels().doc(id).get()).exists; i++) id = shortId();
     const doc = {
-      id, author: device_id, created_at: new Date().toISOString(), plays: 0,
+      id, author: device_id, created_at: new Date().toISOString(), plays: 0, title: level.title, goal_type: level.goal.type,
       level: { ...level, id: "s-" + id, reference_solution: level.reference_solution },
       author_parts: r.parts, hash: r.hash,
     };
     await col.levels().doc(id).set(doc);
     res.status(201).json({ ok: true, id, author_parts: r.parts });
+  });
+
+  // Newest shared levels (Sandbox "Community" list). Public data only.
+  app.get("/levels/recent", async (req, res) => {
+    const limit = Math.min(Math.max(parseInt(req.query.limit || "20", 10) || 20, 1), 50);
+    const snap = await col.levels().orderBy("created_at", "desc").limit(limit).get();
+    res.set("Cache-Control", "public, max-age=60");
+    res.json({ levels: snap.docs.map((d) => {
+      const x = d.data();
+      return { id: x.id, title: x.title || x.level?.title || "", goal: x.goal_type || x.level?.goal?.type || "", author_parts: x.author_parts, plays: x.plays || 0, created_at: x.created_at };
+    }) });
+  });
+
+  // Share link: opens the browser build straight into the level (/play/ reads ?level=).
+  app.get("/l/:id", (req, res) => {
+    const { id } = req.params;
+    if (!isShortId(id)) return res.status(404).end();
+    res.redirect(302, "/play/?level=" + encodeURIComponent(id));
   });
 
   app.get("/level/:id", async (req, res) => {

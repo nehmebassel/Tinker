@@ -51,6 +51,16 @@ var sim: Simulation
 var sounds: SoundWatcher
 var info_card: PartInfoCard = null
 var tutorial: Tutorial = null
+## "campaign" | "daily" | "edit" (sandbox: build the layout) | "verify" (sandbox: author solves it to
+## publish) | "shared" (a published level opened from a code or link). See App.sandbox.
+var mode: String = "campaign"
+var sandbox_index: int = -1
+var setup_btn: Button  # editor: opens the level setup (goal, player parts, slots, title)
+var publish_btn: Button
+var remix_btn: Button
+var copy_btn: Button
+var edit_btn: Button
+var _published_code := ""
 var last_result: String = ""  # result of the last finished run ("" while editing / running)
 var placements: Array[Placement] = []
 var history: Array = []  # Array of Array[Placement] snapshots
@@ -122,7 +132,13 @@ func _ready() -> void:
 	_build_scene()
 	level_number = App.level_number if has_node("/root/App") else 0
 	daily = App.daily if has_node("/root/App") else {}
-	if not daily.is_empty():
+	var sb: Dictionary = App.sandbox if has_node("/root/App") else {}
+	if not sb.is_empty():
+		mode = str(sb["mode"])
+		sandbox_index = int(sb.get("index", -1))
+		_load_sandbox(sb)
+	elif not daily.is_empty():
+		mode = "daily"
 		_load_level_data(LevelData.from_dict(daily["level"]))
 	else:
 		if level_number > 0:
@@ -201,7 +217,7 @@ func _build_scene() -> void:
 	top_v.add_child(row1)
 	back_btn = _button("<", 96)
 	back_btn.custom_minimum_size = Vector2(96, 72)
-	back_btn.pressed.connect(func() -> void: App.open_world_select())
+	back_btn.pressed.connect(_go_back)
 	row1.add_child(back_btn)
 	title_lbl = _label("", 40, C_PANEL_TXT)
 	title_lbl.clip_text = true
@@ -242,6 +258,14 @@ func _build_scene() -> void:
 	fit_btn = _button("Fit", BTN)
 	fit_btn.pressed.connect(_fit_camera)
 	row2.add_child(fit_btn)
+	setup_btn = _button("Next", BTN)
+	setup_btn.name = "SetupButton"
+	setup_btn.add_theme_stylebox_override("normal", _round_style(C_GO))
+	setup_btn.add_theme_stylebox_override("hover", _round_style(C_GO))
+	setup_btn.add_theme_color_override("font_color", C_INK)
+	setup_btn.pressed.connect(_open_setup)
+	setup_btn.visible = false
+	row2.add_child(setup_btn)
 
 	# Tray at the bottom with a collapse tab.
 	tray = PanelContainer.new()
@@ -373,6 +397,22 @@ func _build_scene() -> void:
 	submit_btn.pressed.connect(_submit_daily)
 	submit_btn.visible = false
 	row.add_child(submit_btn)
+	publish_btn = _go_button("Publish", _publish)
+	publish_btn.name = "PublishButton"
+	row.add_child(publish_btn)
+	copy_btn = _go_button("Copy link", _copy_link)
+	copy_btn.name = "CopyLinkButton"
+	row.add_child(copy_btn)
+	remix_btn = _button("Remix", BTN)
+	remix_btn.name = "RemixButton"
+	remix_btn.pressed.connect(_remix)
+	row.add_child(remix_btn)
+	edit_btn = _button("Edit", BTN)
+	edit_btn.name = "EditButton"
+	edit_btn.pressed.connect(func() -> void: _save_draft_layout(); App.open_sandbox_level("edit", sandbox_index))
+	row.add_child(edit_btn)
+	for b in [publish_btn, copy_btn, remix_btn, edit_btn]:
+		b.visible = false
 
 
 func _label(text: String, size: int, color: Color) -> Label:
@@ -460,7 +500,7 @@ func _load_level_data(l: LevelData) -> void:
 		title_lbl.text = "Daily · Day %d" % int(daily.get("day", 0))
 	else:
 		title_lbl.text = ("%d · " % level_number if level_number > 0 else "") + level.title
-	back_btn.visible = level_number > 0 or not daily.is_empty()
+	back_btn.visible = level_number > 0 or not daily.is_empty() or mode in ["edit", "verify", "shared"]
 	_rebuild_tray()
 	_refresh_hud()
 	stage_bg.queue_redraw()
@@ -535,7 +575,7 @@ func _refresh_tray_counts() -> void:
 		var part: String = item.get_meta("part")
 		var left: int = _tray_left(part)
 		var def := PartRegistry.get_def(part)
-		item.get_node("Count").text = "%s  ×%d" % [def.get("name", part), left]
+		item.get_node("Count").text = ("%s  ∞" % def.get("name", part)) if mode == "edit" else ("%s  ×%d" % [def.get("name", part), left])
 		item.modulate.a = 1.0 if left > 0 else 0.4
 
 
@@ -549,12 +589,15 @@ func _tray_left(part: String) -> int:
 
 func _refresh_hud() -> void:
 	var editing := not sim.running and not run_ended
-	counter_lbl.text = "%d / %d parts" % [placements.size(), level.slots] if level else ""
+	counter_lbl.text = ("%d parts" % placements.size() if mode == "edit" else "%d / %d parts" % [placements.size(), level.slots]) if level else ""
 	undo_btn.disabled = history.is_empty() or not editing
 	redo_btn.disabled = future.is_empty() or not editing
 	rot_btn.disabled = selected < 0 or not editing
 	rot90_btn.disabled = rot_btn.disabled
-	play_btn.text = "STOP" if (sim.running or run_ended) else "RUN"
+	setup_btn.visible = mode == "edit" and editing
+	tries_badge.visible = mode in ["campaign", "daily"]
+	tries_lbl.visible = tries_badge.visible
+	play_btn.text = "STOP" if (sim.running or run_ended) else ("TEST" if mode == "edit" else "RUN")
 	play_btn.get_node("RunIcon").queue_redraw()
 	play_btn.add_theme_stylebox_override("normal", _run_style(C_ACCENT if (sim.running or run_ended) else C_GO))
 	play_btn.add_theme_stylebox_override("hover", _run_style(C_ACCENT if (sim.running or run_ended) else C_GO))
@@ -617,8 +660,8 @@ func _world_to_screen(p: Vector2) -> Vector2:
 ## events; a touch that starts on a Button is left alone. Mouse events are ignored on purpose:
 ## the project emulates touch from mouse, so desktop testing goes through the same path.
 func _input(event: InputEvent) -> void:
-	if info_card != null and is_instance_valid(info_card):
-		return  # the card is modal: its own controls get the touches
+	if (info_card != null and is_instance_valid(info_card)) or hud.has_node("SandboxSetup"):
+		return  # modal overlays (part card, sandbox setup) get the touches
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			if _on_hud_button(event.position):
@@ -1144,6 +1187,12 @@ func _on_run_finished(outcome: Dictionary) -> void:
 	_snd("goal" if outcome["result"] == "goal" else "fail")
 	if outcome["result"] == "goal":
 		_confetti()
+	if mode == "edit":
+		_toast("Test run: goal reached!" if outcome["result"] == "goal" else "Test run: the machine stopped. Press STOP to edit.")
+		_refresh_hud()
+		return
+	for b in [publish_btn, copy_btn, remix_btn, edit_btn]:
+		b.visible = false
 	match outcome["result"]:
 		"goal":
 			result_face.visible = false
@@ -1163,6 +1212,14 @@ func _on_run_finished(outcome: Dictionary) -> void:
 				var ms: int = _solve_ms
 				result_lbl.text = "Solved!\n%d part%s · %s\nSubmit is final: one entry per day." % [outcome["parts_used"], "" if outcome["parts_used"] == 1 else "s", _fmt_ms(ms)]
 			submit_btn.visible = not daily.is_empty()
+			if mode == "verify":
+				result_lbl.text = "You solved your level with %d part%s.\nPublish it to get a link." % [outcome["parts_used"], "" if outcome["parts_used"] == 1 else "s"]
+				publish_btn.visible = true
+				edit_btn.visible = true
+			elif mode == "shared":
+				var ap := int(App.sandbox.get("author_parts", 0))
+				result_lbl.text = "Solved!\n%d part%s (the author used %d)" % [outcome["parts_used"], "" if outcome["parts_used"] == 1 else "s", ap]
+				remix_btn.visible = true
 			result_panel.visible = true
 		"stalled", "timeout":
 			_show_failure(str(outcome["result"]))
@@ -1179,6 +1236,14 @@ func _show_failure(why: String) -> void:
 	submit_btn.visible = false
 	levels_btn.visible = level_number > 0
 	var head := "Everything stopped." if why == "stalled" else "Time's up."
+	remix_btn.visible = mode == "shared"
+	edit_btn.visible = mode == "verify"
+	if not _has_app():
+		result_lbl.text = "%s\nThe goal wasn't reached." % head
+		_out_of_tries = false
+		result_panel.visible = true
+		again_btn.queue_redraw()
+		return
 	if left > 0:
 		result_lbl.text = "%s\nThe goal wasn't reached.\n%d tr%s left" % [head, left, "y" if left == 1 else "ies"]
 		_out_of_tries = false
@@ -1209,8 +1274,10 @@ func _update_out_of_tries_text(head: String) -> void:
 	result_lbl.text = "%s\nNew tries in %s\nYou can keep building meanwhile." % [head, Tries.fmt_wait(wait)]
 
 
+## Tries count in the campaign and the Daily only: the editor, the author's test and shared
+## (community) levels are free to retry.
 func _has_app() -> bool:
-	return has_node("/root/App") and App.tries != null
+	return has_node("/root/App") and App.tries != null and mode in ["campaign", "daily"]
 
 
 static func _now() -> int:
@@ -1318,6 +1385,130 @@ func _draw_overlay() -> void:
 		var c := Color(C_INK, 0.5) if ghost_valid else C_BAD
 		overlay.draw_line(p + Vector2(-20, 0), p + Vector2(20, 0), c, 3.0)
 		overlay.draw_line(p + Vector2(0, -20), p + Vector2(0, 20), c, 3.0)
+
+
+# ------------------------------------------------------------------ sandbox (M5)
+
+func _go_button(text: String, cb: Callable) -> Button:
+	var b := _button(text, BTN)
+	b.add_theme_stylebox_override("normal", _round_style(C_GO))
+	b.add_theme_stylebox_override("hover", _round_style(C_GO))
+	b.add_theme_color_override("font_color", C_INK)
+	b.pressed.connect(cb)
+	return b
+
+
+func _draft() -> Dictionary:
+	if sandbox_index < 0 or sandbox_index >= App.sandbox_store.drafts.size():
+		return {}
+	return App.sandbox_store.drafts[sandbox_index]
+
+
+func _load_sandbox(sb: Dictionary) -> void:
+	match mode:
+		"edit":
+			# The author builds the LAYOUT with every part, unlimited; these become the level's fixed parts.
+			var d := _draft()
+			var tray := []
+			PartRegistry.ensure_loaded()
+			for id in PartRegistry.defs.keys():
+				tray.append({"part": id, "count": 99})
+			var lv := {"id": "editor", "title": str(d.get("title", "My machine")), "goal": d.get("goal", {"type": "basket"}),
+				"fixed": [], "tray": tray, "slots": 99, "reference_solution": []}
+			_load_level_data(LevelData.from_dict(lv))
+			for f in d.get("fixed", []):
+				placements.append(Placement.from_dict(f))
+			sim.set_player_parts(placements)
+			title_lbl.text = "Editor · " + str(d.get("title", ""))
+			_refresh_hud()
+		"verify":
+			var d := _draft()
+			_load_level_data(LevelData.from_dict(SandboxStore.to_level(d, false)))
+			title_lbl.text = "Test · " + str(d.get("title", ""))
+			_published_code = str(d.get("published_id", ""))
+		"shared":
+			_load_level_data(LevelData.from_dict(sb["level"]))
+			title_lbl.text = "%s · %s" % [str(sb.get("code", "")), str(sb["level"].get("title", ""))]
+
+
+func _go_back() -> void:
+	if mode == "edit":
+		_save_draft_layout()
+	if mode in ["edit", "verify", "shared"]:
+		App.open_sandbox()
+	else:
+		App.open_world_select()
+
+
+## Editor: the parts on the board ARE the level's fixed layout.
+func _save_draft_layout() -> void:
+	if mode != "edit" or sandbox_index < 0:
+		return
+	var d := _draft()
+	if d.is_empty():
+		return
+	var fixed := []
+	for p in placements:
+		fixed.append(p.to_dict())
+	if fixed != d.get("fixed", []):
+		d["fixed"] = fixed
+		d["solution"] = []  # the layout changed: the author must solve it again before publishing
+		d["published_id"] = ""
+	App.sandbox_store.put(sandbox_index, d)
+
+
+func _exit_tree() -> void:
+	if mode == "edit" and has_node("/root/App"):
+		_save_draft_layout()
+
+
+func _open_setup() -> void:
+	_cancel_drag()
+	_save_draft_layout()
+	SandboxSetup.open(hud, sandbox_index)
+
+
+func _publish() -> void:
+	var d := _draft()
+	if d.is_empty():
+		return
+	var sol := []
+	for p in placements:
+		sol.append(p.to_dict())
+	var lv := SandboxStore.to_level(d, false)
+	lv["reference_solution"] = sol
+	publish_btn.disabled = true
+	publish_btn.text = "Publishing…"
+	var r: Dictionary = await App.api.post_json("/level", {"device_id": App.settings.device_id, "level": lv})
+	publish_btn.disabled = false
+	publish_btn.text = "Publish"
+	if not r["ok"]:
+		result_lbl.text = "Not published:\n" + str(r["error"])
+		return
+	_published_code = str(r["body"]["id"])
+	d["solution"] = sol
+	d["published_id"] = _published_code
+	App.sandbox_store.put(sandbox_index, d)
+	publish_btn.visible = false
+	copy_btn.visible = true
+	result_lbl.text = "Published! Code: %s\n%s" % [_published_code, App.share_link(_published_code)]
+	_snd("goal")
+
+
+func _copy_link() -> void:
+	if _published_code == "":
+		return
+	var link := App.share_link(_published_code)
+	DisplayServer.clipboard_set(link)
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("navigator.share ? navigator.share({title: 'Tinker level', url: %s}).catch(function(){}) : 0" % JSON.stringify(link), true)
+	_toast("Link copied: " + link)
+
+
+func _remix() -> void:
+	var lv: Dictionary = App.sandbox.get("level", {})
+	var idx := App.sandbox_store.add(SandboxStore.remix_of(lv, str(App.sandbox.get("code", ""))))
+	App.open_sandbox_level("edit", idx)
 
 
 const HAPTIC_MS := {"pick": 10, "place": 18, "rotate": 6, "goal": 60}

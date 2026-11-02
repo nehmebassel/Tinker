@@ -34,3 +34,15 @@ echo "== game client plays the day"
 timeout 300 xvfb-run -a -s "-screen 0 1200x2100x24" godot --path game --rendering-driver opengl3 --resolution 540x960 \
   --quit-after 12000 -- --server=http://127.0.0.1:8090 --daily-flow=/tmp/daily_sol.json 2>&1 | tee /tmp/daily.log | grep -E "ok  |FAIL|DAILY"
 grep -q "DAILY PASS" /tmp/daily.log
+
+echo "== sandbox: phone A builds + publishes, phone B (separate install) plays the link and remixes"
+A=$(mktemp -d); B=$(mktemp -d)
+XDG_DATA_HOME=$A timeout 300 xvfb-run -a -s "-screen 0 1200x2100x24" godot --path game --rendering-driver opengl3 --resolution 540x960 \
+  --quit-after 12000 -- --server=http://127.0.0.1:8090 --sandbox-publish=/tmp/sandbox_code.txt 2>&1 | tee /tmp/sbA.log | grep -E "ok  |FAIL|SANDBOX"
+grep -q "SANDBOX PASS" /tmp/sbA.log
+CODE=$(cat /tmp/sandbox_code.txt)
+[ "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://127.0.0.1:8090/l/$CODE)" = "302 http://127.0.0.1:8090/play/?level=$CODE" ]
+XDG_DATA_HOME=$B timeout 300 xvfb-run -a -s "-screen 0 1200x2100x24" godot --path game --rendering-driver opengl3 --resolution 540x960 \
+  --quit-after 12000 -- --server=http://127.0.0.1:8090 --sandbox-play=$CODE 2>&1 | tee /tmp/sbB.log | grep -E "ok  |FAIL|SANDBOX"
+grep -q "SANDBOX PASS" /tmp/sbB.log
+rm -rf "$A" "$B"
