@@ -1507,7 +1507,22 @@ func _exit_tree() -> void:
 func _open_setup() -> void:
 	_cancel_drag()
 	_save_draft_layout()
-	SandboxSetup.open(hud, sandbox_index)
+	var setup := SandboxSetup.open(hud, sandbox_index)
+	setup.tree_exited.connect(_sync_editor_from_draft)
+
+
+## After Level setup closes ("Keep building"), TEST must check the goal and title just chosen there.
+func _sync_editor_from_draft() -> void:
+	if not is_inside_tree() or mode != "edit":
+		return
+	var d := _draft()
+	if d.is_empty() or level == null:
+		return
+	level.goal = d.get("goal", level.goal).duplicate(true)
+	if sim.level != null and sim.level != level:
+		sim.level.goal = level.goal.duplicate(true)
+	level.title = str(d.get("title", level.title))
+	title_lbl.text = "Editor · " + level.title
 
 
 func _publish() -> void:
