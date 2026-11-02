@@ -2,7 +2,10 @@ class_name Audio
 extends Node
 ## Audio — music and sound effects for every screen. A child of App (App.audio).
 ##
-##   Buses: "Music" and "SFX" (created here), volumes from Settings (music_volume / sfx_volume, 0..1),
+##   Buses: "Music" and "SFX" are declared in res://default_bus_layout.tres. They MUST exist at startup:
+##          the web build plays sounds as Web Audio samples routed through a bus graph built at boot,
+##          and buses added at run time are never connected to the output (the web build was silent).
+##          _make_bus() below only covers a missing layout file. Volumes from Settings (music_volume / sfx_volume, 0..1),
 ##          changed on the Settings screen — nothing hard-coded.
 ##   Music: three loops (menu / build / run), crossfaded. play_music("build").
 ##   SFX:   sfx("place"), one-shots from a small player pool, plus named loops (fan, motor) that the

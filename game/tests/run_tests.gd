@@ -45,6 +45,7 @@ func _run_all() -> void:
 	_test_grid()
 	_test_placement()
 	_test_registry()
+	_test_bus_layout()
 	await _test_levels()
 	await _test_sound_watcher()
 
@@ -55,6 +56,15 @@ func _run_all() -> void:
 		_log("FAIL: " + f)
 	_write_files()
 	quit(0 if failures.is_empty() else 1)
+
+
+## The web build only routes buses that exist at startup (see audio.gd): they must come from the layout.
+func _test_bus_layout() -> void:
+	var layout: Resource = load("res://default_bus_layout.tres")
+	_check("default_bus_layout.tres exists", layout is AudioBusLayout)
+	for bus in ["Music", "SFX"]:
+		_check("bus '%s' declared in default_bus_layout.tres" % bus, layout != null and ("&\"%s\"" % bus) in FileAccess.get_file_as_string("res://default_bus_layout.tres"))
+		_check("bus '%s' exists at startup" % bus, AudioServer.get_bus_index(bus) >= 0)
 
 
 # ---------------------------------------------------------------- sound must never change a replay
