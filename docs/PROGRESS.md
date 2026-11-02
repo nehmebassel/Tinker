@@ -103,7 +103,7 @@ Session log at the bottom tells the next agent exactly where things stand.
 - [ ] Friends board (needs Game Center / Play Games sign-in, M7)
 - [ ] Web page for the curation queue (curl works today)
 
-### M6 Polish (look, sound, explanations) — LIVE (PR #6 merged, revision tinker-api-00011; done before M5 at Bassel's request)
+### M6 Polish (look, sound, explanations) — LIVE (PRs #6 + #7 merged, revision tinker-api-00012; done before M5 at Bassel's request)
 - [x] Music: 3 loops (menu / build / run), generated with Lyria (lyria-002, Vertex AI, project gen-lang-client-0293187856), made seamless with a 3 s crossfade, -20 LUFS OGG
 - [x] Sound effects: 20 (taps, pick/place/rotate, play/rewind, wood/metal impacts, spring, pop, switch, candle, mouse, cat, basket, pulley, fan/motor loops, solved, failed), generated with ElevenLabs SFX v2, trimmed and loudness-matched
 - [x] Audio system (`App.audio`): Music/SFX buses, crossfade, loops while fans/motors run, tap on every button; **Music and Sounds sliders in Settings** (saved, nothing hard-coded)
@@ -123,6 +123,7 @@ Session log at the bottom tells the next agent exactly where things stand.
 - [x] **Ropes and pulleys rebuilt**: snap points on parts, auto-snap + auto-aim in the editor with live preview, taut ropes pulling at the snap points, rope drawn over the pulley wheel; levels 7/25 re-laid out (search for a robust pulley region), bucket ropes moved to the handle; tests for snapping/aim/solve
 - [x] **Balloon pop** drawn: POP! star, rubber shreds, falling knot
 - [x] **RUN** (was PLAY) with drawn play/stop icons, gloss and a gentle pulse; **basket** redrawn (wicker, dark inside, rim, bullseye target marker, green check when solved)
+- [x] Live check 2026-11-02: web audio measured on production (WEB AUDIO PASS), /config serves 3 tries / 6 h, APK full download
 - [ ] Bassel's ears: music and sounds were checked by spectrogram/waveform only (no listening possible here) — swap any you dislike (files in game/assets/audio, prompts in docs/DESIGN.md)
 
 ### M5 Sandbox · M7 Store (not started)
