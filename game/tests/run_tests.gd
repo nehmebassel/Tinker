@@ -86,6 +86,11 @@ func _test_editor_state() -> void:
 	_check("setup: candle goal without an unlit candle is refused", SandboxStore.problem(d).contains("unlit"))
 	d["fixed"] = [{"part": "candle", "x": 10, "y": 10, "rot": 0, "state": {"lit": false}}]
 	_check("setup: candle goal with an unlit candle is accepted", SandboxStore.problem(d) == "")
+	var many := []
+	for i in SandboxStore.MAX_LAYOUT_PARTS + 1:
+		many.append({"part": "ball", "x": 2 + (i % 20) * 2, "y": 2 + (i / 20) * 4, "rot": 0})
+	d["fixed"] = many + [{"part": "candle", "x": 10, "y": 50, "rot": 0, "state": {"lit": false}}]
+	_check("setup: more than %d layout parts is refused (server limit)" % SandboxStore.MAX_LAYOUT_PARTS, SandboxStore.problem(d).begins_with("Too many parts"))
 
 
 ## Rope snap points + auto-aim (the editor and the simulation share these helpers).

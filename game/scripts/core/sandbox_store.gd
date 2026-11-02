@@ -8,6 +8,8 @@ extends RefCounted
 
 const PATH := "user://sandbox.json"
 const GOALS := ["basket", "candle", "cheese", "pop"]
+## Same limit as the server's validLevel() (server/src/validate.js: fixed.length <= 64).
+const MAX_LAYOUT_PARTS := 64
 
 var drafts: Array = []
 var _path := PATH
@@ -87,6 +89,8 @@ static func problem(d: Dictionary) -> String:
 		total += int(t.get("count", 0))
 	if fixed.is_empty():
 		return "Build something first: drag parts onto the board."
+	if fixed.size() > MAX_LAYOUT_PARTS:
+		return "Too many parts: a level holds at most %d (this one has %d)." % [MAX_LAYOUT_PARTS, fixed.size()]
 	if total < 1:
 		return "Give the player at least one part."
 	if int(d.get("slots", 0)) < 1 or int(d.get("slots", 0)) > total:

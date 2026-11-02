@@ -744,7 +744,7 @@ func _tray_touch(part: String, index: int, pos: Vector2) -> void:
 		_toast("No %s left" % PartRegistry.get_def(part).get("name", part))
 		return
 	if placements.size() >= level.slots:
-		_toast("No slots left — remove a part first")
+		_toast(("A level holds at most %d parts" % level.slots) if mode == "edit" else "No slots left — remove a part first")
 		return
 	_note_first_touch()
 	_begin_tray_drag(part, index, pos)
@@ -974,7 +974,10 @@ func _drop_floating(pos: Vector2, part: String, lifted: Placement) -> void:
 	_push_history()
 	if lifted != null:
 		placements.pop_back()
-	placements.append(Placement.new(part, cell, drag["rot"]))
+	var placed := Placement.new(part, cell, drag["rot"])
+	if lifted != null:
+		placed.state = lifted.state.duplicate()  # a moved part keeps its start state (unlit, off)
+	placements.append(placed)
 	selected = placements.size() - 1
 	sim.set_player_parts(placements)
 	_snd("place")
@@ -1455,7 +1458,7 @@ func _load_sandbox(sb: Dictionary) -> void:
 			for id in PartRegistry.defs.keys():
 				tray.append({"part": id, "count": 99})
 			var lv := {"id": "editor", "title": str(d.get("title", "My machine")), "goal": d.get("goal", {"type": "basket"}),
-				"fixed": [], "tray": tray, "slots": 99, "reference_solution": []}
+				"fixed": [], "tray": tray, "slots": SandboxStore.MAX_LAYOUT_PARTS, "reference_solution": []}
 			sim.keep_player_state = true  # the layout keeps its lit / on states, as it will once published
 			_load_level_data(LevelData.from_dict(lv))
 			for f in d.get("fixed", []):
