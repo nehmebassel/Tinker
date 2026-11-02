@@ -5,7 +5,7 @@ extends Control
 ## A speech bubble under the top bar and a bouncing arrow that points at what to touch next.
 ## It only READS the level screen (placements, run state, last result) and moves on by itself:
 ##   1. "Drag the plank from the tray onto the board"      -> arrow at the first tray part
-##   2. "Tilt it with the round handle... then press PLAY" -> arrow at PLAY   (also mentions "i")
+##   2. "Tilt it with the round handle... then press RUN" -> arrow at RUN   (also mentions "i")
 ##   3. after the run: solved -> done (saved); not solved -> "STOP, adjust, try again"
 ## Skip ends it. Settings -> "Show tutorial again" clears App.settings.tutorial_done.
 ## Never blocks input: everything here ignores the mouse except the Skip button.
@@ -67,7 +67,7 @@ func _show(step: int) -> void:
 		0:
 			_text.text = "Drag the plank from the tray onto the board."
 		1:
-			_text.text = "Tilt it with the round handle so the ball rolls into the basket, then press PLAY. Tap i on a part to see what it does."
+			_text.text = "Tilt it with the round handle so the ball rolls into the basket, then press RUN. Tap i on a part to see what it does."
 		2:
 			_text.text = "Not quite. Press STOP, move or tilt the plank, and try again."
 
@@ -95,7 +95,7 @@ func _process(delta: float) -> void:
 	if screen.run_ended and screen.last_result == "goal":
 		finish()
 		return
-	# Arrow target: the first tray part, then PLAY.
+	# Arrow target: the first tray part, then RUN.
 	var target := Rect2()
 	if _step == 0 and screen.tray.visible and screen.tray_items.get_child_count() > 0:
 		target = screen.tray_items.get_child(0).get_global_rect()

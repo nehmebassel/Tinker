@@ -118,6 +118,11 @@ Session log at the bottom tells the next agent exactly where things stand.
 - [x] Vibration on pick / place / rotate / solve (Android + Android browsers; iOS Safari has no vibration API), **Vibration toggle in Settings**, VIBRATE permission in the APK
 - [x] Confetti burst on solve (HUD layer, visual only)
 - [x] First-run tutorial on level 1: bubble in the tray + bouncing arrow (tray part → PLAY), mentions the "i"; ends on the first solve or Skip; **"Show tutorial again" in Settings**
+- [x] **Auto-fail** (Bassel 2026-11-02): stalled/timeout ends the run by itself → fail sound, sad face, circular-arrow Try again
+- [x] **Limited tries**: 3 failed runs per 6 h window (server `GET /config`, `TRIES_LIMIT` / `TRIES_WINDOW_HOURS` in Cloud Run), hearts + countdown; unit-tested with a fake clock
+- [x] **Ropes and pulleys rebuilt**: snap points on parts, auto-snap + auto-aim in the editor with live preview, taut ropes pulling at the snap points, rope drawn over the pulley wheel; levels 7/25 re-laid out (search for a robust pulley region), bucket ropes moved to the handle; tests for snapping/aim/solve
+- [x] **Balloon pop** drawn: POP! star, rubber shreds, falling knot
+- [x] **RUN** (was PLAY) with drawn play/stop icons, gloss and a gentle pulse; **basket** redrawn (wicker, dark inside, rim, bullseye target marker, green check when solved)
 - [ ] Bassel's ears: music and sounds were checked by spectrogram/waveform only (no listening possible here) — swap any you dislike (files in game/assets/audio, prompts in docs/DESIGN.md)
 
 ### M5 Sandbox · M7 Store (not started)
@@ -142,6 +147,7 @@ Session log at the bottom tells the next agent exactly where things stand.
 
 ## Session log
 
+- **2026-11-02 (session 1h, cont.)** Auto-fail + tries (3 per 6 h, server-configurable), rope/pulley rework with snap points, balloon pop, RUN button, basket redesign. 11 rope-level hashes re-recorded (intentional physics change); everything else identical.
 - **2026-11-02 (session 1h)** Silent web audio root-caused (runtime buses not routed by the web build) and fixed; web audio CI check; vibration, solve confetti, level-1 tutorial; Settings: Vibration + Show tutorial again.
 - **2026-11-02 (session 1g)** M6 polish on Bassel's request: Lyria music, ElevenLabs effects, sound watcher, volume sliders, workbench visuals, part animations, info cards with live demos. Hashes unchanged.
 - **2026-11-01 (session 1f)** Push registered for Android + PWA (Firebase apps, Android plugin, web FCM glue, /push/config). Redeployed. PRs #1→#2→#3 merged to main. Found: the APK link had never worked — Cloud Run returns 500 for non-streamed HTTP/1 responses over 32 MiB and earlier checks were HEAD-only. Fixed by streaming chunked (+ test); live check now does a full GET. PR #5: score elapsed-time cap now spans the full yesterday-or-today window (review finding missed before #3 merged). Live on revision tinker-api-00010.

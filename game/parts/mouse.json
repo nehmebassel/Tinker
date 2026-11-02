@@ -24,5 +24,11 @@
     "switch",
     "basket",
     "spring"
+  ],
+  "anchors": [
+    [
+      0,
+      0
+    ]
   ]
 }

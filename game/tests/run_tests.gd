@@ -46,6 +46,8 @@ func _run_all() -> void:
 	_test_placement()
 	_test_registry()
 	_test_bus_layout()
+	_test_tries()
+	await _test_rope_snap()
 	await _test_levels()
 	await _test_sound_watcher()
 
@@ -56,6 +58,61 @@ func _run_all() -> void:
 		_log("FAIL: " + f)
 	_write_files()
 	quit(0 if failures.is_empty() else 1)
+
+
+## Rope snap points + auto-aim (the editor and the simulation share these helpers).
+func _test_rope_snap() -> void:
+	var Rope: GDScript = load("res://scripts/parts/rope.gd")
+	var level := LevelData.load_from_file("res://levels/campaign/007.json")
+	var sim := Simulation.new()
+	root.add_child(sim)
+	sim.load_level(level)
+	sim.set_player_parts([Placement.new("pulley", Vector2i(22, 16), 0)])
+	var near := Grid.cell_to_world(Vector2i(13, 29)) + Vector2(5, -3)
+	var a: Dictionary = Rope.snap_a(sim.parts, near, 3.0 * Grid.CELL)
+	_check("rope: end snaps to the ball's snap point", not a.is_empty() and a["node"].get_meta("part_id") == "ball")
+	var r: int = Rope.best_rot(sim.parts, Vector2i(12, 30), 0, 30)
+	var res: Dictionary = Rope.resolve(sim.parts, Vector2i(12, 30), r, 30)
+	_check("rope: auto-aim finds the pulley (rot %d)" % r, r >= 0 and not res["b"].is_empty() and res["b"]["node"].get_meta("part_id") == "pulley")
+	sim.set_player_parts([Placement.new("pulley", Vector2i(22, 16), 0), Placement.new("rope", Vector2i(12, 30), r)])
+	sim.start()
+	var o: Dictionary = await sim.finished
+	await process_frame
+	_check("rope: the auto-aimed rope solves Wrecking ball", o["result"] == "goal")
+	var lv2 := LevelData.load_from_file("res://levels/tests/t_rope_pulley_buckets.json")
+	sim.load_level(lv2)
+	var line_ok := false
+	for rl in sim.rope_lines:
+		if rl.chain.size() == 3 and rl.chain[1].get_meta("part_id") == "pulley":
+			line_ok = rl.chain[0].get_meta("part_id") == "bucket" and rl.chain[2].get_meta("part_id") == "bucket"
+	_check("rope: a pulley beats a nearer ball as the target (bucket-pulley-bucket line)", line_ok)
+	var bucket_off := Vector2.ZERO
+	for rl in sim.rope_lines:
+		bucket_off = rl.offs[0]
+	_check("rope: bucket is tied at its handle, not its centre", bucket_off.y < -100.0)
+	sim.free()
+
+
+func _test_tries() -> void:
+	var path := "user://tries_test.json"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	var t := Tries.load_or_new(path)
+	t.set_rules(3, 6.0)
+	var t0 := 1_800_000_000
+	_check("tries: full at start", t.left(t0) == 3 and t.seconds_to_refill(t0) == 0)
+	t.use(t0)
+	_check("tries: a failure costs one", t.left(t0 + 10) == 2)
+	t.use(t0 + 3600)
+	t.use(t0 + 7200)
+	_check("tries: none left after three", t.left(t0 + 7300) == 0)
+	_check("tries: window counts from the FIRST failure", t.seconds_to_refill(t0 + 7300) == 6 * 3600 - 7300)
+	_check("tries: still none 1 s before the window ends", t.left(t0 + 6 * 3600 - 1) == 0)
+	_check("tries: all refilled when the window ends", t.left(t0 + 6 * 3600) == 3)
+	var t2 := Tries.load_or_new(path)
+	_check("tries: state persists", t2.limit == 3 and t2.left(t0 + 6 * 3600) == 3)
+	t2.use(t0 + 7 * 3600)
+	_check("tries: a new window starts at the next failure", t2.seconds_to_refill(t0 + 7 * 3600) == 6 * 3600)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 ## The web build only routes buses that exist at startup (see audio.gd): they must come from the layout.

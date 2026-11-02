@@ -79,7 +79,7 @@ level("t_motor_paddle", "Motor spins a paddle that hits the ball",
       floor(14, 40, 2) + [P("motor", 20, 34, 0), P("plank", 20, 34, 6), P("ball", 24, 38)],
       {"type": "displaced", "index": 4, "min_dx": 80}, note="motor -> plank (paddle) -> ball")
 level("t_motor_winch", "Motor on pulley winches a bucket up",
-      [P("pulley", 20, 10), P("motor", 20, 10, 0), P("bucket", 20, 22), P("rope", 20, 22, 18)],
+      [P("pulley", 20, 10), P("motor", 20, 10, 0), P("bucket", 20, 22), P("rope", 20, 17, 18)],
       {"type": "displaced", "index": 2, "min_dy": -100}, note="motor -> pulley (winch) -> rope -> bucket")
 level("t_motor_conveyor_off", "Motor off keeps conveyor still",
       [P("conveyor", 14, 30, 0), P("motor", 14, 30, 0, on=False), P("ball", 14, 28), P("basket", 28, 36)],
@@ -106,17 +106,17 @@ level("t_switch_balloon_fan", "Balloon rises into an upside-down switch",
 # ---------------------------------------------------------------- rope / pulley / bucket
 level("t_rope_pulley_buckets", "Ball into bucket lifts the other bucket",
       [P("pulley", 20, 8), P("bucket", 20, 20), P("bucket", 26, 18),
-       P("rope", 20, 20, 18), P("rope", 26, 18, 16), P("ball", 20, 12)],
+       P("rope", 20, 15, 18), P("rope", 26, 13, 15), P("ball", 20, 12)],
       {"type": "displaced", "index": 2, "min_dy": -100}, note="ball -> bucket -> rope -> pulley -> bucket")
-level("t_rope_plank_hangs", "Plank hangs from a rope and drops until taut",
-      [P("pulley", 20, 8), P("plank", 20, 16), P("rope", 20, 16, 18)],
-      {"type": "displaced", "index": 1, "min_dy": 60}, note="rope -> plank, pulley as anchor")
+level("t_rope_plank_hangs", "Plank tied by one end swings down on its rope",
+      [P("pulley", 16, 8), P("plank", 20, 16), P("rope", 16, 16, 18)],
+      {"type": "rotated", "index": 1, "min_abs_rad": 1.0}, note="rope ties the plank's END snap point: it hangs and turns")
 level("t_rope_balloon_cheese", "Balloon lifts cheese on a rope",
       [P("balloon", 20, 30), P("cheese", 20, 42), P("rope", 20, 42, 18)],
       {"type": "displaced", "index": 1, "min_dy": -100}, note="balloon -> rope -> cheese")
 level("t_pulley_plank_bucket", "Ball into bucket raises a hanging plank",
       [P("pulley", 20, 8), P("plank", 28, 16), P("bucket", 20, 20),
-       P("rope", 28, 16, 15), P("rope", 20, 20, 18), P("ball", 20, 12)],
+       P("rope", 28, 16, 15), P("rope", 20, 15, 18), P("ball", 20, 12)],
       {"type": "displaced", "index": 1, "min_dy": -60}, note="pulley -> plank")
 
 # ---------------------------------------------------------------- balloon / candle
@@ -160,7 +160,7 @@ level("t_reg_rope_slack_on_pop", "Cheese falls when its balloon pops",
       {"type": "displaced", "index": 2, "min_dy": 150}, note="popped balloon must not anchor the rope")
 
 level("t_reg_winch_motor_first", "Winch works when the motor is created before the pulley",
-      [P("motor", 20, 10, 0), P("pulley", 20, 10), P("bucket", 20, 22), P("rope", 20, 22, 18)],
+      [P("motor", 20, 10, 0), P("pulley", 20, 10), P("bucket", 20, 22), P("rope", 20, 17, 18)],
       {"type": "displaced", "index": 2, "min_dy": -100}, note="rope must tie to the pulley, not the co-located motor")
 
 for l in levels:

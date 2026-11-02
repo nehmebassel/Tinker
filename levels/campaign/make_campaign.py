@@ -69,9 +69,9 @@ level(6, "Pop goes the balloon", "Balloons float. Steer yours into the flame.",
       goal={"type": "pop"}, teaches="floating bodies, second goal type")
 
 level(7, "Wrecking ball", "A rope ties two things together. Hang the ball from a pulley and let it swing.",
-      [P("plank", 9, 32, 1), P("ball", 12, 30), P("plank", 25, 32), P("ball", 24, 30), P("basket", 31, 46)],
+      [P("plank", 9, 32, 1), P("ball", 12, 30), P("plank", 25, 36), P("ball", 22, 34), P("basket", 31, 50)],
       [("rope", 1), ("pulley", 1)],
-      [S("pulley", 20, 20), S("rope", 12, 30, 21)],
+      [S("pulley", 22, 16), S("rope", 12, 30, 20)],
       teaches="connectors")
 
 level(8, "Switched off", "That fan is off. Something has to step on the switch.",
@@ -159,8 +159,8 @@ level(24, "High switch", "The switch has to be up where only the ball can reach 
       [("switch", 1), ("plank", 1)], [S("switch", 14, 23, 0)], slots=1, goal={"type": "cheese"}, teaches="switch placement")
 
 level(25, "Wrecking ball II", "Same trick, one slot, three parts.",
-      [P("plank", 9, 32, 1), P("ball", 12, 30), P("pulley", 20, 20), P("plank", 25, 32), P("ball", 24, 30), P("basket", 31, 46)],
-      [("rope", 1), ("plank", 1), ("spring", 1)], [S("rope", 12, 30, 21)], slots=1, teaches="rope with distractors")
+      [P("plank", 9, 32, 1), P("ball", 12, 30), P("pulley", 22, 16), P("plank", 25, 36), P("ball", 22, 34), P("basket", 31, 50)],
+      [("rope", 1), ("plank", 1), ("spring", 1)], [S("rope", 12, 30, 20)], slots=1, teaches="rope with distractors")
 
 level(26, "Conveyor escape", "The belt drags the mouse toward the cat. Stop it in time.",
       [P("conveyor", 14, 40, 12), P("motor", 14, 40, 0), P("mouse", 12, 38), P("cat", 4, 38), P("plank", 4, 40),

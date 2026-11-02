@@ -36,6 +36,7 @@ entry exists only if the server's replay of the submitted integer solution reach
 | `DAILY_DAYS_AHEAD` | 7 | generate horizon |
 | `DAILY_EPOCH` | 2026-11-01 | "Day 1" |
 | `PUSH_ENABLED` / `PUSH_TOPIC` / `PUSH_TITLE` / `PUSH_BODY` | true / tinker-daily / … | daily reminder (`{day}` placeholder) |
+| `TRIES_LIMIT` / `TRIES_WINDOW_HOURS` | 3 / 6 | failed runs a player may make, refilled this many hours after the first one (served at `GET /config`) |
 | `REPLAY_TIMEOUT_MS` / `GENERATE_TIMEOUT_MS` | 60000 / 600000 | Godot process limits |
 
 ## Deploy

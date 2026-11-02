@@ -101,7 +101,7 @@ Every part is `game/parts/<id>.json` + `game/scripts/parts/<id>.gd`. Links are d
 | Conveyor | belt strip accelerates resting bodies along +X; powered unless a motor on its cell is off | motor, switch |
 | Spring | pad above the body; replaces the incoming normal speed with `gain·v_in + kick` once per landing | — |
 | Motor | powered pivot; rot steps 0–11 clockwise, 12–23 counter-clockwise; drives plank / conveyor / pulley (winch) on its cell | switch |
-| Rope | ties the part at its cell to the part `length_cells` away along its facing (nearest within 2 cells); enforced as a one-sided distance constraint by `Simulation.RopeLine` | any two parts, pulley |
+| Rope | ties two **snap points** (see *Ropes and pulleys* below): end A = snap point nearest its cell, end B = target along its facing (pulleys first); starts taut; one-sided distance constraint pulling AT the snap points (`Simulation.RopeLine`) | parts with `anchors` |
 | Pulley | fixed wheel; ropes that end on it join into one line (total length conserved); motor on its cell = winch | rope, motor |
 | Switch | pressure plate; toggles the **nearest** fan/motor/conveyor (lowest index on ties; a motor-powered conveyor is controlled via its motor); re-arms when empty; link drawn as a dashed line | — |
 | Balloon | negative gravity scale, damped; lifts light things on a rope; pops in a lit flame | fan, candle, rope |
@@ -174,6 +174,42 @@ The smoke test synthesises touch events (converted to window coordinates with `g
 ## Android export
 
 `game/export_presets.cfg` has the "Android" preset (arm64-v8a + x86_64, debug signing). Godot reads the SDK/JDK paths from `~/.config/godot/editor_settings-4.5.tres` and the debug keystore from `GODOT_ANDROID_KEYSTORE_DEBUG_PATH/USER/PASSWORD`. See `tools/setup.sh` for the full local setup and `.github/workflows/ci.yml` for the CI version.
+
+## Ropes and pulleys (M6 rework, 2026-11-02)
+
+Requested by Bassel: clearer, more realistic, visible snap points, auto-snap.
+* **Snap points** = `anchors` in `game/parts/<id>.json` (local px): bucket handle top `(0,-116)`, plank ends
+  and middle `(±108,0),(0,0)`, balloon knot `(0,49)`, centre of ball / cheese / mouse / cat / pulley.
+  Parts without anchors cannot be tied.
+* **Placement** is still `(cell, rot)`: end A = nearest snap point within 2 cells of the cell; end B = a
+  pulley inside the aim cone (±17°, min 30 px) if any, else the first snap point along the facing, up to
+  `max_length_cells` (30). Length = the distance between the two points at build time (**taut**).
+  Shared code: `rope.gd` static `snap_a / scan_b / resolve / best_rot`.
+* **Physics**: `RopeLine` keeps a snap-point offset per chain node; it measures and pulls at the snap points
+  (`apply_impulse` at the offset, spin included in the stretch rate), so a bucket swings from its handle and
+  a plank tied by one end hangs and turns.
+* **Editor**: while a rope is dragged every snap point shows as a ring; the end magnets to the nearest snap
+  point within 3 cells, the rope auto-aims (nearest pulley first) and a live preview shows the rope it will
+  make (green) or a red "nothing in reach". A selected rope also shows the rings.
+* **Drawing**: brass clips at snap points; on a pulley the rope meets the wheel at the tangent points and the
+  pulley draws the arc over the top.
+* **Levels changed**: buckets' ropes moved up to the handle (tests); "Wrecking ball" 7/25 re-laid out with a
+  search (target ball on the left end of a ledge at 25,36; pulley 22,16 in the middle of a 12-cell robust
+  region); `t_rope_plank_hangs` now ties the plank by its end. 11 rope levels got new hashes; all others
+  unchanged.
+
+## Runs: failure, tries, RUN (M6)
+
+* A run that stalls or times out ends by itself: fail sound, sad face, "The goal wasn't reached", tries left,
+  and a circular-arrow **Try again** (rewinds). No STOP needed.
+* **Tries** (`scripts/core/tries.gd`): a failed run costs one; solving is free. `TRIES_LIMIT` (3) per
+  `TRIES_WINDOW_HOURS` (6), the window starting at the first failure; all refill when it ends. Rules come from
+  the server (`GET /config`, Cloud Run env), cached; project settings are the offline fallback. Hearts and a
+  countdown in the top bar; out of tries → RUN shows when new tries come (building is still allowed).
+* The button is **RUN** / **STOP** with drawn icons; it breathes once a part is placed.
+* Basket: woven wicker with a dark inside (drawn behind parts), rim, ribbon; a bobbing bullseye marks it as the
+  goal, a green check with sparkles when the goal is met (latched for the run).
+* Balloon pop: "POP!" star, rubber shreds and a falling knot (0.8 s) instead of vanishing.
 
 ## Look, sound and part cards (M6)
 

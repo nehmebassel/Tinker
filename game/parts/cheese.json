@@ -17,5 +17,11 @@
     "mouse",
     "basket",
     "bucket"
+  ],
+  "anchors": [
+    [
+      0,
+      0
+    ]
   ]
 }

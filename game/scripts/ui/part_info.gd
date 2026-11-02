@@ -84,6 +84,7 @@ func _ready() -> void:
 	vp.handle_input_locally = false
 	svc.add_child(vp)
 	var paper := Node2D.new()
+	paper.z_index = -10
 	paper.draw.connect(func() -> void: _draw_paper(paper))
 	vp.add_child(paper)
 	_sim = Simulation.new()

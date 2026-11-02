@@ -1,17 +1,17 @@
 {
   "id": "t_rope_plank_hangs",
-  "title": "Plank hangs from a rope and drops until taut",
-  "hint": "rope -> plank, pulley as anchor",
+  "title": "Plank tied by one end swings down on its rope",
+  "hint": "rope ties the plank's END snap point: it hangs and turns",
   "test": true,
   "goal": {
-    "type": "displaced",
+    "type": "rotated",
     "index": 1,
-    "min_dy": 60
+    "min_abs_rad": 1.0
   },
   "fixed": [
     {
       "part": "pulley",
-      "x": 20,
+      "x": 16,
       "y": 8,
       "rot": 0
     },
@@ -23,7 +23,7 @@
     },
     {
       "part": "rope",
-      "x": 20,
+      "x": 16,
       "y": 16,
       "rot": 18
     }

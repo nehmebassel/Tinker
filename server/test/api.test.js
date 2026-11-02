@@ -359,3 +359,11 @@ test("elapsed time may span the whole submission window, but not more", async ()
   assert.equal(z.status, 400);
   assert.equal(z.body.error, "bad elapsed_ms");
 });
+
+
+test("GET /config serves the tries rules", async () => {
+  const r = await j("GET", "/config");
+  assert.equal(r.status, 200);
+  assert.equal(r.body.tries_limit, 3);
+  assert.equal(r.body.tries_window_hours, 6);
+});
