@@ -8,6 +8,7 @@ import { config, todayUtc, addDays, dayNumber } from "./config.js";
 import { fcm as realFcm, isFcmToken, dailyMessage } from "./push.js";
 import { col, db } from "./db.js";
 import { replay, generateDaily } from "./godot.js";
+import { mountEconomy, getEconomy, publicEconomy, adminGate } from "./economy.js";
 import { isDate, isDeviceId, isCountry, isShortId, validSolution, validLevel, solutionFits, publicLevel } from "./validate.js";
 
 // ------------------------------------------------------------------ rate limit (per device / ip, per minute)
@@ -35,16 +36,21 @@ function shortId() {
   return s;
 }
 
-export function createApp({ replayFn = replay, generateFn = generateDaily, fcm = realFcm } = {}) {
+export function createApp({ replayFn = replay, generateFn = generateDaily, fcm = realFcm, playVerify, fetchFn } = {}) {
   const app = express();
-  app.use(express.json({ limit: config.maxLevelBytes }));
+  // rawBody: the Stripe webhook signature is over the exact bytes received.
+  app.use(express.json({ limit: config.maxLevelBytes, verify: (req, _res, buf) => { if (req.originalUrl === "/stripe/webhook") req.rawBody = buf; } }));
   app.disable("x-powered-by");
 
   app.get("/health", (_req, res) => res.json({ ok: true, today: todayUtc(), emulator: config.emulator }));
   // Game rules for clients (cached by the game; it falls back to its own defaults offline).
-  app.get("/config", (_req, res) => {
-    res.set("Cache-Control", "public, max-age=300");
-    res.json({ tries_limit: config.triesLimit, tries_window_hours: config.triesWindowHours });
+  // economy: features on/off, prices, rewards, ads and products, all set in the admin console.
+  app.get("/config", async (_req, res, next) => {
+    try {
+      const eco = publicEconomy(await getEconomy());
+      res.set("Cache-Control", "public, max-age=60");
+      res.json({ tries_limit: config.triesLimit, tries_window_hours: config.triesWindowHours, economy: eco });
+    } catch (e) { next(e); }
   });
 
   // ---------------------------------------------------------------- the game itself
@@ -290,11 +296,7 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
 
   // ---------------------------------------------------------------- admin (curation)
   const admin = express.Router();
-  admin.use((req, res, next) => {
-    if (!config.adminToken) return res.status(404).end();
-    if (req.get("x-admin-token") !== config.adminToken) return res.status(401).json({ error: "unauthorized" });
-    next();
-  });
+  admin.use(adminGate);
   // Pre-generate missing dailies for today .. today+daysAhead. Idempotent; safe for Cloud Scheduler.
   admin.post("/generate", async (req, res) => {
     const days = Math.min(Number(req.query.days || config.daysAhead), 30);
@@ -375,7 +377,11 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     if (!snap.exists) return res.status(404).json({ error: "not found" });
     res.json(snap.data());
   });
+  // Admin console page (static, holds no secrets; every call it makes needs the admin token).
+  app.get("/admin/ui", (_req, res) => res.set({ "Cache-Control": "no-cache", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer" }).sendFile(staticDir + "admin.html"));
+  const ecoAdmin = mountEconomy(app, { rateLimited, publicId, ...(playVerify ? { playVerify } : {}), ...(fetchFn ? { fetchFn } : {}) });
   app.use("/admin", admin);
+  app.use("/admin", ecoAdmin);
 
   app.use((err, _req, res, _next) => {
     if (err?.type === "entity.too.large") return res.status(413).json({ error: "payload too large" });

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Tinker Admin</title>
+<style>
+:root{--bg:#f5f1ea;--panel:#fffdf9;--ink:#2d2a4a;--muted:#6f6a86;--line:#e3dccf;--go:#3fb37f;--warn:#e8833a;--bad:#d64545;--accent:#4f7cff}
+@media (prefers-color-scheme:dark){:root{--bg:#1d1b2e;--panel:#27243d;--ink:#efeaf7;--muted:#a49fbd;--line:#3a3657}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--ink);color:#fff}header h1{font-size:18px;margin:0;flex:1}
+header button{background:transparent;color:#fff;border:1px solid #fff6;border-radius:8px;padding:6px 12px;cursor:pointer}
+nav{display:flex;gap:4px;padding:10px 16px;overflow-x:auto;border-bottom:1px solid var(--line);background:var(--panel)}
+nav button{border:0;background:transparent;color:var(--muted);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;white-space:nowrap}
+nav button.on{background:var(--ink);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:18px 16px 80px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px}
+.card h2{font-size:16px;margin:0 0 4px}.card p.hint{color:var(--muted);margin:0 0 12px;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}.kpi b{display:block;font-size:24px}.kpi span{color:var(--muted);font-size:12px}
+label.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed var(--line)}
+label.row:last-child{border-bottom:0}label.row small{display:block;color:var(--muted);font-size:12px}
+input[type=number],input[type=text],input[type=password],select{width:150px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+input.wide{width:280px}
+.switch{position:relative;width:46px;height:26px;flex:none}.switch input{opacity:0;width:0;height:0}
+.switch i{position:absolute;inset:0;background:#c9c2b6;border-radius:26px;transition:.15s}.switch i:before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s}
+.switch input:checked+i{background:var(--go)}.switch input:checked+i:before{transform:translateX(20px)}
+button.main{background:var(--go);color:#fff;border:0;border-radius:10px;padding:10px 18px;font-weight:700;cursor:pointer}
+button.sec{background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 14px;cursor:pointer}
+button.danger{border-color:var(--bad);color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-weight:600}td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;padding:1px 7px;border-radius:20px;font-size:11px;font-weight:700}.t-real{background:#3fb37f22;color:var(--go)}.t-est{background:#e8833a22;color:var(--warn)}.t-test{background:#8882;color:var(--muted)}
+.scroll{overflow-x:auto}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:9}
+#login{max-width:380px;margin:12vh auto}#login input{width:100%;margin:10px 0}
+.savebar{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:12px 16px;display:flex;gap:10px;justify-content:flex-end;margin:0 -16px}
+.warn{background:#e8833a1a;border:1px solid #e8833a55;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+@media (max-width:600px){input[type=number],input[type=text],select{width:110px}input.wide{width:100%}label.row{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<div id="login" class="card">
+  <h2>Tinker admin</h2>
+  <p class="hint">Enter the admin token (Secret Manager: <code>tinker-admin-token</code>). It stays in this browser tab only.</p>
+  <input id="tok" type="password" autocomplete="current-password" placeholder="Admin token">
+  <button class="main" onclick="login()">Sign in</button>
+  <p id="lerr" style="color:var(--bad)"></p>
+</div>
+<div id="app" style="display:none">
+<header><h1>Tinker admin</h1><button onclick="logout()">Sign out</button></header>
+<nav id="tabs"></nav>
+<main id="view"></main>
+</div>
+<div id="toast"></div>
+<script>
+"use strict";
+const TABS = [["overview","Overview"],["features","Features"],["economy","Prices & rewards"],["ads","Ads"],["store","Store"],["ledger","Ledger"],["players","Players"]];
+const FEAT = {coins:"Coins (master switch for the whole economy)",daily_bonus:"Daily login bonus + streak",refill_tries_on_new_level:"Refill tries when a new level is reached",extra_tries:"Buy a try / a full refill with coins",hints:"Hints: show where one part goes (campaign)",skip:"Skip a level with coins (campaign)",rewarded_ads:"Rewarded ads (watch an ad → a try or coins)",interstitial_ads:"Interstitial ads between levels",purchases:"Shop: coin packs and no-ads passes",referrals:"Invite friends (both get coins)"};
+const ECO = {start_coins:"Coins a new player starts with",level_reward:"Coins for a campaign level's first solve",daily_reward:"Coins for solving the Daily",daily_bonus:"Daily login bonus",streak_step:"Extra bonus per consecutive day",streak_max:"Streak cap (days)",extra_try_cost:"Cost: one extra try",refill_cost:"Cost: refill all tries",hint_cost:"Cost: a hint",skip_cost:"Cost: skip a level",ad_reward_coins:"Coins for a rewarded ad",ad_reward_tries:"Tries for a rewarded ad",ads_per_day_cap:"Rewarded ads per player per day",referral_inviter:"Coins to the inviter (when the friend solves a level)",referral_invitee:"Coins to the invited friend"};
+let token = sessionStorage.getItem("tinker_admin") || "", data = null, tab = location.hash.slice(1) || "overview";
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const usd = (n) => "$" + (Number(n) || 0).toFixed(2);
+function toast(t){const e=$("#toast");e.textContent=t;e.style.display="block";clearTimeout(e._t);e._t=setTimeout(()=>e.style.display="none",2600)}
+async function api(method, path, body){
+  const r = await fetch("/admin" + path, {method, headers:{"x-admin-token":token,"content-type":"application/json"}, body: body ? JSON.stringify(body) : undefined});
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { logout(); throw new Error("Signed out: wrong token"); }
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+async function login(){ token = $("#tok").value.trim(); try { await api("GET","/stats"); sessionStorage.setItem("tinker_admin", token); start(); } catch(e){ $("#lerr").textContent = e.message; } }
+function logout(){ sessionStorage.removeItem("tinker_admin"); token=""; $("#app").style.display="none"; $("#login").style.display="block"; }
+$("#tok").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
+async function start(){ $("#login").style.display="none"; $("#app").style.display="block"; data = await api("GET","/economy"); renderTabs(); show(tab); }
+function renderTabs(){ $("#tabs").innerHTML = TABS.map(([k,v]) => `<button data-k="${k}" class="${k===tab?"on":""}">${v}</button>`).join(""); $("#tabs").onclick = (e) => { const k = e.target.dataset.k; if (k) show(k); }; }
+function show(k){ tab = k; location.hash = k; renderTabs(); ({overview,features,economy,ads,store,ledger,players})[k](); }
+function sw(path, on){ return `<span class="switch"><input type="checkbox" data-p="${path}" ${on?"checked":""}><i></i></span>`; }
+function collect(){ document.querySelectorAll("[data-p]").forEach((el) => { const [a,b] = el.dataset.p.split("."); let v = el.type==="checkbox" ? el.checked : el.type==="number" ? Number(el.value) : el.value; data.config[a][b] = v; }); }
+const saveBar = `<div class="savebar"><button class="sec" onclick="start()">Discard</button><button class="main" onclick="save()">Save changes</button></div>`;
+async function save(){ collect(); try { const r = await api("PUT","/economy",{config:data.config}); data.config = r.config; toast("Saved. Players get it within a minute."); } catch(e){ toast("Not saved: " + e.message); } }
+
+async function overview(){
+  $("#view").innerHTML = `<div class="card"><h2>Loading…</h2></div>`;
+  const [s, l] = await Promise.all([api("GET","/stats"), api("GET","/ledger?days=30")]);
+  const c = data.config;
+  $("#view").innerHTML = `
+  ${c.payments.mode==="test" ? `<div class="warn"><b>Test mode.</b> Purchases are granted free and marked TEST. Switch to Live in Store once the store accounts are connected.</div>` : ""}
+  <div class="grid">
+    <div class="kpi"><span>Real revenue, 30 days</span><b>${usd(l.totals.real)}</b></div>
+    <div class="kpi"><span>Estimated ad revenue, 30 days</span><b>${usd(l.totals.estimated)}</b></div>
+    <div class="kpi"><span>Test purchases (not revenue)</span><b>${usd(l.totals.test)}</b></div>
+    <div class="kpi"><span>Players (wallets)</span><b>${s.wallets - s.test_wallets}</b></div>
+    <div class="kpi"><span>Active, last 24 h</span><b>${s.active_24h}</b></div>
+    <div class="kpi"><span>Daily scores today</span><b>${s.daily_scores_today}</b></div>
+    <div class="kpi"><span>Coins earned / spent (30 d)</span><b>${l.coins.earned} / ${l.coins.spent}</b></div>
+    <div class="kpi"><span>Shared sandbox levels</span><b>${s.shared_levels}</b></div>
+  </div>
+  <div class="card" style="margin-top:16px"><h2>What is on</h2><p class="hint">${Object.entries(c.features).map(([k,v]) => `<span class="tag ${v?"t-real":"t-test"}">${esc(k.replace(/_/g," "))}</span>`).join(" ")}</p>
+  <p class="hint">Ads: <b>${esc(c.ads.provider)}</b> · Payments: <b>${esc(c.payments.mode)}</b> (Google Play ${c.payments.google_play?"on":"off"}, Stripe ${c.payments.stripe?"on":"off"}, App Store ${c.payments.apple?"on":"off"})</p></div>`;
+}
+function features(){
+  $("#view").innerHTML = `<div class="card"><h2>Features</h2><p class="hint">Each switch takes effect for players within a minute, no app update needed.</p>
+  ${Object.entries(FEAT).map(([k,t]) => `<label class="row"><span>${t}</span>${sw("features."+k, data.config.features[k])}</label>`).join("")}</div>${saveBar}`;
+}
+function economy(){
+  $("#view").innerHTML = `<div class="card"><h2>Prices & rewards (coins)</h2><p class="hint">Rule of thumb: one rewarded ad ≈ one extra try; a hint ≈ 1.5 tries; a skip ≈ 5 tries. Keep the free path generous; sell convenience.</p>
+  ${Object.entries(ECO).map(([k,t]) => `<label class="row"><span>${t}</span><input type="number" min="0" step="1" data-p="economy.${k}" value="${data.config.economy[k]}"></label>`).join("")}</div>${saveBar}`;
+}
+function ads(){
+  const a = data.config.ads;
+  $("#view").innerHTML = `<div class="card"><h2>Ads</h2><p class="hint"><b>house</b> = built-in placeholder ad (works now, earns nothing). <b>h5</b> = Google H5 Games Ads in the browser (needs an approved AdSense account). <b>admob</b> = Google AdMob in the Android app (needs the AdMob app + ad units).</p>
+  <label class="row"><span>Provider</span><select data-p="ads.provider">${["house","h5","admob"].map((p) => `<option ${a.provider===p?"selected":""}>${p}</option>`).join("")}</select></label>
+  <label class="row"><span>H5 Games Ads client id<small>ca-pub-…</small></span><input class="wide" type="text" data-p="ads.h5_client_id" value="${esc(a.h5_client_id)}"></label>
+  <label class="row"><span>H5 test mode<small>Google shows test ads; nothing is earned</small></span>${sw("ads.h5_test_mode", a.h5_test_mode)}</label>
+  <label class="row"><span>AdMob app id</span><input class="wide" type="text" data-p="ads.admob_app_id" value="${esc(a.admob_app_id)}"></label>
+  <label class="row"><span>AdMob rewarded unit id</span><input class="wide" type="text" data-p="ads.admob_rewarded_unit" value="${esc(a.admob_rewarded_unit)}"></label>
+  <label class="row"><span>AdMob interstitial unit id</span><input class="wide" type="text" data-p="ads.admob_interstitial_unit" value="${esc(a.admob_interstitial_unit)}"></label>
+  <label class="row"><span>Interstitial every N levels</span><input type="number" min="1" data-p="ads.interstitial_every_levels" value="${a.interstitial_every_levels}"></label>
+  <label class="row"><span>Estimated eCPM, rewarded (USD)<small>for the ledger estimate only; the network's report is the truth</small></span><input type="number" min="0" step="0.1" data-p="ads.est_ecpm_rewarded_usd" value="${a.est_ecpm_rewarded_usd}"></label>
+  <label class="row"><span>Estimated eCPM, interstitial (USD)</span><input type="number" min="0" step="0.1" data-p="ads.est_ecpm_interstitial_usd" value="${a.est_ecpm_interstitial_usd}"></label>
+  </div>${saveBar}`;
+}
+function store(){
+  const p = data.config.payments;
+  $("#view").innerHTML = `<div class="card"><h2>Payments</h2>
+  <label class="row"><span>Mode<small>test: free purchases marked TEST · live: real stores only</small></span><select data-p="payments.mode"><option ${p.mode==="test"?"selected":""}>test</option><option ${p.mode==="live"?"selected":""}>live</option></select></label>
+  <label class="row"><span>Google Play billing (Android)<small>package ${esc(data.android_package)}; product ids below must exist in Play Console → Monetise → In-app products</small></span>${sw("payments.google_play", p.google_play)}</label>
+  <label class="row"><span>Stripe card checkout (web / PWA)</span>${sw("payments.stripe", p.stripe)}</label>
+  <label class="row"><span>App Store (iOS)<small>needs the Apple developer account</small></span>${sw("payments.apple", p.apple)}</label>
+  <label class="row"><span>Currency</span><input type="text" data-p="payments.currency" value="${esc(p.currency)}"></label>
+  </div>
+  <div class="card"><h2>Stripe keys</h2><p class="hint">Stored server-side, never shown again in full. Webhook URL: <code>${location.origin}/stripe/webhook</code> (events: checkout.session.completed, charge.refunded).</p>
+  <label class="row"><span>Secret key<small>${esc(data.secrets.stripe_secret_key) || "not set"}</small></span><input class="wide" type="password" id="sk" placeholder="sk_live_… or sk_test_…"></label>
+  <label class="row"><span>Webhook signing secret<small>${esc(data.secrets.stripe_webhook_secret) || "not set"}</small></span><input class="wide" type="password" id="wh" placeholder="whsec_…"></label>
+  <div style="text-align:right"><button class="sec" onclick="saveSecrets()">Save keys</button></div></div>
+  <div class="card"><h2>Products</h2><p class="hint">The same ids are used in Google Play (and later the App Store). Prices here are what the shop shows and what the ledger books; store prices are set in each store's console.</p>
+  <div class="scroll"><table id="prod"><tr><th>Id</th><th>Title</th><th class="num">Coins</th><th class="num">No-ads days</th><th class="num">Price USD</th><th>Badge</th><th>Once</th><th>Active</th><th></th></tr>
+  ${data.config.products.map((x,i) => prodRow(x,i)).join("")}</table></div>
+  <button class="sec" onclick="addProd()">+ Add product</button></div>${saveBar.replace("save()","saveProducts()")}`;
+}
+function prodRow(x,i){ return `<tr data-i="${i}"><td><input type="text" value="${esc(x.id)}" data-f="id"></td><td><input class="wide" type="text" value="${esc(x.title)}" data-f="title"></td><td class="num"><input type="number" min="0" value="${x.coins}" data-f="coins"></td><td class="num"><input type="number" min="0" value="${x.no_ads_days}" data-f="no_ads_days"></td><td class="num"><input type="number" min="0" step="0.01" value="${x.price_usd}" data-f="price_usd"></td><td><input type="text" value="${esc(x.badge||"")}" data-f="badge"></td><td><input type="checkbox" ${x.once?"checked":""} data-f="once"></td><td><input type="checkbox" ${x.active?"checked":""} data-f="active"></td><td><button class="sec danger" onclick="this.closest('tr').remove()">✕</button></td></tr>`; }
+function addProd(){ $("#prod").insertAdjacentHTML("beforeend", prodRow({id:"new_product",title:"New product",coins:100,no_ads_days:0,price_usd:0.99,active:false},999)); }
+async function saveProducts(){ data.config.products = [...document.querySelectorAll("#prod tr[data-i]")].map((tr) => { const o = {}; tr.querySelectorAll("[data-f]").forEach((el) => o[el.dataset.f] = el.type==="checkbox" ? el.checked : el.type==="number" ? Number(el.value) : el.value.trim()); return o; }); await save(); }
+async function saveSecrets(){ const b = {}; if ($("#sk").value) b.stripe_secret_key = $("#sk").value; if ($("#wh").value) b.stripe_webhook_secret = $("#wh").value; try { await api("PUT","/secrets",b); data = await api("GET","/economy"); toast("Keys saved"); store(); } catch(e){ toast(e.message); } }
+async function ledger(){
+  $("#view").innerHTML = `<div class="card"><h2>Loading…</h2></div>`;
+  const days = Number(sessionStorage.getItem("ldays") || 30);
+  const l = await api("GET","/ledger?days=" + days);
+  const kind = (e) => e.test ? `<span class="tag t-test">TEST</span>` : e.estimated ? `<span class="tag t-est">estimate</span>` : `<span class="tag t-real">real</span>`;
+  $("#view").innerHTML = `<div class="card"><h2>Earnings ledger</h2><p class="hint"><span class="tag t-real">real</span> verified store payments · <span class="tag t-est">estimate</span> ad views × your eCPM estimate (check the ad network's report for the truth) · <span class="tag t-test">TEST</span> test mode, not money.</p>
+  <label>Period <select onchange="sessionStorage.setItem('ldays',this.value);ledger()">${[7,30,90,365].map((d) => `<option ${d===days?"selected":""} value="${d}">last ${d} days</option>`).join("")}</select></label>
+  <div class="grid" style="margin-top:12px"><div class="kpi"><span>Real</span><b>${usd(l.totals.real)}</b></div><div class="kpi"><span>Estimated (ads)</span><b>${usd(l.totals.estimated)}</b></div><div class="kpi"><span>Test</span><b>${usd(l.totals.test)}</b></div></div></div>
+  <div class="card"><h2>By day</h2><div class="scroll"><table><tr><th>Date</th><th class="num">Real</th><th class="num">Estimated</th><th class="num">Test</th><th class="num">Ad views</th><th class="num">Purchases</th></tr>
+  ${Object.entries(l.by_day).sort((a,b) => a[0] < b[0] ? 1 : -1).map(([d,v]) => `<tr><td>${d}</td><td class="num">${usd(v.real)}</td><td class="num">${usd(v.estimated)}</td><td class="num">${usd(v.test)}</td><td class="num">${v.ads}</td><td class="num">${v.purchases}</td></tr>`).join("") || `<tr><td colspan="6">Nothing yet</td></tr>`}</table></div></div>
+  <div class="card"><h2>By source</h2><div class="scroll"><table><tr><th>Source : type</th><th class="num">Count</th><th class="num">Real</th><th class="num">Estimated</th><th class="num">Test</th></tr>
+  ${Object.entries(l.by_source).map(([k,v]) => `<tr><td>${esc(k)}</td><td class="num">${v.count}</td><td class="num">${usd(v.real)}</td><td class="num">${usd(v.estimated)}</td><td class="num">${usd(v.test)}</td></tr>`).join("") || `<tr><td colspan="5">Nothing yet</td></tr>`}</table></div></div>
+  <div class="card"><h2>Coin flow</h2><div class="scroll"><table><tr><th>Type</th><th class="num">Coins</th></tr>${Object.entries(l.coins.by_type).map(([k,v]) => `<tr><td>${esc(k)}</td><td class="num">${v}</td></tr>`).join("")}</table></div></div>
+  <div class="card"><h2>Latest entries</h2><div class="scroll"><table><tr><th>Time (UTC)</th><th>Type</th><th>Source</th><th>Product</th><th>Player</th><th class="num">Amount</th><th>Kind</th></tr>
+  ${l.entries.map((e) => `<tr><td>${esc(e.ts.slice(0,16).replace("T"," "))}</td><td>${esc(e.type)}</td><td>${esc(e.source)}</td><td>${esc(e.product)}</td><td>${esc(e.device)}</td><td class="num">${usd(e.amount_usd)}</td><td>${kind(e)}</td></tr>`).join("") || `<tr><td colspan="7">Nothing yet</td></tr>`}</table></div></div>`;
+}
+async function players(){
+  const s = await api("GET","/stats");
+  $("#view").innerHTML = `<div class="card"><h2>Test users</h2><p class="hint">Twelve demo players with names, flags, Daily scores (today and yesterday) and campaign progress, so the leaderboards look alive while testing. Currently: <b>${s.test_users}</b>. Remove them before launch.</p>
+  <button class="sec" onclick="seed()">Add / refresh test users</button> <button class="sec danger" onclick="unseed()">Remove test users</button></div>
+  <div class="card"><h2>Give coins</h2><p class="hint">Support tool: credit (or debit with a negative number) a player's wallet. Needs the player's device id (Settings → About in the game).</p>
+  <label class="row"><span>Device id</span><input class="wide" type="text" id="gdev"></label><label class="row"><span>Coins</span><input type="number" id="gcoins" value="100"></label>
+  <div style="text-align:right"><button class="sec" onclick="grant()">Grant</button></div></div>`;
+}
+async function seed(){ try { const r = await api("POST","/test-users"); toast("Test users ready: " + r.made.length); players(); } catch(e){ toast(e.message); } }
+async function unseed(){ try { const r = await api("DELETE","/test-users"); toast("Removed " + r.removed + " records"); players(); } catch(e){ toast(e.message); } }
+async function grant(){ try { const r = await api("POST","/grant",{device_id:$("#gdev").value.trim(), coins:Number($("#gcoins").value)}); toast("Wallet now " + r.wallet.coins + " coins"); } catch(e){ toast(e.message); } }
+if (token) start().catch(() => logout());
+</script>
+</body>
+</html>
