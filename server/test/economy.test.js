@@ -20,11 +20,17 @@ const fakePlay = async (pkg, product, token) => {
 };
 const consumed = [];
 const sentPush = [];
+const earlyEvents = [];
 const fakeFcm = {
   async subscribe() { return { ok: true }; },
   async unsubscribe() { return { ok: true }; },
   async sendTopic() { return { ok: true, id: "x" }; },
-  async sendEach(msgs) { sentPush.push(...msgs); return msgs.map((m) => (m.token.endsWith("dead") ? { ok: false, error: "messaging/registration-token-not-registered" } : { ok: true })); },
+  async sendEach(msgs) {
+    sentPush.push(...msgs);
+    // A fast phone: reports "received" before sendEach returns (the record must already exist).
+    for (const m of msgs) if (!m.token.endsWith("dead")) earlyEvents.push(await fetch(base + "/push/event", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ rcpt: m.data.rcpt, event: "received" }) }).then((r) => r.json()));
+    return msgs.map((m) => (m.token.endsWith("dead") ? { ok: false, error: "messaging/registration-token-not-registered" } : { ok: true }));
+  },
 };
 const stripeCalls = [];
 const fakeFetch = async (url, opts) => { stripeCalls.push([url, String(opts.body)]); return { ok: true, json: async () => ({ url: "https://checkout.stripe.test/s1" }) }; };
@@ -156,12 +162,17 @@ test("stripe: checkout needs keys; webhook only with a valid signature", async (
   const s = await j("POST", "/purchase/stripe", { device_id: A, product: "coins_200" });
   assert.equal(s.status, 200);
   assert.equal(s.body.url, "https://checkout.stripe.test/s1");
-  const ev = { type: "checkout.session.completed", livemode: false, data: { object: { id: "cs_1", payment_status: "paid", amount_total: 99, metadata: { device_id: A, product: "coins_200" } } } };
+  const ev = { type: "checkout.session.completed", livemode: false, data: { object: { id: "cs_1", payment_status: "paid", amount_total: 99, metadata: { device_id: A, product: "coins_200", coins: "200", no_ads_days: "0", once: "0" } } } };
+  assert.ok(stripeCalls.at(-1)[1].includes("metadata%5Bcoins%5D=200"), "checkout carries the entitlement snapshot");
   const raw = JSON.stringify(ev);
   const t = Math.floor(Date.now() / 1000);
   const sig = createHmac("sha256", "whsec_test").update(`${t}.${raw}`).digest("hex");
   const bad = await fetch(base + "/stripe/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": `t=${t},v1=00` }, body: raw });
   assert.equal(bad.status, 400);
+  // The product is switched off after checkout started: the paid session must still be fulfilled.
+  const cfg2 = (await j("GET", "/admin/economy", null, ADMIN)).body.config;
+  cfg2.products = cfg2.products.map((x) => (x.id === "coins_200" ? { ...x, active: false } : x));
+  await j("PUT", "/admin/economy", { config: cfg2 }, ADMIN);
   const coinsBefore = (await j("POST", "/wallet", { device_id: A })).body.wallet.coins;
   const ok = await fetch(base + "/stripe/webhook", { method: "POST", headers: { "content-type": "application/json", "stripe-signature": `t=${t},v1=${sig}` }, body: raw });
   assert.equal(ok.status, 200);
@@ -228,7 +239,8 @@ test("push campaign to selected players: sent / received / opened tracked", asyn
   assert.equal(r.body.failed, 1);
   const msgA = sentPush.find((m) => m.token.startsWith("tokA"));
   assert.match(msgA.data.rcpt, /^[a-f0-9]{24}$/);
-  assert.equal((await j("POST", "/push/event", { rcpt: msgA.data.rcpt, event: "received" })).body.counted, true);
+  assert.equal(earlyEvents[0].counted, true, "receipt reported before sendEach returned is counted");
+  assert.equal((await j("POST", "/push/event", { rcpt: msgA.data.rcpt, event: "received" })).body.counted, false, "counted once");
   assert.equal((await j("POST", "/push/event", { rcpt: msgA.data.rcpt, event: "opened" })).body.counted, true);
   assert.equal((await j("POST", "/push/event", { rcpt: msgA.data.rcpt, event: "opened" })).body.counted, false, "counted once");
   const list = await j("GET", "/admin/campaigns", null, ADMIN);

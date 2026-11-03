@@ -178,6 +178,11 @@ export function mountOps(app, admin, { fcm, rateLimited, publicId }) {
     let sent = 0, failed = 0;
     for (let i = 0; i < msgs.length; i += 500) {
       const chunk = msgs.slice(i, i + 500);
+      // Reserve the recipient records BEFORE sending: a phone can report "received" (or the player can
+      // open it) before sendEach returns, and that event needs a record to land on (Codex PR #9).
+      const pre = db.batch();
+      chunk.forEach(({ d, rcpt }) => pre.set(R().doc(rcpt), { campaign: id, device_id: d.id, name: d.name || "", sent: null, error: "", sent_at: "" }));
+      await pre.commit();
       const results = await fcm.sendEach(chunk.map(({ d, rcpt }) => ({
         token: d.fcm_token, notification: { title: campaign.title, body: campaign.body },
         data: { kind: "campaign", campaign: id, rcpt },
@@ -188,7 +193,7 @@ export function mountOps(app, admin, { fcm, rateLimited, publicId }) {
       chunk.forEach(({ d, rcpt }, k) => {
         const r = results[k] || { ok: false, error: "no result" };
         if (r.ok) sent++; else failed++;
-        batch.set(R().doc(rcpt), { campaign: id, device_id: d.id, name: d.name || "", sent: r.ok, error: r.ok ? "" : String(r.error || "").slice(0, 120), sent_at: new Date().toISOString() });
+        batch.set(R().doc(rcpt), { sent: r.ok, error: r.ok ? "" : String(r.error || "").slice(0, 120), sent_at: new Date().toISOString() }, { merge: true });
         // A token FCM says is dead will never work again: stop using it.
         if (!r.ok && /registration-token-not-registered|invalid-registration-token/.test(String(r.error))) batch.update(D().doc(d.id), { push_enabled: false });
       });

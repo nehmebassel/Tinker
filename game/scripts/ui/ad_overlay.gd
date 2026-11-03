@@ -37,6 +37,9 @@ static func play(root: Node, p_rewarded: bool, _what: String) -> bool:
 
 
 func _ready() -> void:
+	if has_node("/root/App"):
+		App.modal_open += 1
+		tree_exiting.connect(func() -> void: App.modal_open = maxi(0, App.modal_open - 1))
 	layer = 100
 	var dim := ColorRect.new()
 	dim.color = Color(0.06, 0.04, 0.12, 0.92)

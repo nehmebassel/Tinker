@@ -164,7 +164,9 @@ Google Play (now) and the App Store (later); publish to Google Play on the perso
 - [x] Listing pack `docs/play/` (texts, Data safety / content rating / target audience answers, products, icon 512, feature graphic, 5 screenshots 1080×1920); AAB versionCode bug found and fixed (a yymmddHHMM code overflowed int32 → Godot fell back to 1; now minutes since 2026 + 1,000,000, verified inside the bundle)
 - [x] Codex PR #9: Play purchase was consumed before the credit (paid, nothing received if the process died in between) → consume only after the credit is stored; unconsumed purchases are re-sent by the app; a skipped level then solved for real kept the skip forever → real solve replaces it (+5 unit checks); house-ad fallback was booked as H5 revenue → `Ads.last_provider`
 - [x] Play Console: service account `tinker-api@…` invited to Tinker (view app info, financial data, manage orders, release to testing tracks), approved by Bassel; `tools/play_upload.py` (API upload as that account) written but blocked: the deploy identity needs Service Account Token Creator on `tinker-api` (IAM grant needs Bassel's OK). First AAB sent to Bassel to upload by hand.
-- [ ] Play Console: upload to internal testing, listing, app content, in-app products, service account access, closed test (12 testers × 14 days)
+- [x] Codex PR #9 round 2: Stripe purchase lost if the product was edited / switched off mid-checkout → entitlement snapshot in the session metadata; taps went through the shop / ad overlays into the level → `App.modal_open`; a fast "received" could beat the recipient record → records reserved before sending; double-tap Hint paid twice → in-flight guard
+- [x] First AAB uploaded to Play Console by Bassel (1441799)
+- [ ] Play Console: forms, closed test, R8 (red items), token creator grant (approved 21:43), listing, app content, in-app products, service account access, closed test (12 testers × 14 days)
 - [ ] Regression, PR, deploy
 
 ### M7 Store (not started)

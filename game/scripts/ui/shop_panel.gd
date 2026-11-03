@@ -26,6 +26,9 @@ static func open(parent: Node) -> ShopPanel:
 
 
 func _ready() -> void:
+	if has_node("/root/App"):
+		App.modal_open += 1
+		tree_exiting.connect(func() -> void: App.modal_open = maxi(0, App.modal_open - 1))
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var dim := ColorRect.new()

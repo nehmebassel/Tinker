@@ -16,6 +16,7 @@ var push: Push
 var audio: Audio
 var tries: Tries
 var sandbox_store: SandboxStore
+var modal_open: int = 0  # shop / ad overlays open: the level screen ignores touches meanwhile
 var economy := Economy.new()  # admin-console rules from GET /config (empty = everything paid off)
 var wallet: Wallet
 var ads: Ads

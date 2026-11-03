@@ -707,8 +707,9 @@ func _world_to_screen(p: Vector2) -> Vector2:
 ## events; a touch that starts on a Button is left alone. Mouse events are ignored on purpose:
 ## the project emulates touch from mouse, so desktop testing goes through the same path.
 func _input(event: InputEvent) -> void:
-	if (info_card != null and is_instance_valid(info_card)) or hud.has_node("SandboxSetup"):
-		return  # modal overlays (part card, sandbox setup) get the touches
+	if (info_card != null and is_instance_valid(info_card)) or hud.has_node("SandboxSetup") \
+			or (has_node("/root/App") and App.modal_open > 0):
+		return  # modal overlays (part card, sandbox setup, shop, ads) get the touches
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			if _on_hud_button(event.position):
@@ -1495,10 +1496,17 @@ func _offer_skip() -> void:
 	App.open_level(level_number + 1)
 
 
+var _hint_buying := false  # one hint purchase in flight at a time (a double tap must not pay twice)
+
+
 func _buy_hint() -> void:
-	if not _hint_available() or _hint_shown >= 0:
+	if not _hint_available() or _hint_shown >= 0 or _hint_buying:
 		return
+	_hint_buying = true
+	hint_btn.disabled = true
 	var r: Dictionary = await App.wallet.spend("hint", "c%d" % level_number)
+	_hint_buying = false
+	hint_btn.disabled = false
 	if not r["ok"]:
 		_no_coins(r)
 		return

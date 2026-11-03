@@ -514,6 +514,9 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
         "line_items[0][price_data][unit_amount]": String(Math.round(p.price_usd * 100)),
         "line_items[0][price_data][product_data][name]": "Tinker: " + p.title,
         "metadata[device_id]": d, "metadata[product]": p.id,
+        // The entitlement as sold: fulfilled from this snapshot even if the product is edited or
+        // switched off before the webhook arrives (Codex PR #9).
+        "metadata[coins]": String(p.coins || 0), "metadata[no_ads_days]": String(p.no_ads_days || 0), "metadata[once]": p.once ? "1" : "0",
       });
       const r = await fetchFn("https://api.stripe.com/v1/checkout/sessions", { method: "POST", body,
         headers: { Authorization: "Bearer " + sec.stripe_secret_key, "Content-Type": "application/x-www-form-urlencoded" } });
@@ -530,8 +533,11 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
       const cfg = await getEconomy();
       if (ev.type === "checkout.session.completed" && ev.data?.object?.payment_status === "paid") {
         const s = ev.data.object;
-        const p = findProduct(cfg, s.metadata?.product);
-        if (p && isDeviceId(s.metadata?.device_id)) {
+        const m = s.metadata || {};
+        // Fulfil what was sold (snapshot in the session), not today's catalog.
+        const p = m.coins !== undefined ? { id: String(m.product || "?"), coins: parseInt(m.coins, 10) || 0, no_ads_days: parseInt(m.no_ads_days, 10) || 0, once: m.once === "1" }
+          : cfg.products.find((x) => x.id === m.product);
+        if (p && isDeviceId(m.device_id)) {
           await creditPurchase(s.metadata.device_id, cfg, p, { source: "stripe", orderId: s.id, amountUsd: (s.amount_total || 0) / 100, test: !ev.livemode });
         }
       } else if (ev.type === "charge.refunded") {
