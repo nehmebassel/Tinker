@@ -213,6 +213,47 @@ current gear; `App.map_last_node` remembers where it was, so after a solve it ro
 next gear while the rail is laid. Animated decor per world (pendulum, meshing gears, Newton's cradle,
 pulley with counterweight). Music: `music_map.ogg` (Lyria, soothing, seed 411), also on the Sandbox screens.
 
+## Monetization, admin console, Google Play (2026-11-03)
+
+Requested by Bassel: tries refill per level; coins, hints, extra tries, skips, ads, no-ads, invites as the
+commercial path; everything switchable from an admin page only he can open; a ledger of ad and purchase
+earnings; Play Store billing and release; players / online / OS / push campaigns in the admin page.
+
+**Industry pattern used** (casual puzzle games): a soft currency (coins) earned generously by playing
+(first solves, the Daily, a daily login bonus with a streak, invites) and spent on convenience (an extra
+try, a full refill, a hint, a skip). Rewarded ads are opt-in (watch → a try or coins, capped per day);
+interstitials between levels are OFF by default (they hurt early retention) and are removed by a no-ads
+pass. Real money buys coin packs, no-ads passes (7 / 30 days / forever) and a one-time starter pack.
+
+**Server** (`server/src/economy.js`, `server/src/ops.js`): Firestore `settings/economy` holds every
+switch, price, reward, ad setting, product and the publisher info (defaults in `DEFAULTS`); `GET /config`
+serves the public part. Coins live server-side in `wallets/{device}` and move only inside Firestore
+transactions that also write the `ledger`. Store purchases are verified before credit: Google Play tokens
+with the Android Publisher API (then consumed), Stripe through Checkout + a signed webhook, Apple stubbed
+(501) until the account exists; TEST mode grants for free and books as TEST. Ad revenue in the ledger is
+an ESTIMATE (eCPM from the console); the ad network's report is the truth. Presence heartbeat (60 s) feeds
+online / daily activity / OS; push campaigns send per token and track sent / received / opened per
+recipient (`push_rcpt`).
+
+**Admin console** `/admin/ui` (static page, phone + desktop): token = Secret Manager `tinker-admin-token`;
+10 wrong tokens lock an address out for 10 minutes. Tabs: Overview, Players (online now, used today /
+date range, OS breakdown, select → give coins / notify), Push (compose, audience, dry run, history with
+open rate, per-player detail), Ledger, Features, Prices & rewards, Ads, Store (payments mode, Google Play
+/ Stripe / App Store, publisher info for /privacy, Stripe keys, products), Test users.
+
+**Client**: `Economy` (rules), `Wallet` (mirror of the server wallet), `Ads` (house placeholder /
+H5 Games Ads on web / AdMob later), `Store` (TEST / Play Billing via the TinkerPush plugin / Stripe),
+`CoinChip`, `ShopPanel`, `AdOverlay`, `BoardView` + `BoardDrawer` (slide-in leaderboard on the map).
+A try is spent when RUN is pressed; solving refills (switch). Hints = a see-through part of the level's
+reference solution (campaign only, never the Daily).
+
+**Battery** (`FramePacer`, low-processor mode, manual view transform, web DPR cap 2): idle screens render
+~12 frames/s instead of every frame. `--perf-probe` + a CI power check guard it.
+
+**Google Play**: target API 36, Billing Library 8.3 (Kotlin 2.2.10) inside the TinkerPush plugin; signed
+AAB from `tools/build_aab.sh` (upload key in Secret Manager); listing pack and form answers in
+`docs/play/LISTING.md`.
+
 ## World 4 "Rigging" and the level-design harness (2026-11-02)
 
 `game/tests/design_levels.gd` (not exported) takes a JSON list of candidate levels, checks each does NOT

@@ -161,7 +161,8 @@ Google Play (now) and the App Store (later); publish to Google Play on the perso
 - [x] Target API 36 (Play requirement since 2026-08-31), compileSdk / build-tools 36
 - [x] Upload key created in Secret Manager (`tinker-upload-keystore`, `tinker-upload-keystore-password`, approved by Bassel 21:14); `tools/build_aab.sh` → signed AAB (first: versionCode 2611031914, 0.2.0, 54 MB)
 - [x] Privacy policy page `/privacy` (publisher / contact / website from the admin console)
-- [ ] Listing pack + Play Console setup + closed testing
+- [x] Listing pack `docs/play/` (texts, Data safety / content rating / target audience answers, products, icon 512, feature graphic, 5 screenshots 1080×1920); AAB versionCode bug found and fixed (a yymmddHHMM code overflowed int32 → Godot fell back to 1; now minutes since 2026 + 1,000,000, verified inside the bundle)
+- [ ] Play Console: upload to internal testing, listing, app content, in-app products, service account access, closed test (12 testers × 14 days)
 - [ ] Regression, PR, deploy
 
 ### M7 Store (not started)
