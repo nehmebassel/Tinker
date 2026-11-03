@@ -74,6 +74,54 @@ func _ready() -> void:
 		_roll_to(_current)
 	App.map_last_node = _current
 	_scroll_to(_marble_off, false)
+	_drawer = BoardDrawer.new()
+	add_child(_drawer)
+	_toast_lbl = UiKit.label("", 36, UiKit.INK)
+	var ts := UiKit.style(Color("ffd43b"), 30)
+	_toast_lbl.add_theme_stylebox_override("normal", ts)
+	_toast_lbl.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_toast_lbl.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_toast_lbl.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_toast_lbl.offset_bottom = -60
+	_toast_lbl.visible = false
+	add_child(_toast_lbl)
+	_economy_on_arrival.call_deferred()
+
+
+var _drawer: BoardDrawer
+var _toast_lbl: Label
+
+
+## On the map: claim the daily login bonus (shown as a toast) and keep the campaign board up to date.
+func _economy_on_arrival() -> void:
+	if App.flow_test or App.settings.base_url() == "":
+		return
+	var pr := App.save.board_progress()
+	App.api.post_json("/progress", {"device_id": App.settings.device_id, "solved": pr["solved"], "parts": pr["parts"],
+		"name": App.settings.name, "country": Settings.country()})
+	if not App.economy.cfg.has("features"):
+		await App.economy_changed
+	if not is_inside_tree() or not App.economy.on("daily_bonus"):
+		return
+	if not App.wallet.synced:
+		await App.wallet.sync()
+	if App.wallet.bonus_today or not is_inside_tree():
+		return
+	var r: Dictionary = await App.wallet.claim_bonus()
+	if r["ok"] and is_inside_tree():
+		var st := int(App.wallet.streak)
+		_toast("Daily bonus: +%d coins%s" % [int(r.get("coins_added", 0)), (" · day %d streak" % st) if st > 1 else ""])
+		App.audio.sfx("goal")
+
+
+func _toast(t: String) -> void:
+	_toast_lbl.text = "  " + t + "  "
+	_toast_lbl.visible = true
+	_toast_lbl.modulate.a = 1.0
+	var tw := create_tween()
+	tw.tween_interval(2.6)
+	tw.tween_property(_toast_lbl, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(func() -> void: _toast_lbl.visible = false)
 
 
 func _build_top() -> void:
@@ -95,6 +143,7 @@ func _build_top() -> void:
 	var solved := UiKit.label("%d / %d solved" % [App.save.solved_count(), Campaign.level_count()], 32, Color(UiKit.PANEL_TXT, 0.8))
 	solved.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	h.add_child(solved)
+	h.add_child(CoinChip.make(112))
 	var gear := UiKit.button("Settings", UiKit.MUTED, UiKit.PANEL_TXT, 112)
 	gear.add_theme_font_size_override("font_size", 28)
 	gear.name = "SettingsButton"

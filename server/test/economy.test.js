@@ -36,7 +36,11 @@ before(async () => {
   server = createApp({ playVerify: fakePlay, fetchFn: fakeFetch, fcm: fakeFcm }).listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
 });
-after(() => server.close());
+after(async () => {
+  server.close();
+  // Leave no economy overrides behind: later suites (ci_daily's staging server) expect the defaults.
+  for (const c of ["settings"]) { const s = await db.collection(c).get(); await Promise.all(s.docs.map((d) => d.ref.delete())); }
+});
 
 const j = async (method, path, body, headers = {}) => {
   const r = await fetch(base + path, { method, headers: { "content-type": "application/json", ...headers }, body: body ? JSON.stringify(body) : undefined });

@@ -71,6 +71,26 @@ func record_solve(number: int, parts_used: int, elapsed_ms: int, solution: Array
 	return better
 
 
+## Skipped with coins (economy "skip"): counts as solved so the next level unlocks; no best score.
+func record_skip(number: int) -> void:
+	var key := str(number)
+	if not levels.get(key, {}).get("solved", false):
+		levels[key] = {"solved": true, "skipped": true, "best_parts": 0, "best_ms": 0, "solution": []}
+		save()
+
+
+## Campaign leaderboard numbers: levels solved (skips excluded) and the sum of best part counts.
+func board_progress() -> Dictionary:
+	var solved := 0
+	var parts := 0
+	for k in levels:
+		var e: Dictionary = levels[k]
+		if e.get("solved", false) and not e.get("skipped", false):
+			solved += 1
+			parts += int(e.get("best_parts", 0))
+	return {"solved": solved, "parts": parts}
+
+
 func reset() -> void:
 	levels = {}
 	save()

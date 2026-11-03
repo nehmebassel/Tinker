@@ -35,6 +35,7 @@ var board_date: String = ""
 var _nav_gen := 0  # bumped by every navigation; a slow async navigation checks it before switching
 var flow_test: bool = false
 var daily_test: String = ""
+var economy_test: bool = false  # --economy-flow (CI, against a staging server)
 var sandbox_test: String = ""  # "publish:<file to write the code>" or "play:<code>" (CI, two installs)  # --daily-flow=<solution.json>: CI test of the whole daily loop
 
 
@@ -85,6 +86,8 @@ func _ready() -> void:
 			sandbox_test = "play:" + a.trim_prefix("--sandbox-play=")
 		elif a.begins_with("--shot-ws="):
 			_shot_ws(a.trim_prefix("--shot-ws="))
+		elif a == "--economy-flow":
+			economy_test = true
 		elif a.begins_with("--perf-probe="):
 			_perf_probe(a.trim_prefix("--perf-probe="))
 	if OS.has_feature("web") and not flow_test and daily_test == "" and sandbox_test == "":
@@ -97,6 +100,8 @@ func _ready() -> void:
 		_run_flow()
 	elif sandbox_test != "":
 		_run_sandbox_flow.call_deferred()
+	elif economy_test:
+		_run_economy_flow.call_deferred()
 	elif daily_test != "":
 		_run_daily_flow.call_deferred()
 
@@ -526,3 +531,99 @@ func _run_sandbox_flow() -> void:
 		_flow_assert(ed != null and ed != ls and ed.mode == "edit" and ed.placements.size() == ref.fixed.size(), "Remix opens the editor with the layout")
 	print("SANDBOX %s" % ("PASS" if _flow_ok else "FAIL"))
 	get_tree().quit(0 if _flow_ok else 1)
+
+
+# ------------------------------------------------------------------ economy flow test (CI)
+## Against a staging server with test users seeded: daily bonus on the map, the board drawer, a TEST
+## purchase in the shop, out of tries -> rewarded (house) ad -> a try back, a try bought with coins,
+## a hint. Screenshots in build/shots/econ_*.png. Prints ECON PASS / ECON FAIL.
+func _run_economy_flow() -> void:
+	_flow_ok = true
+	save.reset()
+	tries.reset()
+	await get_tree().create_timer(0.5).timeout
+	if not economy.cfg.has("features"):
+		await economy_changed
+	_flow_assert(economy.on("coins") and economy.on("rewarded_ads") and economy.on("hints"), "economy config from the server")
+	# The game starts on the map, which claims the daily login bonus by itself.
+	var ws := await _wait_scene("WorldSelect", 300)
+	_flow_assert(ws != null, "map open")
+	for i in 900:
+		if wallet.bonus_today:
+			break
+		await get_tree().process_frame
+	await get_tree().create_timer(0.5).timeout
+	var expect := economy.num("start_coins") + economy.num("daily_bonus")
+	_flow_assert(wallet.bonus_today and wallet.coins == expect, "new wallet %d + daily bonus %d on the map = %d coins (got %d)" % [economy.num("start_coins"), economy.num("daily_bonus"), expect, wallet.coins])
+	var chip: Control = ws.find_child("CoinChip", true, false)
+	_flow_assert(chip != null and chip.visible, "coin chip visible")
+	var drawer: BoardDrawer = ws.find_child("BoardDrawer", true, false)
+	drawer.open("campaign")
+	for i in 600:
+		if drawer.view.loaded:
+			break
+		await get_tree().process_frame
+	await get_tree().create_timer(0.6).timeout
+	_flow_assert(drawer.view._list.get_child_count() >= 12, "campaign board lists the test users (%d rows)" % drawer.view._list.get_child_count())
+	await _shot_econ("econ_1_board.png")
+	drawer.close()
+	await get_tree().create_timer(0.5).timeout
+	var shop := ShopPanel.open(get_tree().current_scene)
+	await get_tree().create_timer(0.8).timeout
+	await _shot_econ("econ_2_shop.png")
+	var c0 := wallet.coins
+	var buy: Button = shop.find_child("Buy_coins_200", true, false)
+	_flow_assert(buy != null, "shop offers coins_200")
+	if buy:
+		buy.pressed.emit()
+		for i in 600:
+			if wallet.coins != c0:
+				break
+			await get_tree().process_frame
+	_flow_assert(wallet.coins == c0 + 200, "TEST purchase credited 200 coins (%d)" % wallet.coins)
+	shop.close()
+	open_level(1)
+	var ls := await _wait_scene("LevelScreen", 300)
+	_flow_assert(ls != null, "level 1 open")
+	await get_tree().create_timer(0.5).timeout
+	for i in tries.limit:
+		tries.use(int(Time.get_unix_time_from_system()))
+	ls._show_out_of_tries()
+	await get_tree().create_timer(0.4).timeout
+	await _shot_econ("econ_3_offers.png")
+	var ad: Button = ls.find_child("OfferAd", true, false)
+	_flow_assert(ad != null, "out of tries offers a rewarded ad")
+	if ad:
+		ad.pressed.emit()
+		await get_tree().create_timer(1.0).timeout
+		await _shot_econ("econ_4_ad.png")
+		await get_tree().create_timer(5.0).timeout
+		var close: Button = get_tree().root.find_child("AdClose", true, false)
+		_flow_assert(close != null, "house ad shows a close button")
+		if close:
+			close.pressed.emit()
+		await get_tree().create_timer(2.0).timeout
+	_flow_assert(tries.left(int(Time.get_unix_time_from_system())) == 1, "watching the ad gave a try back")
+	for i in 1:
+		tries.use(int(Time.get_unix_time_from_system()))
+	ls._show_out_of_tries()
+	await get_tree().create_timer(0.3).timeout
+	var c1 := wallet.coins
+	var buytry: Button = ls.find_child("OfferTry", true, false)
+	if buytry:
+		buytry.pressed.emit()
+		await get_tree().create_timer(2.0).timeout
+	_flow_assert(tries.left(int(Time.get_unix_time_from_system())) == 1 and wallet.coins == c1 - economy.num("extra_try_cost"), "bought a try with coins (tries %d, coins %d -> %d, button %s)" % [tries.left(int(Time.get_unix_time_from_system())), c1, wallet.coins, buytry != null])
+	var c2 := wallet.coins
+	await ls._buy_hint()
+	await get_tree().create_timer(0.6).timeout
+	_flow_assert(ls.find_child("HintGhost", true, false) != null and wallet.coins == c2 - economy.num("hint_cost"), "hint shows a part for coins")
+	await _shot_econ("econ_5_hint.png")
+	print("ECON %s" % ("PASS" if _flow_ok else "FAIL"))
+	get_tree().quit(0 if _flow_ok else 1)
+
+
+func _shot_econ(file: String) -> void:
+	await get_tree().process_frame
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://").path_join("../build/shots"))
+	get_viewport().get_texture().get_image().save_png(ProjectSettings.globalize_path("res://").path_join("../build/shots/" + file))

@@ -46,3 +46,14 @@ XDG_DATA_HOME=$B timeout 300 xvfb-run -a -s "-screen 0 1200x2100x24" godot --pat
   --quit-after 12000 -- --server=http://127.0.0.1:8090 --sandbox-play=$CODE 2>&1 | tee /tmp/sbB.log | grep -E "ok  |FAIL|SANDBOX"
 grep -q "SANDBOX PASS" /tmp/sbB.log
 rm -rf "$A" "$B"
+
+echo "== economy: daily bonus, board drawer with test users, TEST purchase, rewarded ad -> try, try for coins, hint"
+curl -fsS -X POST -H "x-admin-token: ci-admin" http://127.0.0.1:8090/admin/test-users >/dev/null
+E=$(mktemp -d)
+XDG_DATA_HOME=$E timeout 300 xvfb-run -a -s "-screen 0 1200x2100x24" godot --path game --rendering-driver opengl3 --resolution 540x960 \
+  --quit-after 12000 -- --server=http://127.0.0.1:8090 --economy-flow 2>&1 | tee /tmp/econ.log | grep -E "ok  |FAIL|ECON|SCRIPT ERROR"
+grep -q "ECON PASS" /tmp/econ.log
+# The ledger saw the TEST purchase and the house ad, and the admin console page is served.
+curl -fsS -H "x-admin-token: ci-admin" "http://127.0.0.1:8090/admin/ledger?days=1" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['totals']['test']>=0.99, d['totals']; print('ledger ok', d['totals'])"
+curl -fsS http://127.0.0.1:8090/admin/ui | grep -q "Tinker admin"
+rm -rf "$E"

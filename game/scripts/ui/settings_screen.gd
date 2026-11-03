@@ -97,7 +97,15 @@ func _ready() -> void:
 	_status = UiKit.label("", 30)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_status)
-	v.add_child(UiKit.label("Device %s · %s" % [App.settings.device_id.substr(0, 8), Settings.country()], 26, Color(UiKit.INK, 0.6)))
+	# Support: the full device id (the admin console finds a player by it) — tap to copy.
+	var dev := UiKit.button("Device id: %s  (tap to copy) · %s" % [App.settings.device_id, Settings.country()], Color("efe7d6"), Color(UiKit.INK, 0.7), 80)
+	dev.name = "DeviceId"
+	dev.add_theme_font_size_override("font_size", 22)
+	dev.clip_text = true
+	dev.pressed.connect(func() -> void:
+		DisplayServer.clipboard_set(App.settings.device_id)
+		_status.text = "Device id copied.")
+	v.add_child(dev)
 
 
 func _volume_row(title: String, key: String, node_name: String) -> Control:

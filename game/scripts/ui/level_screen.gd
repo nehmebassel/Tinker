@@ -96,6 +96,10 @@ var again_btn: Button
 var tries_badge: Control  # hearts in the top bar
 var tries_lbl: Label  # refill countdown next to the hearts
 var _out_of_tries := false
+var hint_btn: Button
+var offers: VBoxContainer
+var _hint_ghost: Node2D
+var _hint_shown := -1  # index in the reference solution of the hinted part
 var _rope_preview: Dictionary = {}  # while dragging a rope: {"a": snap point, "b": target} (see rope.gd)
 const RopeScript := preload("res://scripts/parts/rope.gd")
 const ROPE_MAGNET_CELLS := 3.0  # a dragged rope end jumps to a snap point this close
@@ -240,6 +244,10 @@ func _build_scene() -> void:
 	tries_lbl = _label("", 24, Color(C_PANEL_TXT, 0.75))
 	tries_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row1.add_child(tries_lbl)
+	if has_node("/root/App"):
+		var chip := CoinChip.make(72)
+		chip.custom_minimum_size.x = 170
+		row1.add_child(chip)
 	counter_lbl = _label("", 30, Color(C_PANEL_TXT, 0.8))
 	counter_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row1.add_child(counter_lbl)
@@ -329,6 +337,12 @@ func _build_scene() -> void:
 	play_btn.add_theme_color_override("font_color", C_INK)
 	play_btn.pressed.connect(_toggle_play)
 	play_btn.set_meta("no_tap", true)  # has its own start / rewind sound
+	hint_btn = _button("Hint", BTN)
+	hint_btn.name = "HintButton"
+	hint_btn.add_theme_font_size_override("font_size", 30)
+	hint_btn.pressed.connect(_buy_hint)
+	hint_btn.visible = false
+	side.add_child(hint_btn)
 	side.add_child(play_btn)
 
 	toast_lbl = _label("", 36, C_PANEL_TXT)
@@ -397,7 +411,10 @@ func _build_scene() -> void:
 	next_btn.add_theme_stylebox_override("normal", _round_style(C_GO))
 	next_btn.add_theme_stylebox_override("hover", _round_style(C_GO))
 	next_btn.add_theme_color_override("font_color", C_INK)
-	next_btn.pressed.connect(func() -> void: App.open_level(level_number + 1))
+	next_btn.pressed.connect(func() -> void:
+		next_btn.disabled = true
+		await App.ads.maybe_interstitial()
+		App.open_level(level_number + 1))
 	row.add_child(next_btn)
 	submit_btn = _button("Submit", BTN)
 	submit_btn.add_theme_stylebox_override("normal", _round_style(C_GO))
@@ -422,6 +439,12 @@ func _build_scene() -> void:
 	row.add_child(edit_btn)
 	for b in [publish_btn, copy_btn, remix_btn, edit_btn]:
 		b.visible = false
+	# Economy offers (admin console decides which exist): shown on failure / out of tries.
+	offers = VBoxContainer.new()
+	offers.name = "Offers"
+	offers.add_theme_constant_override("separation", 14)
+	offers.visible = false
+	rv2.add_child(offers)
 
 
 func _label(text: String, size: int, color: Color) -> Label:
@@ -604,6 +627,7 @@ func _refresh_hud() -> void:
 	rot_btn.disabled = selected < 0 or not editing
 	rot90_btn.disabled = rot_btn.disabled
 	setup_btn.visible = mode == "edit" and editing
+	hint_btn.visible = editing and _hint_available() and _hint_shown < 0
 	var sk := _state_key(placements[selected].part) if selected >= 0 and selected < placements.size() else ""
 	state_btn.visible = mode == "edit" and editing and sk != ""
 	if state_btn.visible:
@@ -1251,6 +1275,9 @@ func _on_run_finished(outcome: Dictionary) -> void:
 		b.visible = false
 	match outcome["result"]:
 		"goal":
+			offers.visible = false
+			_clear_hint()
+			_reward_solve()
 			result_face.visible = false
 			again_btn.disabled = false
 			_out_of_tries = false
@@ -1308,6 +1335,7 @@ func _show_failure(why: String) -> void:
 		_out_of_tries = true
 		again_btn.disabled = false
 		_update_out_of_tries_text(head + "\nThe goal wasn't reached.")
+	_build_offers()
 	result_panel.visible = true
 	again_btn.queue_redraw()
 	tries_badge.queue_redraw()
@@ -1321,6 +1349,7 @@ func _show_out_of_tries() -> void:
 	_out_of_tries = true
 	again_btn.disabled = false
 	_update_out_of_tries_text("Out of tries.")
+	_build_offers()
 	result_panel.visible = true
 
 
@@ -1328,6 +1357,182 @@ func _update_out_of_tries_text(head: String) -> void:
 	var wait := App.tries.seconds_to_refill(_now()) if _has_app() else 0
 	result_lbl.set_meta("head", head)
 	result_lbl.text = "%s\nNew tries in %s\nYou can keep building meanwhile." % [head, Tries.fmt_wait(wait)]
+
+
+# ------------------------------------------------------------------ economy (coins, ads, hints, skip)
+
+func _eco() -> bool:
+	return has_node("/root/App") and mode in ["campaign", "daily"]
+
+
+## Hints exist for campaign levels (their reference solution ships with the game); never for the
+## Daily (its solution stays on the server, and the board must stay fair).
+func _hint_available() -> bool:
+	return _eco() and mode == "campaign" and level_number > 0 and App.economy.on("hints") \
+		and level != null and not level.reference_solution.is_empty()
+
+
+## Solving: a new level starts with full tries (admin switch), and the first solve of a campaign
+## level pays coins.
+func _reward_solve() -> void:
+	if not _eco():
+		return
+	if App.economy.on("refill_tries_on_new_level"):
+		App.tries.refill()
+		tries_badge.queue_redraw()
+	if mode == "campaign" and level_number > 0 and App.economy.on("coins"):
+		var r: Dictionary = await App.wallet.earn_campaign(level_number)
+		if r["ok"]:
+			_toast("+%d coins" % int(r.get("coins_added", 0)))
+
+
+func _build_offers() -> void:
+	for c in offers.get_children():
+		offers.remove_child(c)  # now, not at frame end: the new buttons reuse the same names
+		c.queue_free()
+	offers.visible = false
+	if not _eco():
+		return
+	var eco := App.economy
+	var rows := []
+	if _out_of_tries:
+		if eco.on("rewarded_ads"):
+			var n := eco.num("ad_reward_tries", 1)
+			rows.append(_offer("OfferAd", "Watch an ad: +%d tr%s" % [n, "y" if n == 1 else "ies"], -1, _offer_ad))
+		if eco.on("extra_tries"):
+			rows.append(_offer("OfferTry", "+1 try", eco.num("extra_try_cost"), _offer_spend.bind("extra_try")))
+			rows.append(_offer("OfferRefill", "Refill all tries", eco.num("refill_cost"), _offer_spend.bind("refill")))
+	if mode == "campaign" and level_number > 0:
+		if _hint_available() and _hint_shown < 0:
+			rows.append(_offer("OfferHint", "Hint: where a part goes", eco.num("hint_cost"), _offer_hint))
+		if eco.on("skip") and App.has_next(level_number):
+			rows.append(_offer("OfferSkip", "Skip this level", eco.num("skip_cost"), _offer_skip))
+	for r in rows:
+		offers.add_child(r)
+	offers.visible = not rows.is_empty()
+
+
+## cost < 0: free (an ad).
+func _offer(id: String, text: String, cost: int, cb: Callable) -> Button:
+	var b := _button(text + ("   ·   %d coins" % cost if cost >= 0 else "   ·   free"), 104)
+	b.name = id
+	b.add_theme_font_size_override("font_size", 30)
+	var fill := Color("ffd43b") if cost >= 0 else C_GO
+	b.add_theme_stylebox_override("normal", _round_style(fill))
+	b.add_theme_stylebox_override("hover", _round_style(fill))
+	b.add_theme_stylebox_override("pressed", _round_style(fill.darkened(0.2)))
+	b.add_theme_color_override("font_color", C_INK)
+	b.add_theme_color_override("font_hover_color", C_INK)
+	b.add_theme_color_override("font_pressed_color", C_INK)
+	if cost >= 0 and App.wallet.synced and App.wallet.coins < cost:
+		b.text = text + "   ·   needs %d coins" % cost
+	b.pressed.connect(func() -> void:
+		b.disabled = true
+		await cb.call()
+		if is_instance_valid(b):
+			b.disabled = false)
+	return b
+
+
+func _offer_ad() -> void:
+	if not await App.ads.show_rewarded("try"):
+		_toast("No reward: the ad was closed early")
+		return
+	var r: Dictionary = await App.wallet.ad_reward("try", App.ads.provider())
+	if not r["ok"]:
+		_toast(str(r["error"]))
+		return
+	_grant_tries(int(r.get("tries_added", 1)))
+
+
+func _offer_spend(item: String) -> void:
+	var ref := "c%d" % level_number if level_number > 0 else str(daily.get("date", ""))
+	var r: Dictionary = await App.wallet.spend(item, ref)
+	if not r["ok"]:
+		_no_coins(r)
+		return
+	_grant_tries(App.tries.limit if item == "refill" else 1)
+
+
+func _no_coins(r: Dictionary) -> void:
+	if int(r.get("status", 0)) == 402:
+		_toast("Not enough coins")
+		ShopPanel.open(get_tree().current_scene)
+	else:
+		_toast(str(r["error"]))
+
+
+func _grant_tries(n: int) -> void:
+	App.tries.add(n, _now())
+	_out_of_tries = false
+	tries_badge.queue_redraw()
+	App.audio.sfx("goal")
+	result_panel.visible = false
+	_stop_run()
+	var left := App.tries.left(_now())
+	_toast("%d tr%s left" % [left, "y" if left == 1 else "ies"])
+
+
+func _offer_hint() -> void:
+	result_panel.visible = false
+	_stop_run()
+	await _buy_hint()
+
+
+func _offer_skip() -> void:
+	var r: Dictionary = await App.wallet.spend("skip", "c%d" % level_number)
+	if not r["ok"]:
+		_no_coins(r)
+		return
+	App.save.record_skip(level_number)
+	if App.economy.on("refill_tries_on_new_level"):
+		App.tries.refill()
+	App.open_level(level_number + 1)
+
+
+func _buy_hint() -> void:
+	if not _hint_available() or _hint_shown >= 0:
+		return
+	var r: Dictionary = await App.wallet.spend("hint", "c%d" % level_number)
+	if not r["ok"]:
+		_no_coins(r)
+		return
+	_show_hint()
+
+
+## The hint: a see-through copy of one part of the reference solution at its cell and angle, gently
+## pulsing. It stays until the level is solved or left.
+func _show_hint() -> void:
+	var sol: Array = level.reference_solution
+	var pick := 0
+	for i in sol.size():
+		var placed := false
+		for p in placements:
+			placed = placed or (p.part == sol[i].part and p.cell == sol[i].cell and p.rot == sol[i].rot)
+		if not placed:
+			pick = i
+			break
+	_hint_shown = pick
+	var pl: Placement = sol[pick]
+	_hint_ghost = PartFactory.create(pl, 9100, false)
+	if _hint_ghost:
+		_hint_ghost.name = "HintGhost"
+		_hint_ghost.modulate = Color(1, 1, 1, 0.45)
+		_disable_collisions(_hint_ghost)
+		_hint_ghost.process_mode = Node.PROCESS_MODE_DISABLED
+		world.add_child(_hint_ghost)
+		var tw := create_tween().set_loops()
+		tw.tween_property(_hint_ghost, "modulate:a", 0.8, 0.7)
+		tw.tween_property(_hint_ghost, "modulate:a", 0.3, 0.7)
+	_toast("Hint: the %s goes here" % str(PartRegistry.get_def(pl.part).get("name", pl.part)).to_lower())
+	App.audio.sfx("place")
+	_refresh_hud()
+
+
+func _clear_hint() -> void:
+	if _hint_ghost and is_instance_valid(_hint_ghost):
+		_hint_ghost.queue_free()
+	_hint_ghost = null
 
 
 ## Tries count in the campaign and the Daily only: the editor, the author's test and shared
@@ -1713,6 +1918,8 @@ func _submit_daily() -> void:
 	submit_btn.text = "Checking…"
 	var r: Dictionary = await App.submit_daily(placements, _solve_ms)
 	if r["ok"] or r["status"] == 409:
+		if r["ok"] and App.economy.on("coins"):
+			await App.wallet.earn_daily(daily["date"])
 		App.open_board(daily["date"])
 		return
 	submit_btn.disabled = false
