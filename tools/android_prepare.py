@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Prepares Godot's Android Gradle build template (game/android/build, generated, not committed):
 1. puts Google's Maven Central mirror first (Maven Central rate-limits proxied/CI traffic);
-2. writes res/values/firebase.xml from the registered Firebase Android app, so FirebaseApp
+2. compileSdk / build tools 36 (Play's target API 36 requirement);
+3. writes res/values/firebase.xml from the registered Firebase Android app, so FirebaseApp
    initialises at process start and FCM can show notifications while the game is closed.
 The Firebase config is fetched by tools/build_clients.sh into build/firebase/google-services.json.
 """
@@ -11,6 +12,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TPL = os.path.join(ROOT, "game", "android", "build")
 MIRROR = 'maven { url "https://maven-central.storage-download.googleapis.com/maven2/" }'
 PACKAGE = "my.otono.tinker"
+
+# Google Play requires target API 36 (Android 16) for new apps and updates since 2026-08-31 (the preset
+# sets target_sdk 36); the template compiles against 35, so raise compileSdk to match.
+cfg = os.path.join(TPL, "config.gradle")
+c = open(cfg).read()
+c2 = re.sub(r"compileSdk(\s*):\s*\d+", r"compileSdk\1: 36", c)
+c2 = re.sub(r"buildTools(\s*):\s*'[\d.]+'", r"buildTools\1: '36.0.0'", c2)
+if c2 != c:
+    open(cfg, "w").write(c2)
 
 for name in ("build.gradle", "settings.gradle"):
     p = os.path.join(TPL, name)

@@ -69,6 +69,12 @@ export const DEFAULTS = {
     stripe_publishable_key: "",
     currency: "USD",
   },
+  legal: {
+    company: "OTONOMY",          // shown on /privacy and in the store listing
+    contact_email: "",           // privacy / support contact (required by Google Play); set in the console
+    website: "https://otono.my",
+    updated: "2026-11-03",
+  },
   products: [
     { id: "coins_200", title: "Handful of coins", coins: 200, no_ads_days: 0, price_usd: 0.99, active: true },
     { id: "coins_1200", title: "Bag of coins", coins: 1200, no_ads_days: 0, price_usd: 4.99, active: true, badge: "Popular" },
@@ -131,6 +137,7 @@ export function publicEconomy(cfg) {
       admob_interstitial_unit: cfg.ads.admob_interstitial_unit, interstitial_every_levels: cfg.ads.interstitial_every_levels,
     },
     payments: { mode: cfg.payments.mode, google_play: cfg.payments.google_play, stripe: cfg.payments.stripe, apple: cfg.payments.apple, currency: cfg.payments.currency },
+    legal: { company: cfg.legal.company, contact_email: cfg.legal.contact_email, website: cfg.legal.website },
     products: cfg.products.filter((p) => p.active).map(({ id, title, coins, no_ads_days, price_usd, badge, once }) => ({ id, title, coins, no_ads_days, price_usd, badge: badge || "", once: Boolean(once) })),
   };
 }

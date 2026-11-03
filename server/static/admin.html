@@ -139,6 +139,12 @@ function store(){
   <label class="row"><span>App Store (iOS)<small>needs the Apple developer account</small></span>${sw("payments.apple", p.apple)}</label>
   <label class="row"><span>Currency</span><input type="text" data-p="payments.currency" value="${esc(p.currency)}"></label>
   </div>
+  <div class="card"><h2>Publisher (privacy policy & store)</h2><p class="hint">Shown on <a href="/privacy" target="_blank">/privacy</a> — the privacy policy URL for Google Play and the App Store.</p>
+  <label class="row"><span>Company</span><input class="wide" type="text" data-p="legal.company" value="${esc(data.config.legal.company)}"></label>
+  <label class="row"><span>Contact email<small>required by Google Play; also where deletion requests go</small></span><input class="wide" type="text" data-p="legal.contact_email" value="${esc(data.config.legal.contact_email)}"></label>
+  <label class="row"><span>Website</span><input class="wide" type="text" data-p="legal.website" value="${esc(data.config.legal.website)}"></label>
+  <label class="row"><span>Policy date</span><input type="text" data-p="legal.updated" value="${esc(data.config.legal.updated)}"></label>
+  </div>
   <div class="card"><h2>Stripe keys</h2><p class="hint">Stored server-side, never shown again in full. Webhook URL: <code>${location.origin}/stripe/webhook</code> (events: checkout.session.completed, charge.refunded).</p>
   <label class="row"><span>Secret key<small>${esc(data.secrets.stripe_secret_key) || "not set"}</small></span><input class="wide" type="password" id="sk" placeholder="sk_live_… or sk_test_…"></label>
   <label class="row"><span>Webhook signing secret<small>${esc(data.secrets.stripe_webhook_secret) || "not set"}</small></span><input class="wide" type="password" id="wh" placeholder="whsec_…"></label>

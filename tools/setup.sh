@@ -34,7 +34,7 @@ if [ ! -x "$SDK/cmdline-tools/latest/bin/sdkmanager" ]; then
 fi
 export PATH=$SDK/cmdline-tools/latest/bin:$PATH
 yes | sdkmanager --licenses >/dev/null 2>&1 || true
-sdkmanager "platform-tools" "build-tools;35.0.0" "platforms;android-35" >/dev/null
+sdkmanager "platform-tools" "build-tools;36.0.0" "platforms;android-36" >/dev/null
 
 JDK=${JAVA_HOME:-$(ls -d /usr/lib/jvm/java-*-openjdk-amd64 2>/dev/null | sort | tail -1)}
 mkdir -p "$HOME/.config/godot"

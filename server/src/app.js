@@ -378,6 +378,19 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     if (!snap.exists) return res.status(404).json({ error: "not found" });
     res.json(snap.data());
   });
+  // Privacy policy (Google Play requires a public URL). Company / contact / website come from the
+  // admin console (settings/economy.legal), so nothing about the publisher is hard-coded.
+  app.get("/privacy", async (_req, res, next) => {
+    try {
+      const { legal } = await getEconomy();
+      const esc = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      const tpl = await import("node:fs/promises").then((fs) => fs.readFile(staticDir + "privacy.html", "utf8"));
+      const contact = legal.contact_email ? `<a href="mailto:${esc(legal.contact_email)}">${esc(legal.contact_email)}</a>` : "the contact address in the store listing";
+      res.set("Cache-Control", "public, max-age=600").type("html").send(tpl
+        .replaceAll("{{COMPANY}}", esc(legal.company)).replaceAll("{{CONTACT}}", contact)
+        .replaceAll("{{WEBSITE}}", esc(legal.website)).replaceAll("{{UPDATED}}", esc(legal.updated)));
+    } catch (e) { next(e); }
+  });
   // Admin console page (static, holds no secrets; every call it makes needs the admin token).
   app.get("/admin/ui", (_req, res) => res.set({ "Cache-Control": "no-cache", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer" }).sendFile(staticDir + "admin.html"));
   const ecoAdmin = mountEconomy(app, { rateLimited, publicId, ...(playVerify ? { playVerify } : {}), ...(fetchFn ? { fetchFn } : {}) });

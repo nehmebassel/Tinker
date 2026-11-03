@@ -238,3 +238,15 @@ test("push campaign to selected players: sent / received / opened tracked", asyn
   assert.equal(dead.data().push_enabled, false, "dead token switched off");
   assert.equal((await j("POST", "/admin/push", { title: "", body: "x", target: "all" }, ADMIN)).status, 400);
 });
+
+test("privacy policy page uses the publisher set in the console", async () => {
+  const cfg = (await j("GET", "/admin/economy", null, ADMIN)).body.config;
+  cfg.legal.contact_email = "privacy@example.test";
+  await j("PUT", "/admin/economy", { config: cfg }, ADMIN);
+  const r = await fetch(base + "/privacy");
+  assert.equal(r.status, 200);
+  const html = await r.text();
+  assert.ok(html.includes("mailto:privacy@example.test"));
+  assert.ok(html.includes("OTONOMY"));
+  assert.equal(html.includes("{{"), false);
+});
