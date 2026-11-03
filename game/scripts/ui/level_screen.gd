@@ -1443,7 +1443,7 @@ func _offer_ad() -> void:
 	if not await App.ads.show_rewarded("try"):
 		_toast("No reward: the ad was closed early")
 		return
-	var r: Dictionary = await App.wallet.ad_reward("try", App.ads.provider())
+	var r: Dictionary = await App.wallet.ad_reward("try", App.ads.last_provider)
 	if not r["ok"]:
 		_toast(str(r["error"]))
 		return

@@ -162,6 +162,8 @@ Google Play (now) and the App Store (later); publish to Google Play on the perso
 - [x] Upload key created in Secret Manager (`tinker-upload-keystore`, `tinker-upload-keystore-password`, approved by Bassel 21:14); `tools/build_aab.sh` → signed AAB (first: versionCode 2611031914, 0.2.0, 54 MB)
 - [x] Privacy policy page `/privacy` (publisher / contact / website from the admin console)
 - [x] Listing pack `docs/play/` (texts, Data safety / content rating / target audience answers, products, icon 512, feature graphic, 5 screenshots 1080×1920); AAB versionCode bug found and fixed (a yymmddHHMM code overflowed int32 → Godot fell back to 1; now minutes since 2026 + 1,000,000, verified inside the bundle)
+- [x] Codex PR #9: Play purchase was consumed before the credit (paid, nothing received if the process died in between) → consume only after the credit is stored; unconsumed purchases are re-sent by the app; a skipped level then solved for real kept the skip forever → real solve replaces it (+5 unit checks); house-ad fallback was booked as H5 revenue → `Ads.last_provider`
+- [x] Play Console: service account `tinker-api@…` invited to Tinker (view app info, financial data, manage orders, release to testing tracks), approved by Bassel; `tools/play_upload.py` (API upload as that account) written but blocked: the deploy identity needs Service Account Token Creator on `tinker-api` (IAM grant needs Bassel's OK). First AAB sent to Bassel to upload by hand.
 - [ ] Play Console: upload to internal testing, listing, app content, in-app products, service account access, closed test (12 testers × 14 days)
 - [ ] Regression, PR, deploy
 

@@ -251,9 +251,13 @@ export async function verifyGooglePlay(packageName, productId, token) {
   try { r = await client.request({ url: base }); } catch (e) { return { ok: false, error: "google: " + (e?.response?.data?.error?.message || e.message) }; }
   const d = r.data || {};
   if (d.purchaseState !== 0) return { ok: false, error: "purchase not completed (state " + d.purchaseState + ")" };
-  // Consumable: consume so it can be bought again (coins); acknowledging is implied by consume.
-  if (d.consumptionState === 0) await client.request({ url: base + ":consume", method: "POST" }).catch(() => {});
-  return { ok: true, orderId: d.orderId || token.slice(-24), test: d.purchaseType === 0 /* license tester */ };
+  // Consuming makes the product buyable again. It is done by the caller only AFTER the credit is stored
+  // (Codex PR #9): consumed-but-not-credited would mean paid and nothing received. An unconsumed purchase
+  // is re-sent by the app on its next start (queryPurchasesAsync), and the credit is idempotent per order.
+  const consume = async () => {
+    if (d.consumptionState === 0) await client.request({ url: base + ":consume", method: "POST" }).catch((e) => console.error("consume failed", e?.message));
+  };
+  return { ok: true, orderId: d.orderId || token.slice(-24), test: d.purchaseType === 0 /* license tester */, consume };
 }
 
 function stripeSigOk(raw, header, secret) {
@@ -483,6 +487,8 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
       const v = await playVerify(config.androidPackage, product, token);
       if (!v.ok) return bad(res, 402, v.error);
       const r = await creditPurchase(d, cfg, p, { source: "google_play", orderId: v.orderId, amountUsd: v.test ? 0 : p.price_usd, test: v.test });
+      // Credited (now or by an earlier attempt): only now let Google consume it.
+      if (v.consume) await v.consume();
       if (r.duplicate) return res.json({ ok: true, duplicate: true, wallet: walletView(await ensureWallet(d, cfg), cfg) });
       res.json({ ok: true, wallet: walletView(r.wallet, cfg) });
     } catch (e) { fail(res, e); }

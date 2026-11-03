@@ -98,7 +98,7 @@ func _build() -> void:
 		b.pressed.connect(func() -> void:
 			b.disabled = true
 			if await App.ads.show_rewarded("coins"):
-				var r: Dictionary = await App.wallet.ad_reward("coins", App.ads.provider())
+				var r: Dictionary = await App.wallet.ad_reward("coins", App.ads.last_provider)
 				_say(("+%d coins!" % int(r.get("coins_added", 0))) if r["ok"] else str(r["error"]))
 			else:
 				_say("No reward: the ad was closed early.")

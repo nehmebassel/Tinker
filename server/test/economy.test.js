@@ -16,8 +16,9 @@ const verified = [];
 const fakePlay = async (pkg, product, token) => {
   verified.push([pkg, product, token]);
   if (token === "bad-token-123") return { ok: false, error: "purchase not completed" };
-  return { ok: true, orderId: "GPA." + token, test: false };
+  return { ok: true, orderId: "GPA." + token, test: false, consume: async () => { consumed.push(token); } };
 };
+const consumed = [];
 const sentPush = [];
 const fakeFcm = {
   async subscribe() { return { ok: true }; },
@@ -120,6 +121,8 @@ test("purchases: test mode grants and books as TEST; google play verified + idem
   assert.equal(again.body.wallet.coins, coins);
   assert.equal((await j("POST", "/purchase/google", { device_id: B, product: "coins_200", token: "bad-token-123" })).status, 402);
   assert.deepEqual(verified[0], ["my.otono.tinker", "coins_200", "tok-abcdef-1"]);
+  assert.ok(consumed.includes("tok-abcdef-1"), "consumed only after the credit");
+  assert.ok(!consumed.includes("bad-token-123"), "a failed purchase is not consumed");
   assert.equal((await j("POST", "/purchase/apple", { device_id: B })).status, 501);
 });
 

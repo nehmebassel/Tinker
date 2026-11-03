@@ -56,7 +56,8 @@ func best(number: int) -> Dictionary:
 func record_solve(number: int, parts_used: int, elapsed_ms: int, solution: Array) -> bool:
 	var key := str(number)
 	var cur: Dictionary = levels.get(key, {})
-	var better: bool = not cur.get("solved", false) \
+	# A skipped level (bought with coins) has no real score: the first real solve always replaces it.
+	var better: bool = not cur.get("solved", false) or cur.get("skipped", false) \
 		or parts_used < int(cur.get("best_parts", 1 << 30)) \
 		or (parts_used == int(cur.get("best_parts", 1 << 30)) and elapsed_ms < int(cur.get("best_ms", 1 << 30)))
 	if better:

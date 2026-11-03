@@ -9,6 +9,9 @@ extends Node
 ## show_rewarded() returns true only if the player watched to the end (then the server grants).
 
 var levels_since_interstitial := 0
+## Who actually showed the last rewarded ad ("h5" / "admob" / "house"): a network that had no ad falls
+## back to the house ad, which must be booked as house (no revenue), not as the network (Codex PR #9).
+var last_provider := "house"
 var _h5_loaded := false
 
 
@@ -26,7 +29,9 @@ func show_rewarded(what: String) -> bool:
 		"h5":
 			var r := await _h5_break("reward", what)
 			if r != "unavailable":
+				last_provider = "h5"
 				return r == "viewed"
+	last_provider = "house"
 	return await AdOverlay.play(get_tree().root, true, what)
 
 

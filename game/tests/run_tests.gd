@@ -47,6 +47,7 @@ func _run_all() -> void:
 	_test_registry()
 	_test_bus_layout()
 	_test_tries()
+	_test_skip_then_solve()
 	await _test_rope_snap()
 	await _test_editor_state()
 	await _test_levels()
@@ -59,6 +60,20 @@ func _run_all() -> void:
 		_log("FAIL: " + f)
 	_write_files()
 	quit(0 if failures.is_empty() else 1)
+
+
+## A level skipped with coins, then solved for real: the real score replaces the skip (Codex PR #9).
+func _test_skip_then_solve() -> void:
+	var path := "user://save_skip_test.json"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	var s := SaveData.load_or_new(path)
+	s.record_skip(5)
+	_check("skip: counts as solved (unlocks the next level)", s.is_solved(5))
+	_check("skip: not on the campaign board", s.board_progress()["solved"] == 0)
+	_check("skip then real solve: recorded as a new best", s.record_solve(5, 2, 4200, []))
+	_check("skip then real solve: skip flag gone, real score kept", not s.best(5).get("skipped", false) and int(s.best(5)["best_parts"]) == 2)
+	_check("skip then real solve: on the campaign board", s.board_progress()["solved"] == 1)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 ## Sandbox editor: the layout is loaded as player placements, but must keep its start states (Codex PR #8):
