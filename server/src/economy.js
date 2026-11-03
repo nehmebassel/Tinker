@@ -340,6 +340,15 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
     } catch (e) { fail(res, e); }
   });
 
+  // An invited friend's first rewarded solve (campaign or Daily) pays the inviter exactly once:
+  // the friend's wallet is flagged referral_paid inside the same transaction that books the reward.
+  const referralDue = (w, cfg) => (w.referred_by && !w.referral_paid && cfg.features.referrals ? w.referred_by : "");
+  const payInviter = async (inviter, friend, cfg) => {
+    if (!inviter) return;
+    await mutate(inviter, cfg, async () => ({ coins: cfg.economy.referral_inviter,
+      ledger: [{ kind: "coins", type: "referral_inviter", ref: friend.slice(0, 6), coins: cfg.economy.referral_inviter }] })).catch(() => {});
+  };
+
   // Daily bonus: once per UTC day; the streak grows on consecutive days.
   app.post("/wallet/bonus", async (req, res) => {
     const d = guard(req, res, "bonus"); if (!d) return;
@@ -372,18 +381,15 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
         if (!(await db.collection("scores").doc(`${date}_${d}`).get()).exists) return bad(res, 403, "no verified score for that day");
         key = "d" + date; amount = cfg.economy.daily_reward;
       } else return bad(res, 400, "bad reason");
-      let first = false;
+      let inviter = "";
       const w = await mutate(d, cfg, async (w) => {
         const done = w.rewarded || [];
         if (done.includes(key)) throw { status: 409, error: "already rewarded" };
-        first = done.length === 0;
-        return { coins: amount, set: { rewarded: [...done, key].slice(-2000) }, ledger: [{ kind: "coins", type: "earn_" + reason, ref: key, coins: amount }] };
+        inviter = referralDue(w, cfg);
+        return { coins: amount, set: { rewarded: [...done, key].slice(-2000), ...(inviter ? { referral_paid: true } : {}) },
+          ledger: [{ kind: "coins", type: "earn_" + reason, ref: key, coins: amount }] };
       });
-      // An invited friend's first solve pays the inviter.
-      if (first && w.referred_by && cfg.features.referrals) {
-        await mutate(w.referred_by, cfg, async () => ({ coins: cfg.economy.referral_inviter,
-          ledger: [{ kind: "coins", type: "referral_inviter", ref: d.slice(0, 6), coins: cfg.economy.referral_inviter }] })).catch(() => {});
-      }
+      await payInviter(inviter, d, cfg);
       res.json({ coins_added: amount, wallet: walletView(w, cfg) });
     } catch (e) { fail(res, e); }
   });
@@ -600,10 +606,14 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
     if (!cfg.features.coins) return { coins_added: 0 };
     const key = "d" + date;
     try {
+      let inviter = "";
       await mutate(deviceId, cfg, async (w) => {
         if ((w.rewarded || []).includes(key)) throw { status: 409 };
-        return { coins: cfg.economy.daily_reward, set: { rewarded: [...(w.rewarded || []), key].slice(-2000) }, ledger: [{ kind: "coins", type: "earn_daily", ref: key, coins: cfg.economy.daily_reward }] };
+        inviter = referralDue(w, cfg);
+        return { coins: cfg.economy.daily_reward, set: { rewarded: [...(w.rewarded || []), key].slice(-2000), ...(inviter ? { referral_paid: true } : {}) },
+          ledger: [{ kind: "coins", type: "earn_daily", ref: key, coins: cfg.economy.daily_reward }] };
       });
+      await payInviter(inviter, deviceId, cfg);
       return { coins_added: cfg.economy.daily_reward };
     } catch (e) { if (e?.status === 409) return { coins_added: 0 }; throw e; }
   };

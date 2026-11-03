@@ -1406,7 +1406,7 @@ func _build_offers() -> void:
 	var eco := App.economy
 	var rows := []
 	if _out_of_tries:
-		if eco.on("rewarded_ads"):
+		if eco.on("rewarded_ads") and _ads_left():
 			var n := eco.num("ad_reward_tries", 1)
 			rows.append(_offer("OfferAd", "Watch an ad: +%d tr%s" % [n, "y" if n == 1 else "ies"], -1, _offer_ad))
 		if eco.on("extra_tries"):
@@ -1444,7 +1444,16 @@ func _offer(id: String, text: String, cost: int, cb: Callable) -> Button:
 	return b
 
 
+## The server caps rewarded ads per day; don't make anyone watch an ad that can't pay out.
+func _ads_left() -> bool:
+	return not App.wallet.synced or App.wallet.ads_left_today > 0
+
+
 func _offer_ad() -> void:
+	if not _ads_left():
+		_toast("No more ad rewards today", true)
+		_build_offers()
+		return
 	if not await App.ads.show_rewarded("try"):
 		_toast("No reward: the ad was closed early")
 		return

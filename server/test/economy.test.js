@@ -11,7 +11,7 @@ if (!process.env.FIRESTORE_EMULATOR_HOST) throw new Error("Refusing to run: FIRE
 process.env.ADMIN_TOKEN = process.env.ADMIN_TOKEN || "test-admin";
 const ADMIN = { "x-admin-token": process.env.ADMIN_TOKEN };
 
-let server, base;
+let server, base, appInst;
 const verified = [];
 const fakePlay = async (pkg, product, token) => {
   verified.push([pkg, product, token]);
@@ -40,7 +40,8 @@ before(async () => {
     const snap = await db.collection(c).get();
     await Promise.all(snap.docs.map((d) => d.ref.delete()));
   }
-  server = createApp({ playVerify: fakePlay, fetchFn: fakeFetch, fcm: fakeFcm }).listen(0);
+  appInst = createApp({ playVerify: fakePlay, fetchFn: fakeFetch, fcm: fakeFcm });
+  server = appInst.listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
 });
 after(async () => {
@@ -116,6 +117,20 @@ test("referral: invitee paid on claim, inviter on the friend's first solve", asy
   await j("POST", "/wallet/earn", { device_id: C, reason: "campaign", level: 1 });
   const after = (await j("POST", "/wallet", { device_id: A })).body.wallet.coins;
   assert.equal(after - before, 100);
+});
+
+test("referral: a Daily first solve pays the inviter once (then campaign solves don't)", async () => {
+  const D = "eco-device-dddd";
+  const code = (await j("POST", "/wallet", { device_id: A })).body.wallet.ref_code;
+  const before = (await j("POST", "/wallet", { device_id: A })).body.wallet.coins;
+  assert.equal((await j("POST", "/referral/claim", { device_id: D, code })).status, 200);
+  const r = await appInst.locals.earnDaily(D, todayUtc());
+  assert.ok(r.coins_added > 0);
+  assert.equal((await appInst.locals.earnDaily(D, todayUtc())).coins_added, 0, "Daily reward is once per date");
+  await j("POST", "/wallet/earn", { device_id: D, reason: "campaign", level: 1 });
+  await j("POST", "/wallet/earn", { device_id: D, reason: "campaign", level: 2 });
+  const after = (await j("POST", "/wallet", { device_id: A })).body.wallet.coins;
+  assert.equal(after - before, 100, "inviter paid exactly once");
 });
 
 test("purchases: test mode grants and books as TEST; google play verified + idempotent", async () => {
