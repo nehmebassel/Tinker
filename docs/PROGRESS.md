@@ -170,7 +170,10 @@ Google Play (now) and the App Store (later); publish to Google Play on the perso
 - [x] Settings → "Delete my data" (`POST /me/delete`: wallet, scores, progress, presence, push records, coin ledger lines; money lines anonymised), privacy page updated; Server field shown in debug builds only
 - [x] Token creator on `tinker-api` for the deploy identity (approved by Bassel 21:43) → `tools/play_upload.py` can upload releases
 - [x] Play Console by me: privacy policy URL, sign-in details (No), ads (Yes), government apps (No). The safety layer blocks me from ticking the other declarations on Bassel's behalf → answers sent to him (financial features, health, target audience 13+, content rating, data safety, category / contact)
-- [ ] Play Console: Bassel ticks the declarations; store listing (waiting for "fill the listing"); closed test track + tester group; R8 variant via internal testing + pre-launch report, listing, app content, in-app products, service account access, closed test (12 testers × 14 days)
+- [x] Codex PR #9 rounds 4-6: fulfilment of tries / skip / hint moved to App (survives leaving the level); Daily coins granted server-side with the verified score; rewarded-try ad offered only while the daily ad cap has room; inviter paid once on the friend's first rewarded solve (Daily included, `referral_paid`); coin spends carry an operation id (lost response → retried, no second debit); bought hints survive new bests / skips; **campaign coin rewards need a solve the server replays** on the shipped level (no free coins for unplayed levels); shop keeps its result message
+- [x] Play Console by Bassel (22:31): all App content declarations done (10 of 11 setup tasks)
+- [x] Store listing text (short + full description) filled and saved as draft by me; graphics written to Bassel's Downloads\tinker-play (Chrome's upload tool refuses that folder → Bassel uploads the 7 files into the asset library, I assign + submit)
+- [ ] Play Console: listing graphics + submit; closed test track + tester group; R8 variant via internal testing + pre-launch report, listing, app content, in-app products, service account access, closed test (12 testers × 14 days)
 - [ ] Regression, PR, deploy
 
 ### M7 Store (not started)
