@@ -592,6 +592,21 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
   });
 
   // ---------------------------------------------------------------- admin console
+  // The Daily reward, granted by the server together with the verified score (POST /score), so a lost
+  // response or a dropped follow-up request can never cost the player their coins (Codex PR #9).
+  // Idempotent per date; a no-op when coins are off.
+  app.locals.earnDaily = async (deviceId, date) => {
+    const cfg = await getEconomy();
+    if (!cfg.features.coins) return { coins_added: 0 };
+    const key = "d" + date;
+    try {
+      await mutate(deviceId, cfg, async (w) => {
+        if ((w.rewarded || []).includes(key)) throw { status: 409 };
+        return { coins: cfg.economy.daily_reward, set: { rewarded: [...(w.rewarded || []), key].slice(-2000) }, ledger: [{ kind: "coins", type: "earn_daily", ref: key, coins: cfg.economy.daily_reward }] };
+      });
+      return { coins_added: cfg.economy.daily_reward };
+    } catch (e) { if (e?.status === 409) return { coins_added: 0 }; throw e; }
+  };
   // Used by the admin console (grant to one or many players).
   app.locals.grantCoins = async (deviceId, coins, note = "") => {
     const cfg = await getEconomy();

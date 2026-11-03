@@ -344,6 +344,30 @@ func delete_my_data() -> Dictionary:
 	return r
 
 
+## Tries for coins / an ad, fulfilled here (persistent) so leaving the level mid-request can't lose them.
+## item: extra_try | refill. Returns the server's answer; on success the tries are already added.
+func buy_tries(item: String, ref: String) -> Dictionary:
+	var r: Dictionary = await wallet.spend(item, ref)
+	if r["ok"]:
+		tries.add(tries.limit if item == "refill" else 1, int(Time.get_unix_time_from_system()))
+	return r
+
+
+func ad_for_try() -> Dictionary:
+	var r: Dictionary = await wallet.ad_reward("try", ads.last_provider)
+	if r["ok"]:
+		tries.add(int(r.get("tries_added", 1)), int(Time.get_unix_time_from_system()))
+	return r
+
+
+## A hint for a campaign level, remembered in the save: shown again (free) whenever the level opens.
+func buy_hint(number: int) -> Dictionary:
+	var r: Dictionary = await wallet.spend("hint", "c%d" % number)
+	if r["ok"]:
+		save.record_hint(number)
+	return r
+
+
 ## Skip a campaign level for coins. Lives in App (persistent), not the level screen: if the player
 ## leaves the level while the request is in flight, the paid skip is still recorded (Codex PR #9).
 func buy_skip(number: int) -> Dictionary:

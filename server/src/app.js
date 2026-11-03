@@ -146,7 +146,11 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     if (!solutionFits(level, solution)) return res.status(400).json({ error: "solution does not fit tray/slots" });
     const scoreId = `${date}_${device_id}`;
     const existing = await col.scores().doc(scoreId).get();
-    if (existing.exists) return res.status(409).json({ error: "already submitted", entry: existing.data() });
+    if (existing.exists) {
+      // A resubmission (e.g. the first response was lost): make sure the Daily reward was granted.
+      const reward = await app.locals.earnDaily?.(device_id, date).catch(() => null);
+      return res.status(409).json({ error: "already submitted", entry: existing.data(), coins_added: reward?.coins_added || 0 });
+    }
     // The proof: replay on the server with the same simulation.
     const r = await replayFn(level, solution);
     if (!r.ok) return res.status(400).json({ error: "replay failed: " + r.error });
@@ -168,7 +172,8 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     }
     await col.devices().doc(device_id).set({ country: ctry, last_seen: entry.created_at, name: entry.name }, { merge: true });
     const rank = await rankOf(date, "global", entry);
-    res.status(201).json({ ok: true, parts: entry.parts, ms: entry.ms, rank });
+    const reward = await app.locals.earnDaily?.(device_id, date).catch((e) => { console.error("daily reward", e); return null; });
+    res.status(201).json({ ok: true, parts: entry.parts, ms: entry.ms, rank, coins_added: reward?.coins_added || 0 });
   });
 
   // ---------------------------------------------------------------- board

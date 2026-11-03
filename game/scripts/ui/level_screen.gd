@@ -536,6 +536,10 @@ func _load_level_data(l: LevelData) -> void:
 	_rebuild_tray()
 	_refresh_hud()
 	stage_bg.queue_redraw()
+	# A hint bought earlier for this level is shown again, free.
+	if mode == "campaign" and level_number > 0 and has_node("/root/App") and App.save.has_hint(level_number) \
+			and not level.reference_solution.is_empty() and _hint_shown < 0:
+		_show_hint.call_deferred()
 
 
 func _rebuild_tray() -> void:
@@ -1444,20 +1448,24 @@ func _offer_ad() -> void:
 	if not await App.ads.show_rewarded("try"):
 		_toast("No reward: the ad was closed early")
 		return
-	var r: Dictionary = await App.wallet.ad_reward("try", App.ads.last_provider)
+	var r: Dictionary = await App.ad_for_try()  # tries added by App, even if this screen is gone
+	if not is_inside_tree():
+		return
 	if not r["ok"]:
 		_toast(str(r["error"]))
 		return
-	_grant_tries(int(r.get("tries_added", 1)))
+	_tries_granted()
 
 
 func _offer_spend(item: String) -> void:
 	var ref := "c%d" % level_number if level_number > 0 else str(daily.get("date", ""))
-	var r: Dictionary = await App.wallet.spend(item, ref)
+	var r: Dictionary = await App.buy_tries(item, ref)  # tries added by App, even if this screen is gone
+	if not is_inside_tree():
+		return
 	if not r["ok"]:
 		_no_coins(r)
 		return
-	_grant_tries(App.tries.limit if item == "refill" else 1)
+	_tries_granted()
 
 
 func _no_coins(r: Dictionary) -> void:
@@ -1468,8 +1476,8 @@ func _no_coins(r: Dictionary) -> void:
 		_toast(str(r["error"]))
 
 
-func _grant_tries(n: int) -> void:
-	App.tries.add(n, _now())
+## The tries were already added by App: refresh the screen.
+func _tries_granted() -> void:
 	_out_of_tries = false
 	tries_badge.queue_redraw()
 	App.audio.sfx("goal")
@@ -1504,7 +1512,9 @@ func _buy_hint() -> void:
 		return
 	_hint_buying = true
 	hint_btn.disabled = true
-	var r: Dictionary = await App.wallet.spend("hint", "c%d" % level_number)
+	var r: Dictionary = await App.buy_hint(level_number)  # remembered in the save even if this screen is gone
+	if not is_inside_tree():
+		return
 	_hint_buying = false
 	hint_btn.disabled = false
 	if not r["ok"]:
@@ -1931,8 +1941,9 @@ func _submit_daily() -> void:
 	submit_btn.text = "Checking…"
 	var r: Dictionary = await App.submit_daily(placements, _solve_ms)
 	if r["ok"] or r["status"] == 409:
-		if r["ok"] and App.economy.on("coins"):
-			await App.wallet.earn_daily(daily["date"])
+		# The Daily reward is granted by the server with the verified score (POST /score).
+		if int(r["body"].get("coins_added", 0)) > 0 if r["body"] is Dictionary else false:
+			App.wallet.sync()
 		App.open_board(daily["date"])
 		return
 	submit_btn.disabled = false

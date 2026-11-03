@@ -72,6 +72,19 @@ func record_solve(number: int, parts_used: int, elapsed_ms: int, solution: Array
 	return better
 
 
+## A hint bought for this level (shown again whenever the level opens).
+func record_hint(number: int) -> void:
+	var key := str(number)
+	var e: Dictionary = levels.get(key, {})
+	e["hint"] = true
+	levels[key] = e
+	save()
+
+
+func has_hint(number: int) -> bool:
+	return bool(levels.get(str(number), {}).get("hint", false))
+
+
 ## Skipped with coins (economy "skip"): counts as solved so the next level unlocks; no best score.
 func record_skip(number: int) -> void:
 	var key := str(number)

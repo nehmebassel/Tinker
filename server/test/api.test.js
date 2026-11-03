@@ -29,7 +29,7 @@ before(async () => {
   assert.ok(process.env.FIRESTORE_EMULATOR_HOST, "emulator required");
   level1 = JSON.parse(await readFile(campaign, "utf8"));
   // Wipe emulator state for the collections we touch.
-  for (const c of ["daily", "scores", "levels", "devices", "push"]) {
+  for (const c of ["daily", "scores", "levels", "devices", "push", "wallets", "ledger", "settings"]) {
     const snap = await db.collection(c).get();
     await Promise.all(snap.docs.map((d) => d.ref.delete()));
   }
@@ -91,8 +91,10 @@ test("score: the real solution is accepted once per device per day, then boards 
   assert.equal(a.status, 201, JSON.stringify(a.body));
   assert.equal(a.body.parts, 1);
   assert.equal(a.body.rank, 1);
+  assert.equal(a.body.coins_added, 20, "the Daily reward comes with the verified score");
   const dup = await j("POST", "/score", { device_id: DEV_A, date: today, solution: sol, elapsed_ms: 1000, country: "LB" });
   assert.equal(dup.status, 409);
+  assert.equal(dup.body.coins_added, 0, "a resubmission never pays twice");
   const b = await j("POST", "/score", { device_id: DEV_B, date: today, solution: sol, elapsed_ms: 8000, country: "FR" });
   assert.equal(b.status, 201);
   assert.equal(b.body.rank, 1, "same parts, faster => rank 1");
