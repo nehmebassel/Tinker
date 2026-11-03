@@ -157,7 +157,11 @@ Google Play (now) and the App Store (later); publish to Google Play on the perso
 - [x] Leaderboard: BoardView (Today / Yesterday / Campaign, World / country, medals, your row pinned), slide-in BoardDrawer on the map (trophy tab, swipe), after-Daily board screen with a result card
 - [x] "No parts left" / "Can't place it there" (Bassel 21:09): was white text on the light board, barely visible → red banner with dark outline, new "nope" sound (deny.ogg, synthesized), vibration and a small shake; every other toast is a dark pill
 - [x] Play Billing in our Android plugin (TinkerPush: billing-ktx 8.3.0, Kotlin 2.2.10; Play requires Billing 8+ for new apps since 2026-11-01): connect, buy, re-send unverified purchases; tokens verified + consumed by the server
-- [ ] Signed AAB + listing pack + privacy policy + Play Console setup + closed testing
+- [x] Tries bug (Bassel 21:16): pressing STOP shortly after RUN cost nothing (only a failed run was counted) → a try is now spent when RUN is pressed; smoke asserts it
+- [x] Target API 36 (Play requirement since 2026-08-31), compileSdk / build-tools 36
+- [x] Upload key created in Secret Manager (`tinker-upload-keystore`, `tinker-upload-keystore-password`, approved by Bassel 21:14); `tools/build_aab.sh` → signed AAB (first: versionCode 2611031914, 0.2.0, 54 MB)
+- [x] Privacy policy page `/privacy` (publisher / contact / website from the admin console)
+- [ ] Listing pack + Play Console setup + closed testing
 - [ ] Regression, PR, deploy
 
 ### M7 Store (not started)

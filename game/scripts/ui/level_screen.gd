@@ -1235,6 +1235,11 @@ func _start_run() -> void:
 		_show_out_of_tries()
 		return
 	_cancel_drag()
+	# A try is spent when RUN is pressed (Bassel 2026-11-03: stopping a run early used to cost nothing,
+	# because only a failed run was counted). A solve refills them (economy switch), see _reward_solve.
+	if _has_app():
+		App.tries.use(_now())
+		tries_badge.queue_redraw()
 	selected = -1
 	run_ended = false
 	result_panel.visible = false
@@ -1309,11 +1314,11 @@ func _on_run_finished(outcome: Dictionary) -> void:
 	_refresh_hud()
 
 
-## The machine stopped (or ran out of time) without reaching the goal: say so, cost one try.
+## The machine stopped (or ran out of time) without reaching the goal: say so (the try was spent on RUN).
 func _show_failure(why: String) -> void:
 	var left := 99
 	if _has_app():
-		left = App.tries.use(_now())
+		left = App.tries.left(_now())  # already spent when RUN was pressed
 	result_face.visible = true
 	next_btn.visible = false
 	submit_btn.visible = false
@@ -1987,6 +1992,9 @@ var _smoke_ok := true
 ## Drives the real input path: drag the first tray part to the reference cell, rotate it with the
 ## ring, undo/redo, PLAY, wait for the result, screenshot every step. Returns the outcome.
 func run_smoke_steps() -> Dictionary:
+	if _has_app():
+		App.tries.reset()  # each smoke run starts with full tries (runs share one save dir in CI)
+		tries_badge.queue_redraw()
 	_smoke_ok = true
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -2033,8 +2041,11 @@ func run_smoke_steps() -> Dictionary:
 		_assert(placements[0].rot == target.rot, "redo restored rotation")
 	var outcome_box := {}
 	sim.finished.connect(func(o: Dictionary) -> void: outcome_box["o"] = o, CONNECT_ONE_SHOT)
+	var tries_before := App.tries.left(_now()) if _has_app() else 0
 	await _tap_button(play_btn)
 	_assert(sim.running, "simulation running after PLAY")
+	if _has_app():
+		_assert(App.tries.left(_now()) == tries_before - 1, "pressing RUN spent one try (%d -> %d)" % [tries_before, App.tries.left(_now())])
 	await get_tree().create_timer(1.0).timeout
 	_shot(shots_dir + "/04_running.png")
 	while not outcome_box.has("o"):
