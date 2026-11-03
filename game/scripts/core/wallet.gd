@@ -82,7 +82,15 @@ func spend(item: String, ref: String = "") -> Dictionary:
 	var body := {"item": item, "ref": ref}
 	if key != "" and App.economy.cfg.has("economy"):
 		body["expected_cost"] = App.economy.num(key)  # the price the player saw; the server refuses another one
-	var r: Dictionary = await _call("/wallet/spend", body)
+	# One operation id per purchase: if the response is lost the same id is retried and the server
+	# answers "already done" instead of charging twice, so the caller can still deliver what was bought.
+	body["op"] = "%08x%08x" % [randi(), randi()]
+	var r: Dictionary = await _call("/wallet/spend", body.duplicate())
+	for attempt in 2:
+		if int(r.get("status", 0)) != 0 or str(r.get("error", "")) == "offline":
+			break
+		await App.get_tree().create_timer(1.0 + attempt).timeout
+		r = await _call("/wallet/spend", body.duplicate())
 	if int(r.get("status", 0)) == 409 and r.has("cost"):
 		await App._fetch_rules()
 		r["error"] = "The price changed to %d coins. Tap again to buy." % int(r["cost"])

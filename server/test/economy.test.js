@@ -96,6 +96,14 @@ test("spend: prices from config, not enough coins is refused", async () => {
   const changed = await j("POST", "/wallet/spend", { device_id: A, item: "hint", expected_cost: 999 });
   assert.equal(changed.status, 409, "a price the player did not see is not charged");
   assert.equal(changed.body.cost, 30);
+  // A retry with the same operation id (response lost) is answered without a second debit.
+  const B2 = "eco-device-op01";
+  const first = await j("POST", "/wallet/spend", { device_id: B2, item: "extra_try", op: "op-aaaa-1111" });
+  assert.equal(first.status, 200);
+  const again = await j("POST", "/wallet/spend", { device_id: B2, item: "extra_try", op: "op-aaaa-1111" });
+  assert.equal(again.status, 200);
+  assert.equal(again.body.replay, true);
+  assert.equal(again.body.wallet.coins, first.body.wallet.coins, "no second debit");
 });
 
 test("rewarded ads: reward + daily cap", async () => {

@@ -65,6 +65,8 @@ func record_solve(number: int, parts_used: int, elapsed_ms: int, solution: Array
 		for p in solution:
 			sol.append(p.to_dict() if p is Placement else p)
 		levels[key] = {"solved": true, "best_parts": parts_used, "best_ms": elapsed_ms, "solution": sol}
+		if cur.get("hint", false):
+			levels[key]["hint"] = true  # a bought hint stays bought
 	else:
 		cur["solved"] = true
 		levels[key] = cur
@@ -88,8 +90,11 @@ func has_hint(number: int) -> bool:
 ## Skipped with coins (economy "skip"): counts as solved so the next level unlocks; no best score.
 func record_skip(number: int) -> void:
 	var key := str(number)
-	if not levels.get(key, {}).get("solved", false):
+	var cur: Dictionary = levels.get(key, {})
+	if not cur.get("solved", false):
 		levels[key] = {"solved": true, "skipped": true, "best_parts": 0, "best_ms": 0, "solution": []}
+		if cur.get("hint", false):
+			levels[key]["hint"] = true
 		save()
 
 

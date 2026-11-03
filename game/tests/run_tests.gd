@@ -73,6 +73,15 @@ func _test_skip_then_solve() -> void:
 	_check("skip then real solve: recorded as a new best", s.record_solve(5, 2, 4200, []))
 	_check("skip then real solve: skip flag gone, real score kept", not s.best(5).get("skipped", false) and int(s.best(5)["best_parts"]) == 2)
 	_check("skip then real solve: on the campaign board", s.board_progress()["solved"] == 1)
+	s.record_hint(6)
+	s.record_skip(6)
+	_check("hint bought, then skipped: hint kept", s.has_hint(6))
+	s.record_solve(6, 3, 5000, [])
+	_check("hint bought, then solved: hint kept", s.has_hint(6))
+	s.record_hint(7)
+	s.record_solve(7, 4, 5000, [])
+	s.record_solve(7, 2, 4000, [])
+	_check("hint kept across new bests", s.has_hint(7))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 

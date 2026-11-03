@@ -406,8 +406,17 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
       // silently: 409 with the new price, the client refreshes its rules (Codex PR #9).
       if (req.body.expected_cost !== undefined && Number(req.body.expected_cost) !== cost) return res.status(409).json({ error: "price changed", cost });
       const ref = typeof req.body.ref === "string" ? req.body.ref.slice(0, 40) : "";
-      const w = await mutate(d, cfg, async () => ({ coins: -cost, ledger: [{ kind: "coins", type: "spend_" + item, ref, coins: -cost }] }));
-      res.json({ ok: true, item, cost, wallet: walletView(w, cfg) });
+      // Optional operation id: a retry after a lost response is answered "done" without a second debit,
+      // so the client can still deliver what was bought (Codex PR #9).
+      const op = typeof req.body.op === "string" && /^[A-Za-z0-9_-]{8,40}$/.test(req.body.op) ? req.body.op : "";
+      let replay = false;
+      const w = await mutate(d, cfg, async (w) => {
+        const ops = w.spend_ops || [];
+        replay = op !== "" && ops.includes(op);
+        if (replay) return { coins: 0 };
+        return { coins: -cost, set: op ? { spend_ops: [...ops, op].slice(-50) } : {}, ledger: [{ kind: "coins", type: "spend_" + item, ref, coins: -cost }] };
+      });
+      res.json({ ok: true, item, cost, replay, wallet: walletView(w, cfg) });
     } catch (e) { fail(res, e); }
   });
 
