@@ -174,7 +174,9 @@ Google Play (now) and the App Store (later); publish to Google Play on the perso
 - [x] Play Console by Bassel (22:31): all App content declarations done (10 of 11 setup tasks)
 - [x] Store listing text (short + full description) filled and saved as draft by me; graphics written to Bassel's Downloads\tinker-play (Chrome's upload tool refuses that folder → Bassel uploads the 7 files into the asset library, I assign + submit)
 - [ ] Play Console: listing graphics + submit; closed test track + tester group; R8 variant via internal testing + pre-launch report, listing, app content, in-app products, service account access, closed test (12 testers × 14 days)
-- [ ] Regression, PR, deploy
+- [x] Codex PR #9 round 7: inviter payout + friend's flag in one transaction (retried if it fails); Delete my data unsubscribes the push token first
+- [x] Regression (server 47, game 336, smokes, economy flow in CI), PR #9 merged (f78d742), deployed: revision **tinker-api-00014**
+- [x] Live checks: /config economy (no secrets), /admin/ui 200, /admin/* 401 without token, /privacy, /play/, campaign reward refused without a solution and paid with a real Godot replay (3 s), test device deleted via /me/delete; 12 test users seeded on production (campaign + Daily boards populated)
 
 ### M7 Store (not started)
 
@@ -198,6 +200,7 @@ Google Play (now) and the App Store (later); publish to Google Play on the perso
 
 ## Session log
 
+- **2026-11-03 (session 1j)** M7 economy + admin + Google Play: phone heat fix (paced redraws, DPR cap), real leaderboards (drawer on the map, test users), tries per level and counted on RUN, coins/hints/skips/extra tries/rewarded ads/no-ads passes/referrals, admin console (players, push campaigns with received/opened, grants, ledger, switches, prices, ads, store), Play Billing 8.3, target API 36, AAB + upload key, Play Console app + listing text. Codex PR #9: 7 rounds, all findings fixed. Merged + deployed (revision 00014).
 - **2026-11-02 (session 1i)** M5 Sandbox (editor, setup, solve-to-publish, links, community, remix), engineering map screen + map music, World 4 "Rigging" (31-40) via the new design harness. Codex PR #8: 5 findings, all fixed (editor start states, goal sync, moved-part state, 64-part limit). Merged + deployed (revision 00013). Hashes: only c031-c040 added.
 - **2026-11-02 (session 1h, cont.)** Auto-fail + tries (3 per 6 h, server-configurable), rope/pulley rework with snap points, balloon pop, RUN button, basket redesign. 11 rope-level hashes re-recorded (intentional physics change); everything else identical.
 - **2026-11-02 (session 1h)** Silent web audio root-caused (runtime buses not routed by the web build) and fixed; web audio CI check; vibration, solve confetti, level-1 tutorial; Settings: Vibration + Show tutorial again.
