@@ -1391,7 +1391,7 @@ func _reward_solve() -> void:
 		App.tries.refill()
 		tries_badge.queue_redraw()
 	if mode == "campaign" and level_number > 0 and App.economy.on("coins"):
-		var r: Dictionary = await App.wallet.earn_campaign(level_number)
+		var r: Dictionary = await App.wallet.earn_campaign(level_number, placements.duplicate())
 		if r["ok"]:
 			_toast("+%d coins" % int(r.get("coins_added", 0)))
 

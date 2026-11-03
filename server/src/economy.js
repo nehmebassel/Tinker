@@ -18,7 +18,10 @@ import express from "express";
 import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
 import { db } from "./db.js";
 import { config, todayUtc, addDays } from "./config.js";
-import { isDeviceId, isCountry, isDate } from "./validate.js";
+import { isDeviceId, isCountry, isDate, validSolution, solutionFits } from "./validate.js";
+import { replay } from "./godot.js";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export const DEFAULTS = {
   features: {
@@ -322,7 +325,17 @@ export function adminGate(req, res, next) {
 }
 
 // ------------------------------------------------------------------ routes
-export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, fetchFn = fetch, publicId } = {}) {
+// Campaign levels as shipped with the game (same files the client plays; the server image copies them).
+const campaignCache = new Map();
+async function campaignLevel(n) {
+  if (!campaignCache.has(n)) {
+    const f = join(config.gameDir, "levels", "campaign", String(n).padStart(3, "0") + ".json");
+    campaignCache.set(n, await readFile(f, "utf8").then(JSON.parse).catch(() => null));
+  }
+  return campaignCache.get(n);
+}
+
+export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, fetchFn = fetch, publicId, replayFn = replay } = {}) {
   const bad = (res, status, error) => res.status(status).json({ error });
   const guard = (req, res, key) => {
     const d = req.body?.device_id;
@@ -377,6 +390,17 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
       let key, amount;
       if (reason === "campaign" && Number.isInteger(level) && level >= 1 && level <= 1000) {
         key = "c" + level; amount = cfg.economy.level_reward;
+        // Proof of the solve: the server replays the player's solution on the shipped level (Codex PR #9),
+        // exactly like a Daily score. Already-rewarded levels answer 409 before paying for a replay.
+        const cur = (await W().doc(d).get()).data();
+        if ((cur?.rewarded || []).includes(key)) return bad(res, 409, "already rewarded");
+        const lv = await campaignLevel(level);
+        if (!lv) return bad(res, 404, "no such level");
+        const sol = req.body.solution;
+        if (!Array.isArray(sol) || validSolution(sol, lv.slots) || !solutionFits(lv, sol)) return bad(res, 400, "a valid solution is required");
+        const r = await replayFn(lv, sol);
+        if (!r.ok) return bad(res, 400, "replay failed: " + r.error);
+        if (r.result !== "goal") return bad(res, 422, "solution does not reach the goal");
       } else if (reason === "daily" && isDate(date)) {
         if (!(await db.collection("scores").doc(`${date}_${d}`).get()).exists) return bad(res, 403, "no verified score for that day");
         key = "d" + date; amount = cfg.economy.daily_reward;

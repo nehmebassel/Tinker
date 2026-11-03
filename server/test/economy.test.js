@@ -6,6 +6,12 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { createApp, db } from "../src/app.js";
 import { todayUtc } from "../src/config.js";
+import { readFileSync } from "node:fs";
+
+// Campaign rewards need a replayed solve: the fake replay accepts exactly the level's reference solution.
+const refSol = (n) => JSON.parse(readFileSync(new URL(`../../levels/campaign/${String(n).padStart(3, "0")}.json`, import.meta.url), "utf8")).reference_solution;
+const replays = [];
+const fakeReplay = async (level, sol) => { replays.push(level.number); return { ok: true, result: JSON.stringify(sol) === JSON.stringify(level.reference_solution) ? "goal" : "timeout", parts: sol.length }; };
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) throw new Error("Refusing to run: FIRESTORE_EMULATOR_HOST is not set.");
 process.env.ADMIN_TOKEN = process.env.ADMIN_TOKEN || "test-admin";
@@ -40,7 +46,7 @@ before(async () => {
     const snap = await db.collection(c).get();
     await Promise.all(snap.docs.map((d) => d.ref.delete()));
   }
-  appInst = createApp({ playVerify: fakePlay, fetchFn: fakeFetch, fcm: fakeFcm });
+  appInst = createApp({ playVerify: fakePlay, fetchFn: fakeFetch, fcm: fakeFcm, replayFn: fakeReplay });
   server = appInst.listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -79,11 +85,19 @@ test("daily bonus once per day", async () => {
   assert.equal((await j("POST", "/wallet/bonus", { device_id: A })).status, 409);
 });
 
+test("earn: a campaign reward needs a solve the server replays", async () => {
+  assert.equal((await j("POST", "/wallet/earn", { device_id: B, reason: "campaign", level: 1 })).status, 400, "no solution");
+  assert.equal((await j("POST", "/wallet/earn", { device_id: B, reason: "campaign", level: 1, solution: [] })).status, 422, "does not reach the goal");
+  assert.equal((await j("POST", "/wallet/earn", { device_id: B, reason: "campaign", level: 999, solution: [] })).status, 404, "no such level");
+  const big = Array.from({ length: 5 }, () => ({ part: "plank", x: 1, y: 1, rot: 0 }));
+  assert.equal((await j("POST", "/wallet/earn", { device_id: B, reason: "campaign", level: 1, solution: big })).status, 400, "does not fit the tray");
+});
+
 test("earn: a campaign level pays once", async () => {
-  const r = await j("POST", "/wallet/earn", { device_id: A, reason: "campaign", level: 1 });
+  const r = await j("POST", "/wallet/earn", { device_id: A, reason: "campaign", level: 1, solution: refSol(1) });
   assert.equal(r.status, 200);
   assert.equal(r.body.wallet.coins, 70);
-  assert.equal((await j("POST", "/wallet/earn", { device_id: A, reason: "campaign", level: 1 })).status, 409);
+  assert.equal((await j("POST", "/wallet/earn", { device_id: A, reason: "campaign", level: 1, solution: refSol(1) })).status, 409);
   assert.equal((await j("POST", "/wallet/earn", { device_id: A, reason: "daily", date: todayUtc() })).status, 403, "no verified score");
 });
 
@@ -122,7 +136,7 @@ test("referral: invitee paid on claim, inviter on the friend's first solve", asy
   assert.equal(r.status, 200);
   assert.equal(r.body.wallet.coins, 100);
   assert.equal((await j("POST", "/referral/claim", { device_id: C, code })).status, 409);
-  await j("POST", "/wallet/earn", { device_id: C, reason: "campaign", level: 1 });
+  await j("POST", "/wallet/earn", { device_id: C, reason: "campaign", level: 1, solution: refSol(1) });
   const after = (await j("POST", "/wallet", { device_id: A })).body.wallet.coins;
   assert.equal(after - before, 100);
 });
@@ -135,8 +149,8 @@ test("referral: a Daily first solve pays the inviter once (then campaign solves 
   const r = await appInst.locals.earnDaily(D, todayUtc());
   assert.ok(r.coins_added > 0);
   assert.equal((await appInst.locals.earnDaily(D, todayUtc())).coins_added, 0, "Daily reward is once per date");
-  await j("POST", "/wallet/earn", { device_id: D, reason: "campaign", level: 1 });
-  await j("POST", "/wallet/earn", { device_id: D, reason: "campaign", level: 2 });
+  await j("POST", "/wallet/earn", { device_id: D, reason: "campaign", level: 1, solution: refSol(1) });
+  await j("POST", "/wallet/earn", { device_id: D, reason: "campaign", level: 2, solution: refSol(2) });
   const after = (await j("POST", "/wallet", { device_id: A })).body.wallet.coins;
   assert.equal(after - before, 100, "inviter paid exactly once");
 });

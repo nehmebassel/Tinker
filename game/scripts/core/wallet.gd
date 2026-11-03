@@ -68,8 +68,12 @@ func claim_bonus() -> Dictionary:
 	return await _call("/wallet/bonus")
 
 
-func earn_campaign(level: int) -> Dictionary:
-	return await _call("/wallet/earn", {"reason": "campaign", "level": level})
+## The server replays the solution on the shipped level before paying (no free coins for unplayed levels).
+func earn_campaign(level: int, placements: Array) -> Dictionary:
+	var sol := []
+	for p in placements:
+		sol.append({"part": p.part, "x": p.cell.x, "y": p.cell.y, "rot": p.rot})
+	return await _call("/wallet/earn", {"reason": "campaign", "level": level, "solution": sol})
 
 
 func earn_daily(date: String) -> Dictionary:

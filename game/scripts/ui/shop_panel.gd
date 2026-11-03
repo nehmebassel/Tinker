@@ -8,6 +8,7 @@ extends Control
 
 var _coins_lbl: Label
 var _status: Label
+var _last_say := ""
 var _body: VBoxContainer
 
 
@@ -79,7 +80,7 @@ func _build() -> void:
 	x.pressed.connect(close)
 	head.add_child(x)
 	_refresh_coins()
-	_status = UiKit.label("", 28, Color("ffd43b"))
+	_status = UiKit.label(_last_say, 28, Color("ffd43b"))  # survives rebuilds after a purchase
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_body.add_child(_status)
 	var eco := App.economy
@@ -237,6 +238,7 @@ func _refresh_coins() -> void:
 
 
 func _say(t: String) -> void:
+	_last_say = t
 	_status.text = t
 
 
