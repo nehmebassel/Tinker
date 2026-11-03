@@ -333,11 +333,25 @@ func delete_my_data() -> Dictionary:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(f))
 	save.reset()
 	tries.reset()
+	# Fresh in-memory stores too, or their next write would put the deleted data back (Codex PR #9).
+	daily_store = DailyStore.load_or_new()
+	sandbox_store = SandboxStore.load_or_new()
 	settings.device_id = Settings._new_device_id()
 	settings.name = ""
 	settings.save()
 	wallet.coins = 0
 	wallet.changed.emit()
+	return r
+
+
+## Skip a campaign level for coins. Lives in App (persistent), not the level screen: if the player
+## leaves the level while the request is in flight, the paid skip is still recorded (Codex PR #9).
+func buy_skip(number: int) -> Dictionary:
+	var r: Dictionary = await wallet.spend("skip", "c%d" % number)
+	if r["ok"]:
+		save.record_skip(number)
+		if economy.on("refill_tries_on_new_level"):
+			tries.refill()
 	return r
 
 
@@ -639,6 +653,14 @@ func _run_economy_flow() -> void:
 	await get_tree().create_timer(0.6).timeout
 	_flow_assert(ls.find_child("HintGhost", true, false) != null and wallet.coins == c2 - economy.num("hint_cost"), "hint shows a part for coins")
 	await _shot_econ("econ_5_hint.png")
+	# Delete my data: server records gone, local stores fresh, a new device id.
+	sandbox_store.add(SandboxStore.new_draft("to be deleted"))
+	var old_id := settings.device_id
+	var del: Dictionary = await delete_my_data()
+	var w2: Dictionary = await api.post_json("/wallet", {"device_id": old_id})
+	_flow_assert(del["ok"] and settings.device_id != old_id and sandbox_store.drafts.is_empty() and not save.is_solved(1),
+		"delete my data: local stores reset, new device id")
+	_flow_assert(w2["ok"] and int(w2["body"]["wallet"]["coins"]) == economy.num("start_coins"), "delete my data: the old wallet is gone on the server (a request makes a fresh one)")
 	print("ECON %s" % ("PASS" if _flow_ok else "FAIL"))
 	get_tree().quit(0 if _flow_ok else 1)
 

@@ -1486,14 +1486,14 @@ func _offer_hint() -> void:
 
 
 func _offer_skip() -> void:
-	var r: Dictionary = await App.wallet.spend("skip", "c%d" % level_number)
+	var n := level_number
+	var r: Dictionary = await App.buy_skip(n)  # recorded by App even if this screen is gone by then
+	if not is_inside_tree():
+		return
 	if not r["ok"]:
 		_no_coins(r)
 		return
-	App.save.record_skip(level_number)
-	if App.economy.on("refill_tries_on_new_level"):
-		App.tries.refill()
-	App.open_level(level_number + 1)
+	App.open_level(n + 1)
 
 
 var _hint_buying := false  # one hint purchase in flight at a time (a double tap must not pay twice)
