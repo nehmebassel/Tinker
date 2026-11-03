@@ -101,7 +101,8 @@ func set_ghost(on: bool) -> void:
 
 func _process(_delta: float) -> void:
 	if lit:
-		queue_redraw()  # flicker (time-based, visual only)
+		if FramePacer.anim():
+			queue_redraw()  # flicker (time-based, visual only), paced for battery
 
 
 func _draw() -> void:

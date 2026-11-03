@@ -30,9 +30,15 @@ var daily_test: String = ""
 var sandbox_test: String = ""  # "publish:<file to write the code>" or "play:<code>" (CI, two installs)  # --daily-flow=<solution.json>: CI test of the whole daily loop
 
 
+## Any touch / click / scroll: animate at full rate for a moment (FramePacer), so dragging stays smooth.
+func _input(_event: InputEvent) -> void:
+	FramePacer.busy(600)
+
+
 func _ready() -> void:
 	save = SaveData.load_or_new()
 	settings = Settings.load_or_new()
+	settings.apply_battery_saver()
 	daily_store = DailyStore.load_or_new()
 	api = Api.new(settings)
 	add_child(api)
@@ -61,6 +67,8 @@ func _ready() -> void:
 			sandbox_test = "play:" + a.trim_prefix("--sandbox-play=")
 		elif a.begins_with("--shot-ws="):
 			_shot_ws(a.trim_prefix("--shot-ws="))
+		elif a.begins_with("--perf-probe="):
+			_perf_probe(a.trim_prefix("--perf-probe="))
 	if OS.has_feature("web") and not flow_test and daily_test == "" and sandbox_test == "":
 		_open_link_level.call_deferred()
 	if flow_test:
@@ -219,6 +227,24 @@ func submit_daily(placements: Array, solve_ms: int) -> Dictionary:
 
 func has_next(number: int) -> bool:
 	return not Campaign.entry(number + 1).is_empty()
+
+
+## Power check (CI): with nobody touching the screen, how many frames does the current screen render
+## per second? Prints "PERF rendered_per_s=… process_per_s=…" and quits. Arg: "<scene>" or "level:<file>".
+func _perf_probe(what: String) -> void:
+	await get_tree().process_frame
+	if what.begins_with("level:"):
+		open_level(int(what.trim_prefix("level:")))
+	await get_tree().create_timer(4.0).timeout  # settle (map roll, music start)
+	var drawn := [0]
+	var cb := func() -> void: drawn[0] += 1
+	RenderingServer.frame_post_draw.connect(cb)
+	var f0 := Engine.get_process_frames()
+	var t0 := Time.get_ticks_msec()
+	await get_tree().create_timer(5.0).timeout
+	var secs := (Time.get_ticks_msec() - t0) / 1000.0
+	print("PERF %s rendered_per_s=%.1f process_per_s=%.1f" % [what, drawn[0] / secs, (Engine.get_process_frames() - f0) / secs])
+	get_tree().quit(0)
 
 
 func _shot_ws(path: String) -> void:

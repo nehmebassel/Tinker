@@ -132,6 +132,7 @@ func stop() -> void:
 func _physics_process(_delta: float) -> void:
 	if not running:
 		return
+	FramePacer.busy(250)  # a running machine animates at full rate
 	ticks += 1
 	tick.emit(ticks)
 	_freeze_escapees()

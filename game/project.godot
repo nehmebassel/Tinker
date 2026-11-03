@@ -11,6 +11,7 @@ config/description="Build the machine that solves today's goal in the fewest pie
 run/main_scene="res://scenes/world_select.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://assets/icons/icon.svg"
+run/low_processor_mode=true
 
 [autoload]
 

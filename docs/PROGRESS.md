@@ -144,6 +144,19 @@ Session log at the bottom tells the next agent exactly where things stand.
 - [x] Map: world name plates drawn over the rails (rails used to cross the name)
 - [x] Codex PR #8: editor TEST ignored start states (unlit candle / stopped motor came alive); candle goal was unsolvable from scratch → editor Light/Unlit, On/Off button + `keep_player_state` + setup check + tests; editor TEST kept the old goal after Level setup → synced when setup closes; moving a part dropped its start state → kept; editor allowed 99 layout parts but the server takes 64 → limit shared (`SandboxStore.MAX_LAYOUT_PARTS`) and checked in setup
 
+### Heat + leaderboard + economy + Play Store (2026-11-03, Bassel's request) — in progress, branch `m7-economy`
+Requests: phone heats up fast (iPhone 14 Pro / 11 Pro Max PWA); real leaderboard sliding in on the map with test users;
+tries refill on every new level; coins / hints / extra tries / skip / ads / no-ads / invites as the monetization path; every
+feature toggled from an admin page only Bassel can open, with ads + purchases managed there and an earnings ledger; buy through
+Google Play (now) and the App Store (later); publish to Google Play on the personal account (closed test, 12 testers / 14 days).
+- [x] Heat: root cause = idle screens rendered every frame (Camera2D re-sent its transform each frame; decor redrew every frame) at 3x pixel density. Fix: low-processor mode, `FramePacer` (decor 12 Hz idle, 60 Hz when touched or running), manual view transform, web canvas capped at 2x density (Settings → Battery saver). Idle renders/s: map 30→12, level 27→14 (capped by this machine; a phone was at 60). CI power check added.
+- [x] Play Console: app "Tinker: Contraption Puzzles" created on the Techmatters personal account, package `my.otono.tinker` (app id 4973318101926770067)
+- [ ] Server economy: config (toggles, prices, ads, products), wallets, ledger, admin API + page
+- [ ] Client: coins, shop, extra tries, hints, skip, ads, invites, tries refill on new level
+- [ ] Leaderboard drawer on the map + test users
+- [ ] Play Billing + signed AAB + listing pack + internal/closed testing upload
+- [ ] Regression, PR, deploy
+
 ### M7 Store (not started)
 
 ## Decisions

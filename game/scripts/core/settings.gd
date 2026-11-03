@@ -21,6 +21,7 @@ var music_volume: float = 0.6
 var sfx_volume: float = 0.8
 var haptics: bool = true
 var tutorial_done: bool = false
+var battery_saver: bool = true  # FramePacer idle rate + web canvas pixel cap (see apply_battery_saver)
 var _path := PATH
 var _saved_url := false  # true when the player saved a server URL in Settings
 
@@ -44,6 +45,7 @@ static func load_or_new(path: String = PATH) -> Settings:
 			s.sfx_volume = clampf(float(d.get("sfx_volume", s.sfx_volume)), 0.0, 1.0)
 			s.haptics = bool(d.get("haptics", true))
 			s.tutorial_done = bool(d.get("tutorial_done", false))
+			s.battery_saver = bool(d.get("battery_saver", true))
 	# In the browser build the game is served by the backend itself (/play/), so the page's own origin
 	# is the server: zero setup for testers. A value typed in Settings still wins.
 	if OS.has_feature("web") and not s._saved_url:
@@ -67,7 +69,16 @@ func save() -> void:
 	if f:
 		f.store_string(JSON.stringify({"server_url": server_url, "device_id": device_id, "name": name, "push_enabled": push_enabled,
 			"music_volume": music_volume, "sfx_volume": sfx_volume,
-			"haptics": haptics, "tutorial_done": tutorial_done}, "  "))
+			"haptics": haptics, "tutorial_done": tutorial_done, "battery_saver": battery_saver}, "  "))
+
+
+## Battery saver: slower idle animation, and in the browser a canvas capped at 2x pixel density
+## (an iPhone renders 3x = 2.25x more pixels for no visible gain). The cap is read by the page before
+## the engine starts (head_include in export_presets.cfg), so it applies from the next launch.
+func apply_battery_saver() -> void:
+	FramePacer.saver = battery_saver
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("try{localStorage.setItem('tinker_full_res','%s')}catch(e){}" % ("0" if battery_saver else "1"), true)
 
 
 func base_url() -> String:

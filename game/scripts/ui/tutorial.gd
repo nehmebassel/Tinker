@@ -77,10 +77,17 @@ func _process(delta: float) -> void:
 	var vs := get_viewport_rect().size
 	# Inside the tray panel, right of the tray parts: never covers the board (ball, ramps, basket).
 	var left := 24.0 + 220.0 + 24.0
-	_bubble.size = Vector2(vs.x - left - 24.0, 0)
-	_bubble.position = Vector2(left, vs.y - bottom_offset + 76.0)
+	# Assign only on change: re-setting the size every frame re-lays the bubble out and forces a render
+	# every frame (battery, see FramePacer).
+	var w := vs.x - left - 24.0
+	if not is_equal_approx(_bubble.size.x, w):
+		_bubble.size = Vector2(w, 0)
+	var pos := Vector2(left, vs.y - bottom_offset + 76.0)
+	if not _bubble.position.is_equal_approx(pos):
+		_bubble.position = pos
 	# The bubble lives in the tray: hide it while the tray is collapsed (that space is board then).
-	_bubble.visible = not screen.tray_collapsed
+	if _bubble.visible != (not screen.tray_collapsed):
+		_bubble.visible = not screen.tray_collapsed
 	var placed: bool = screen.placements.size() > 0
 	match _step:
 		0:
@@ -103,11 +110,11 @@ func _process(delta: float) -> void:
 		target = screen.tray_items.get_child(0).get_global_rect()
 	elif _step >= 1:
 		target = screen.play_btn.get_global_rect()
-	_arrow.visible = target.size != Vector2.ZERO
-	if _arrow.visible:
+	if _arrow.visible != (target.size != Vector2.ZERO):
+		_arrow.visible = target.size != Vector2.ZERO
+	if _arrow.visible and FramePacer.anim():  # the bob is paced like every idle animation
 		var bob := sin(_t * 6.0) * 12.0
 		_arrow.position = Vector2(target.get_center().x - 40, target.position.y - 96 + bob)
-		_arrow.queue_redraw()
 
 
 func _draw_arrow() -> void:

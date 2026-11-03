@@ -238,6 +238,8 @@ func _level_node(number: int, at: Vector2) -> Button:
 
 func _process(delta: float) -> void:
 	_t += delta
+	if not FramePacer.anim():
+		return  # decor is visual only: paced (FramePacer) so an idle map does not heat the phone
 	_canvas.queue_redraw()
 	if _marble_layer:
 		_marble_layer.queue_redraw()

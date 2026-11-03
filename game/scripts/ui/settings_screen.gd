@@ -63,6 +63,22 @@ func _ready() -> void:
 		paint_vib.call()
 		App.audio.buzz(30))
 	row.add_child(vib)
+	var bat := UiKit.button("", UiKit.GO, UiKit.INK, 100)
+	bat.name = "BatteryToggle"
+	bat.toggle_mode = true
+	bat.button_pressed = App.settings.battery_saver
+	bat.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var paint_bat := func() -> void:
+		bat.text = "Battery saver: " + ("On" if bat.button_pressed else "Off")
+		for k in ["normal", "hover", "pressed"]:
+			bat.add_theme_stylebox_override(k, UiKit.style(UiKit.GO if bat.button_pressed else Color("c9c2b6")))
+	paint_bat.call()
+	bat.toggled.connect(func(on: bool) -> void:
+		App.settings.battery_saver = on
+		App.settings.save()
+		App.settings.apply_battery_saver()
+		paint_bat.call())
+	v.add_child(bat)
 	var tut := UiKit.button("Show tutorial again", UiKit.MUTED, UiKit.PANEL_TXT, 100)
 	tut.name = "TutorialReset"
 	tut.size_flags_horizontal = Control.SIZE_EXPAND_FILL

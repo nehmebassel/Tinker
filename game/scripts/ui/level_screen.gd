@@ -194,8 +194,11 @@ func _build_scene() -> void:
 	camera = Camera2D.new()
 	camera.name = "Camera"
 	camera.position_smoothing_enabled = false
+	# The camera only HOLDS the view (position, zoom); _apply_view() pushes it to the viewport when it
+	# changes. An enabled Camera2D re-sends the canvas transform every frame, which makes Godot re-render
+	# every frame even when nothing moves: the main cause of phones heating up (2026-11-03).
+	camera.enabled = false
 	world.add_child(camera)
-	camera.make_current()
 
 	hud = CanvasLayer.new()
 	hud.name = "HUD"
@@ -651,6 +654,15 @@ func _clamp_camera() -> void:
 	var maxp := Vector2(Grid.STAGE_PX) + Vector2(margin, margin) - half
 	camera.position.x = clampf(camera.position.x, minf(minp.x, maxp.x), maxf(minp.x, maxp.x))
 	camera.position.y = clampf(camera.position.y, minf(minp.y, maxp.y), maxf(minp.y, maxp.y))
+	_apply_view()
+
+
+## screen = (world - camera.position) * zoom + viewport_size / 2, set only when it actually changes.
+func _apply_view() -> void:
+	var z := camera.zoom.x
+	var xf := Transform2D(0.0, Vector2(z, z), 0.0, get_viewport_rect().size / 2.0 - camera.position * z)
+	if not get_viewport().canvas_transform.is_equal_approx(xf):
+		get_viewport().canvas_transform = xf
 
 
 func _on_resized() -> void:
@@ -1381,11 +1393,15 @@ var _tick_acc := 0.0
 
 
 func _process(delta: float) -> void:
-	overlay.queue_redraw()
+	if sim.running or confetti_left > 0.0:
+		FramePacer.busy(200)
+	confetti_left = maxf(0.0, confetti_left - delta)
+	if FramePacer.anim():
+		overlay.queue_redraw()
 	# RUN breathes gently once there is something to run, so the next step is obvious.
 	var ready := not sim.running and not run_ended and not placements.is_empty()
 	play_btn.pivot_offset = play_btn.size / 2.0
-	var k := 1.0 + (0.045 * (0.5 + 0.5 * sin(Time.get_ticks_msec() / 260.0)) if ready else 0.0)
+	var k := play_btn.scale.x if not FramePacer.anim() else 1.0 + (0.045 * (0.5 + 0.5 * sin(Time.get_ticks_msec() / 260.0)) if ready else 0.0)
 	play_btn.scale = Vector2(k, k)
 	_tick_acc += delta
 	if _tick_acc < 0.5 or not _has_app():
@@ -1503,6 +1519,7 @@ func _save_draft_layout() -> void:
 
 
 func _exit_tree() -> void:
+	get_viewport().canvas_transform = Transform2D.IDENTITY  # the next screen (map, sandbox) is unscrolled
 	if mode == "edit" and has_node("/root/App"):
 		_save_draft_layout()
 
@@ -1600,7 +1617,11 @@ func _draw_run_icon(n: Control) -> void:
 
 ## Celebration burst from the top of the screen when a run reaches the goal. HUD layer only:
 ## it cannot touch the simulation. CPUParticles2D so it works in the web (Compatibility) build.
+var confetti_left := 0.0  # seconds of full-rate animation left for the confetti
+
+
 func _confetti() -> void:
+	confetti_left = 3.0
 	var vs := get_viewport_rect().size
 	var colors := [C_ACCENT, C_GO, Color("6ec6ff"), Color("ffd43b"), Color("b35fd1"), Color("e8833a")]
 	for i in 2:
