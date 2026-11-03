@@ -353,13 +353,24 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
     } catch (e) { fail(res, e); }
   });
 
-  // An invited friend's first rewarded solve (campaign or Daily) pays the inviter exactly once:
-  // the friend's wallet is flagged referral_paid inside the same transaction that books the reward.
+  // An invited friend's first rewarded solve (campaign or Daily) pays the inviter exactly once. One
+  // transaction flags the friend's wallet referral_paid AND credits the inviter, so a failure leaves
+  // neither done and the next rewarded solve retries it (Codex PR #9).
   const referralDue = (w, cfg) => (w.referred_by && !w.referral_paid && cfg.features.referrals ? w.referred_by : "");
   const payInviter = async (inviter, friend, cfg) => {
     if (!inviter) return;
-    await mutate(inviter, cfg, async () => ({ coins: cfg.economy.referral_inviter,
-      ledger: [{ kind: "coins", type: "referral_inviter", ref: friend.slice(0, 6), coins: cfg.economy.referral_inviter }] })).catch(() => {});
+    try {
+      await ensureWallet(inviter, cfg);
+      const fr = W().doc(friend), ir = W().doc(inviter);
+      await db.runTransaction(async (tx) => {
+        const [f, i] = [await tx.get(fr), await tx.get(ir)];
+        if (!f.exists || !i.exists || f.data().referral_paid || f.data().referred_by !== inviter) return;
+        const coins = cfg.economy.referral_inviter;
+        tx.update(fr, { referral_paid: true });
+        tx.update(ir, { coins: (i.data().coins || 0) + coins });
+        await ledger({ device_id: inviter, kind: "coins", type: "referral_inviter", ref: friend.slice(0, 6), coins }, tx);
+      });
+    } catch (e) { console.error("referral payout failed (retried on the next solve):", e?.message || e); }
   };
 
   // Daily bonus: once per UTC day; the streak grows on consecutive days.
@@ -410,7 +421,7 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
         const done = w.rewarded || [];
         if (done.includes(key)) throw { status: 409, error: "already rewarded" };
         inviter = referralDue(w, cfg);
-        return { coins: amount, set: { rewarded: [...done, key].slice(-2000), ...(inviter ? { referral_paid: true } : {}) },
+        return { coins: amount, set: { rewarded: [...done, key].slice(-2000) },
           ledger: [{ kind: "coins", type: "earn_" + reason, ref: key, coins: amount }] };
       });
       await payInviter(inviter, d, cfg);
@@ -643,7 +654,7 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
       await mutate(deviceId, cfg, async (w) => {
         if ((w.rewarded || []).includes(key)) throw { status: 409 };
         inviter = referralDue(w, cfg);
-        return { coins: cfg.economy.daily_reward, set: { rewarded: [...(w.rewarded || []), key].slice(-2000), ...(inviter ? { referral_paid: true } : {}) },
+        return { coins: cfg.economy.daily_reward, set: { rewarded: [...(w.rewarded || []), key].slice(-2000) },
           ledger: [{ kind: "coins", type: "earn_daily", ref: key, coins: cfg.economy.daily_reward }] };
       });
       await payInviter(inviter, deviceId, cfg);

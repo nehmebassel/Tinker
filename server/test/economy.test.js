@@ -26,10 +26,11 @@ const fakePlay = async (pkg, product, token) => {
 };
 const consumed = [];
 const sentPush = [];
+const unsubscribed = [];
 const earlyEvents = [];
 const fakeFcm = {
   async subscribe() { return { ok: true }; },
-  async unsubscribe() { return { ok: true }; },
+  async unsubscribe(token, topic) { unsubscribed.push([token, topic]); return { ok: true }; },
   async sendTopic() { return { ok: true, id: "x" }; },
   async sendEach(msgs) {
     sentPush.push(...msgs);
@@ -153,6 +154,19 @@ test("referral: a Daily first solve pays the inviter once (then campaign solves 
   await j("POST", "/wallet/earn", { device_id: D, reason: "campaign", level: 2, solution: refSol(2) });
   const after = (await j("POST", "/wallet", { device_id: A })).body.wallet.coins;
   assert.equal(after - before, 100, "inviter paid exactly once");
+});
+
+test("referral: a failed inviter payout is retried on the next solve", async () => {
+  const E = "eco-device-eeee", I = "eco-device-iiii";
+  const code = (await j("POST", "/wallet", { device_id: I })).body.wallet.ref_code;
+  const before = (await j("POST", "/wallet", { device_id: I })).body.wallet.coins;
+  assert.equal((await j("POST", "/referral/claim", { device_id: E, code })).status, 200);
+  // Simulate the payout transaction having failed after the friend's first reward: reward booked, flag not set.
+  await db.collection("wallets").doc(E).update({ rewarded: ["c9"] });
+  await j("POST", "/wallet/earn", { device_id: E, reason: "campaign", level: 1, solution: refSol(1) });
+  const after = (await j("POST", "/wallet", { device_id: I })).body.wallet.coins;
+  assert.equal(after - before, 100, "inviter paid on the retry");
+  assert.equal((await db.collection("wallets").doc(E).get()).data().referral_paid, true);
 });
 
 test("purchases: test mode grants and books as TEST; google play verified + idempotent", async () => {
@@ -323,8 +337,10 @@ test("delete my data: removes the device's records, keeps money lines anonymised
   await j("POST", "/wallet", { device_id: D });
   await j("POST", "/progress", { device_id: D, solved: 2, parts: 3 });
   await j("POST", "/purchase/google", { device_id: D, product: "coins_200", token: "tok-del-00001" });
+  await db.collection("devices").doc(D).set({ fcm_token: "tok-fcm-dddd" }, { merge: true });
   const r = await j("POST", "/me/delete", { device_id: D });
   assert.equal(r.status, 200);
+  assert.ok(unsubscribed.some(([t]) => t === "tok-fcm-dddd"), "Daily reminders stopped for the deleted device");
   assert.ok(r.body.deleted >= 4);
   assert.equal((await db.collection("wallets").doc(D).get()).exists, false);
   assert.equal((await db.collection("devices").doc(D).get()).exists, false);

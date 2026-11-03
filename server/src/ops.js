@@ -13,7 +13,7 @@
 import { randomBytes } from "node:crypto";
 import { FieldValue } from "@google-cloud/firestore";
 import { db } from "./db.js";
-import { todayUtc, addDays } from "./config.js";
+import { config, todayUtc, addDays } from "./config.js";
 import { isDeviceId, isCountry, isDate } from "./validate.js";
 
 const ONLINE_S = 150;  // a device is "online" if it pinged in the last 2.5 minutes (it pings every 60 s)
@@ -68,6 +68,15 @@ export function mountOps(app, admin, { fcm, rateLimited, publicId }) {
     const d = req.body?.device_id;
     if (!isDeviceId(d)) return res.status(400).json({ error: "bad device_id" });
     if (rateLimited("delete:" + d)) return res.status(429).json({ error: "slow down" });
+    // Stop Daily reminders first: deleting the device record alone would leave the token on the FCM topic.
+    const dev = await db.collection("devices").doc(d).get();
+    const tok = dev.exists ? dev.data().fcm_token : "";
+    if (tok) {
+      const u = await fcm.unsubscribe(tok, config.pushTopic).catch((e) => ({ ok: false, error: String(e?.message || e) }));
+      if (u && u.ok === false && !/not-registered|invalid-registration/i.test(String(u.error || ""))) {
+        return res.status(502).json({ error: "could not stop notifications, try again" });
+      }
+    }
     let n = 0;
     const del = async (q) => { const s = await q.get(); const b = db.batch(); s.docs.forEach((x) => b.delete(x.ref)); if (s.size) await b.commit(); n += s.size; };
     const w = await db.collection("wallets").doc(d).get();
