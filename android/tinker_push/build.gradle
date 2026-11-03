@@ -1,8 +1,8 @@
-// Godot 4 Android plugin (v2) giving the game Firebase Cloud Messaging tokens.
+// Godot 4 Android plugin (v2): Firebase Cloud Messaging tokens + Google Play Billing (in-app products).
 // Built by tools/build_clients.sh -> game/addons/tinker_push/bin/tinker_push-release.aar
 plugins {
     id "com.android.library" version "8.7.3"
-    id "org.jetbrains.kotlin.android" version "2.0.21"
+    id "org.jetbrains.kotlin.android" version "2.2.10"
 }
 android {
     namespace "my.otono.tinkerpush"
@@ -15,4 +15,5 @@ dependencies {
     compileOnly "org.godotengine:godot:4.5.1.stable"
     implementation "com.google.firebase:firebase-messaging:24.1.0"
     implementation "androidx.core:core-ktx:1.13.1"
+    implementation "com.android.billingclient:billing-ktx:8.3.0"   // Play requires 8+ for new apps since 2026-11-01
 }

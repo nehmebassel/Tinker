@@ -777,10 +777,10 @@ func _tray_touch(part: String, index: int, pos: Vector2) -> void:
 		open_info(part)
 		return
 	if _tray_left(part) <= 0:
-		_toast("No %s left" % PartRegistry.get_def(part).get("name", part))
+		_toast("No %s left" % str(PartRegistry.get_def(part).get("name", part)).to_lower(), true)
 		return
 	if placements.size() >= level.slots:
-		_toast(("A level holds at most %d parts" % level.slots) if mode == "edit" else "No slots left — remove a part first")
+		_toast(("A level holds at most %d parts" % level.slots) if mode == "edit" else "No parts left: remove one to place another", true)
 		return
 	_note_first_touch()
 	_begin_tray_drag(part, index, pos)
@@ -999,7 +999,7 @@ func _drop_floating(pos: Vector2, part: String, lifted: Placement) -> void:
 		_refresh_hud()
 		return
 	if not Grid.in_stage(cell) or _overlaps(cell, drag["rot"]):
-		_toast("Can't place it there")
+		_toast("Can't place it there", true)
 		if lifted != null:
 			placements.append(lifted)
 			sim.set_player_parts(placements)
@@ -1935,10 +1935,35 @@ func _draw_dashed(on: CanvasItem, a: Vector2, b: Vector2, c: Color) -> void:
 	on.draw_circle(b, 7.0, c)
 
 
-func _toast(msg: String) -> void:
+## Messages over the board: a dark pill (always readable on the light sheet). warn = a red pill, the
+## "nope" sound, a vibration and a little shake (no parts / no slots left; Bassel 2026-11-03).
+func _toast(msg: String, warn: bool = false) -> void:
 	toast_lbl.text = msg
 	toast_lbl.visible = true
-	var t := get_tree().create_timer(2.2)
+	var st := StyleBoxFlat.new()
+	st.bg_color = C_ACCENT if warn else C_PANEL
+	st.border_color = C_INK
+	st.set_border_width_all(5)
+	st.set_corner_radius_all(28)
+	st.content_margin_left = 32
+	st.content_margin_right = 32
+	st.content_margin_top = 16
+	st.content_margin_bottom = 16
+	st.shadow_color = Color(0, 0, 0, 0.3)
+	st.shadow_size = 10
+	st.shadow_offset = Vector2(0, 6)
+	toast_lbl.add_theme_stylebox_override("normal", st)
+	toast_lbl.add_theme_color_override("font_color", Color.WHITE if warn else C_PANEL_TXT)
+	if warn:
+		_snd("deny")
+		if has_node("/root/App"):
+			App.audio.buzz(60)
+		toast_lbl.pivot_offset = toast_lbl.size / 2.0
+		var sh := create_tween()
+		for dx in [18.0, -14.0, 10.0, -6.0, 0.0]:
+			sh.tween_property(toast_lbl, "rotation", deg_to_rad(dx * 0.12), 0.05)
+		FramePacer.busy(400)
+	var t := get_tree().create_timer(2.6 if warn else 2.2)
 	t.timeout.connect(func() -> void:
 		if toast_lbl.text == msg:
 			toast_lbl.visible = false)

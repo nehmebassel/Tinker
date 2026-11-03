@@ -155,7 +155,9 @@ Google Play (now) and the App Store (later); publish to Google Play on the perso
 - [x] Admin players & push (`server/src/ops.js`, Bassel 20:46): presence heartbeat (online now, platform / OS / model / app version, first & last seen), activity per day (used today / date range, daily-active chart), give coins to selected players, push campaigns to selected / filter / everyone with per-recipient sent · received · opened and open rate (dead tokens switched off). Admin page works on phone and desktop. 3 more server tests (42 total).
 - [x] Client economy: coin chip (map, level, board), shop (daily bonus, watch ad, coin packs, no-ads passes, invites), out-of-tries / failure offers (ad → try, +1 try, refill, hint, skip), Hint button (ghost of a reference-solution part, campaign only), skip, full tries on every new level, coins for first solves and the Daily, interstitial every N levels (off by default), house ad placeholder, H5 Games Ads on web, Store (TEST / Google Play / Stripe), presence heartbeat, push open tracking, invite links (`/i/CODE` → `?ref=`), device id in Settings. CI: `--economy-flow` in tools/ci_daily.sh (ECON PASS).
 - [x] Leaderboard: BoardView (Today / Yesterday / Campaign, World / country, medals, your row pinned), slide-in BoardDrawer on the map (trophy tab, swipe), after-Daily board screen with a result card
-- [ ] Play Billing + signed AAB + listing pack + internal/closed testing upload
+- [x] "No parts left" / "Can't place it there" (Bassel 21:09): was white text on the light board, barely visible → red banner with dark outline, new "nope" sound (deny.ogg, synthesized), vibration and a small shake; every other toast is a dark pill
+- [x] Play Billing in our Android plugin (TinkerPush: billing-ktx 8.3.0, Kotlin 2.2.10; Play requires Billing 8+ for new apps since 2026-11-01): connect, buy, re-send unverified purchases; tokens verified + consumed by the server
+- [ ] Signed AAB + listing pack + privacy policy + Play Console setup + closed testing
 - [ ] Regression, PR, deploy
 
 ### M7 Store (not started)
