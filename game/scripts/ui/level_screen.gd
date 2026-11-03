@@ -96,6 +96,10 @@ var again_btn: Button
 var tries_badge: Control  # hearts in the top bar
 var tries_lbl: Label  # refill countdown next to the hearts
 var _out_of_tries := false
+var hint_btn: Button
+var offers: VBoxContainer
+var _hint_ghost: Node2D
+var _hint_shown := -1  # index in the reference solution of the hinted part
 var _rope_preview: Dictionary = {}  # while dragging a rope: {"a": snap point, "b": target} (see rope.gd)
 const RopeScript := preload("res://scripts/parts/rope.gd")
 const ROPE_MAGNET_CELLS := 3.0  # a dragged rope end jumps to a snap point this close
@@ -194,8 +198,11 @@ func _build_scene() -> void:
 	camera = Camera2D.new()
 	camera.name = "Camera"
 	camera.position_smoothing_enabled = false
+	# The camera only HOLDS the view (position, zoom); _apply_view() pushes it to the viewport when it
+	# changes. An enabled Camera2D re-sends the canvas transform every frame, which makes Godot re-render
+	# every frame even when nothing moves: the main cause of phones heating up (2026-11-03).
+	camera.enabled = false
 	world.add_child(camera)
-	camera.make_current()
 
 	hud = CanvasLayer.new()
 	hud.name = "HUD"
@@ -237,6 +244,10 @@ func _build_scene() -> void:
 	tries_lbl = _label("", 24, Color(C_PANEL_TXT, 0.75))
 	tries_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row1.add_child(tries_lbl)
+	if has_node("/root/App"):
+		var chip := CoinChip.make(72)
+		chip.custom_minimum_size.x = 170
+		row1.add_child(chip)
 	counter_lbl = _label("", 30, Color(C_PANEL_TXT, 0.8))
 	counter_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row1.add_child(counter_lbl)
@@ -326,6 +337,12 @@ func _build_scene() -> void:
 	play_btn.add_theme_color_override("font_color", C_INK)
 	play_btn.pressed.connect(_toggle_play)
 	play_btn.set_meta("no_tap", true)  # has its own start / rewind sound
+	hint_btn = _button("Hint", BTN)
+	hint_btn.name = "HintButton"
+	hint_btn.add_theme_font_size_override("font_size", 30)
+	hint_btn.pressed.connect(_buy_hint)
+	hint_btn.visible = false
+	side.add_child(hint_btn)
 	side.add_child(play_btn)
 
 	toast_lbl = _label("", 36, C_PANEL_TXT)
@@ -394,7 +411,10 @@ func _build_scene() -> void:
 	next_btn.add_theme_stylebox_override("normal", _round_style(C_GO))
 	next_btn.add_theme_stylebox_override("hover", _round_style(C_GO))
 	next_btn.add_theme_color_override("font_color", C_INK)
-	next_btn.pressed.connect(func() -> void: App.open_level(level_number + 1))
+	next_btn.pressed.connect(func() -> void:
+		next_btn.disabled = true
+		await App.ads.maybe_interstitial()
+		App.open_level(level_number + 1))
 	row.add_child(next_btn)
 	submit_btn = _button("Submit", BTN)
 	submit_btn.add_theme_stylebox_override("normal", _round_style(C_GO))
@@ -419,6 +439,12 @@ func _build_scene() -> void:
 	row.add_child(edit_btn)
 	for b in [publish_btn, copy_btn, remix_btn, edit_btn]:
 		b.visible = false
+	# Economy offers (admin console decides which exist): shown on failure / out of tries.
+	offers = VBoxContainer.new()
+	offers.name = "Offers"
+	offers.add_theme_constant_override("separation", 14)
+	offers.visible = false
+	rv2.add_child(offers)
 
 
 func _label(text: String, size: int, color: Color) -> Label:
@@ -510,6 +536,10 @@ func _load_level_data(l: LevelData) -> void:
 	_rebuild_tray()
 	_refresh_hud()
 	stage_bg.queue_redraw()
+	# A hint bought earlier for this level is shown again, free.
+	if mode == "campaign" and level_number > 0 and has_node("/root/App") and App.save.has_hint(level_number) \
+			and not level.reference_solution.is_empty() and _hint_shown < 0:
+		_show_hint.call_deferred()
 
 
 func _rebuild_tray() -> void:
@@ -601,6 +631,7 @@ func _refresh_hud() -> void:
 	rot_btn.disabled = selected < 0 or not editing
 	rot90_btn.disabled = rot_btn.disabled
 	setup_btn.visible = mode == "edit" and editing
+	hint_btn.visible = editing and _hint_available() and _hint_shown < 0
 	var sk := _state_key(placements[selected].part) if selected >= 0 and selected < placements.size() else ""
 	state_btn.visible = mode == "edit" and editing and sk != ""
 	if state_btn.visible:
@@ -651,6 +682,15 @@ func _clamp_camera() -> void:
 	var maxp := Vector2(Grid.STAGE_PX) + Vector2(margin, margin) - half
 	camera.position.x = clampf(camera.position.x, minf(minp.x, maxp.x), maxf(minp.x, maxp.x))
 	camera.position.y = clampf(camera.position.y, minf(minp.y, maxp.y), maxf(minp.y, maxp.y))
+	_apply_view()
+
+
+## screen = (world - camera.position) * zoom + viewport_size / 2, set only when it actually changes.
+func _apply_view() -> void:
+	var z := camera.zoom.x
+	var xf := Transform2D(0.0, Vector2(z, z), 0.0, get_viewport_rect().size / 2.0 - camera.position * z)
+	if not get_viewport().canvas_transform.is_equal_approx(xf):
+		get_viewport().canvas_transform = xf
 
 
 func _on_resized() -> void:
@@ -671,8 +711,9 @@ func _world_to_screen(p: Vector2) -> Vector2:
 ## events; a touch that starts on a Button is left alone. Mouse events are ignored on purpose:
 ## the project emulates touch from mouse, so desktop testing goes through the same path.
 func _input(event: InputEvent) -> void:
-	if (info_card != null and is_instance_valid(info_card)) or hud.has_node("SandboxSetup"):
-		return  # modal overlays (part card, sandbox setup) get the touches
+	if (info_card != null and is_instance_valid(info_card)) or hud.has_node("SandboxSetup") \
+			or (has_node("/root/App") and App.modal_open > 0):
+		return  # modal overlays (part card, sandbox setup, shop, ads) get the touches
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			if _on_hud_button(event.position):
@@ -741,10 +782,10 @@ func _tray_touch(part: String, index: int, pos: Vector2) -> void:
 		open_info(part)
 		return
 	if _tray_left(part) <= 0:
-		_toast("No %s left" % PartRegistry.get_def(part).get("name", part))
+		_toast("No %s left" % str(PartRegistry.get_def(part).get("name", part)).to_lower(), true)
 		return
 	if placements.size() >= level.slots:
-		_toast(("A level holds at most %d parts" % level.slots) if mode == "edit" else "No slots left — remove a part first")
+		_toast(("A level holds at most %d parts" % level.slots) if mode == "edit" else "No parts left: remove one to place another", true)
 		return
 	_note_first_touch()
 	_begin_tray_drag(part, index, pos)
@@ -963,7 +1004,7 @@ func _drop_floating(pos: Vector2, part: String, lifted: Placement) -> void:
 		_refresh_hud()
 		return
 	if not Grid.in_stage(cell) or _overlaps(cell, drag["rot"]):
-		_toast("Can't place it there")
+		_toast("Can't place it there", true)
 		if lifted != null:
 			placements.append(lifted)
 			sim.set_player_parts(placements)
@@ -1199,6 +1240,11 @@ func _start_run() -> void:
 		_show_out_of_tries()
 		return
 	_cancel_drag()
+	# A try is spent when RUN is pressed (Bassel 2026-11-03: stopping a run early used to cost nothing,
+	# because only a failed run was counted). A solve refills them (economy switch), see _reward_solve.
+	if _has_app():
+		App.tries.use(_now())
+		tries_badge.queue_redraw()
 	selected = -1
 	run_ended = false
 	result_panel.visible = false
@@ -1239,6 +1285,9 @@ func _on_run_finished(outcome: Dictionary) -> void:
 		b.visible = false
 	match outcome["result"]:
 		"goal":
+			offers.visible = false
+			_clear_hint()
+			_reward_solve()
 			result_face.visible = false
 			again_btn.disabled = false
 			_out_of_tries = false
@@ -1270,11 +1319,11 @@ func _on_run_finished(outcome: Dictionary) -> void:
 	_refresh_hud()
 
 
-## The machine stopped (or ran out of time) without reaching the goal: say so, cost one try.
+## The machine stopped (or ran out of time) without reaching the goal: say so (the try was spent on RUN).
 func _show_failure(why: String) -> void:
 	var left := 99
 	if _has_app():
-		left = App.tries.use(_now())
+		left = App.tries.left(_now())  # already spent when RUN was pressed
 	result_face.visible = true
 	next_btn.visible = false
 	submit_btn.visible = false
@@ -1296,6 +1345,7 @@ func _show_failure(why: String) -> void:
 		_out_of_tries = true
 		again_btn.disabled = false
 		_update_out_of_tries_text(head + "\nThe goal wasn't reached.")
+	_build_offers()
 	result_panel.visible = true
 	again_btn.queue_redraw()
 	tries_badge.queue_redraw()
@@ -1309,6 +1359,7 @@ func _show_out_of_tries() -> void:
 	_out_of_tries = true
 	again_btn.disabled = false
 	_update_out_of_tries_text("Out of tries.")
+	_build_offers()
 	result_panel.visible = true
 
 
@@ -1316,6 +1367,204 @@ func _update_out_of_tries_text(head: String) -> void:
 	var wait := App.tries.seconds_to_refill(_now()) if _has_app() else 0
 	result_lbl.set_meta("head", head)
 	result_lbl.text = "%s\nNew tries in %s\nYou can keep building meanwhile." % [head, Tries.fmt_wait(wait)]
+
+
+# ------------------------------------------------------------------ economy (coins, ads, hints, skip)
+
+func _eco() -> bool:
+	return has_node("/root/App") and mode in ["campaign", "daily"]
+
+
+## Hints exist for campaign levels (their reference solution ships with the game); never for the
+## Daily (its solution stays on the server, and the board must stay fair).
+func _hint_available() -> bool:
+	return _eco() and mode == "campaign" and level_number > 0 and App.economy.on("hints") \
+		and level != null and not level.reference_solution.is_empty()
+
+
+## Solving: a new level starts with full tries (admin switch), and the first solve of a campaign
+## level pays coins.
+func _reward_solve() -> void:
+	if not _eco():
+		return
+	if App.economy.on("refill_tries_on_new_level"):
+		App.tries.refill()
+		tries_badge.queue_redraw()
+	if mode == "campaign" and level_number > 0 and App.economy.on("coins"):
+		var r: Dictionary = await App.wallet.earn_campaign(level_number, placements.duplicate())
+		if r["ok"]:
+			_toast("+%d coins" % int(r.get("coins_added", 0)))
+
+
+func _build_offers() -> void:
+	for c in offers.get_children():
+		offers.remove_child(c)  # now, not at frame end: the new buttons reuse the same names
+		c.queue_free()
+	offers.visible = false
+	if not _eco():
+		return
+	var eco := App.economy
+	var rows := []
+	if _out_of_tries:
+		if eco.on("rewarded_ads") and _ads_left():
+			var n := eco.num("ad_reward_tries", 1)
+			rows.append(_offer("OfferAd", "Watch an ad: +%d tr%s" % [n, "y" if n == 1 else "ies"], -1, _offer_ad))
+		if eco.on("extra_tries"):
+			rows.append(_offer("OfferTry", "+1 try", eco.num("extra_try_cost"), _offer_spend.bind("extra_try")))
+			rows.append(_offer("OfferRefill", "Refill all tries", eco.num("refill_cost"), _offer_spend.bind("refill")))
+	if mode == "campaign" and level_number > 0:
+		if _hint_available() and _hint_shown < 0:
+			rows.append(_offer("OfferHint", "Hint: where a part goes", eco.num("hint_cost"), _offer_hint))
+		if eco.on("skip") and App.has_next(level_number):
+			rows.append(_offer("OfferSkip", "Skip this level", eco.num("skip_cost"), _offer_skip))
+	for r in rows:
+		offers.add_child(r)
+	offers.visible = not rows.is_empty()
+
+
+## cost < 0: free (an ad).
+func _offer(id: String, text: String, cost: int, cb: Callable) -> Button:
+	var b := _button(text + ("   ·   %d coins" % cost if cost >= 0 else "   ·   free"), 104)
+	b.name = id
+	b.add_theme_font_size_override("font_size", 30)
+	var fill := Color("ffd43b") if cost >= 0 else C_GO
+	b.add_theme_stylebox_override("normal", _round_style(fill))
+	b.add_theme_stylebox_override("hover", _round_style(fill))
+	b.add_theme_stylebox_override("pressed", _round_style(fill.darkened(0.2)))
+	b.add_theme_color_override("font_color", C_INK)
+	b.add_theme_color_override("font_hover_color", C_INK)
+	b.add_theme_color_override("font_pressed_color", C_INK)
+	if cost >= 0 and App.wallet.synced and App.wallet.coins < cost:
+		b.text = text + "   ·   needs %d coins" % cost
+	b.pressed.connect(func() -> void:
+		b.disabled = true
+		await cb.call()
+		if is_instance_valid(b):
+			b.disabled = false)
+	return b
+
+
+## The server caps rewarded ads per day; don't make anyone watch an ad that can't pay out.
+func _ads_left() -> bool:
+	return not App.wallet.synced or App.wallet.ads_left_today > 0
+
+
+func _offer_ad() -> void:
+	if not _ads_left():
+		_toast("No more ad rewards today", true)
+		_build_offers()
+		return
+	if not await App.ads.show_rewarded("try"):
+		_toast("No reward: the ad was closed early")
+		return
+	var r: Dictionary = await App.ad_for_try()  # tries added by App, even if this screen is gone
+	if not is_inside_tree():
+		return
+	if not r["ok"]:
+		_toast(str(r["error"]))
+		return
+	_tries_granted()
+
+
+func _offer_spend(item: String) -> void:
+	var ref := "c%d" % level_number if level_number > 0 else str(daily.get("date", ""))
+	var r: Dictionary = await App.buy_tries(item, ref)  # tries added by App, even if this screen is gone
+	if not is_inside_tree():
+		return
+	if not r["ok"]:
+		_no_coins(r)
+		return
+	_tries_granted()
+
+
+func _no_coins(r: Dictionary) -> void:
+	if int(r.get("status", 0)) == 402:
+		_toast("Not enough coins")
+		ShopPanel.open(get_tree().current_scene)
+	else:
+		_toast(str(r["error"]))
+
+
+## The tries were already added by App: refresh the screen.
+func _tries_granted() -> void:
+	_out_of_tries = false
+	tries_badge.queue_redraw()
+	App.audio.sfx("goal")
+	result_panel.visible = false
+	_stop_run()
+	var left := App.tries.left(_now())
+	_toast("%d tr%s left" % [left, "y" if left == 1 else "ies"])
+
+
+func _offer_hint() -> void:
+	result_panel.visible = false
+	_stop_run()
+	await _buy_hint()
+
+
+func _offer_skip() -> void:
+	var n := level_number
+	var r: Dictionary = await App.buy_skip(n)  # recorded by App even if this screen is gone by then
+	if not is_inside_tree():
+		return
+	if not r["ok"]:
+		_no_coins(r)
+		return
+	App.open_level(n + 1)
+
+
+var _hint_buying := false  # one hint purchase in flight at a time (a double tap must not pay twice)
+
+
+func _buy_hint() -> void:
+	if not _hint_available() or _hint_shown >= 0 or _hint_buying:
+		return
+	_hint_buying = true
+	hint_btn.disabled = true
+	var r: Dictionary = await App.buy_hint(level_number)  # remembered in the save even if this screen is gone
+	if not is_inside_tree():
+		return
+	_hint_buying = false
+	hint_btn.disabled = false
+	if not r["ok"]:
+		_no_coins(r)
+		return
+	_show_hint()
+
+
+## The hint: a see-through copy of one part of the reference solution at its cell and angle, gently
+## pulsing. It stays until the level is solved or left.
+func _show_hint() -> void:
+	var sol: Array = level.reference_solution
+	var pick := 0
+	for i in sol.size():
+		var placed := false
+		for p in placements:
+			placed = placed or (p.part == sol[i].part and p.cell == sol[i].cell and p.rot == sol[i].rot)
+		if not placed:
+			pick = i
+			break
+	_hint_shown = pick
+	var pl: Placement = sol[pick]
+	_hint_ghost = PartFactory.create(pl, 9100, false)
+	if _hint_ghost:
+		_hint_ghost.name = "HintGhost"
+		_hint_ghost.modulate = Color(1, 1, 1, 0.45)
+		_disable_collisions(_hint_ghost)
+		_hint_ghost.process_mode = Node.PROCESS_MODE_DISABLED
+		world.add_child(_hint_ghost)
+		var tw := create_tween().set_loops()
+		tw.tween_property(_hint_ghost, "modulate:a", 0.8, 0.7)
+		tw.tween_property(_hint_ghost, "modulate:a", 0.3, 0.7)
+	_toast("Hint: the %s goes here" % str(PartRegistry.get_def(pl.part).get("name", pl.part)).to_lower())
+	App.audio.sfx("place")
+	_refresh_hud()
+
+
+func _clear_hint() -> void:
+	if _hint_ghost and is_instance_valid(_hint_ghost):
+		_hint_ghost.queue_free()
+	_hint_ghost = null
 
 
 ## Tries count in the campaign and the Daily only: the editor, the author's test and shared
@@ -1381,11 +1630,15 @@ var _tick_acc := 0.0
 
 
 func _process(delta: float) -> void:
-	overlay.queue_redraw()
+	if sim.running or confetti_left > 0.0:
+		FramePacer.busy(200)
+	confetti_left = maxf(0.0, confetti_left - delta)
+	if FramePacer.anim():
+		overlay.queue_redraw()
 	# RUN breathes gently once there is something to run, so the next step is obvious.
 	var ready := not sim.running and not run_ended and not placements.is_empty()
 	play_btn.pivot_offset = play_btn.size / 2.0
-	var k := 1.0 + (0.045 * (0.5 + 0.5 * sin(Time.get_ticks_msec() / 260.0)) if ready else 0.0)
+	var k := play_btn.scale.x if not FramePacer.anim() else 1.0 + (0.045 * (0.5 + 0.5 * sin(Time.get_ticks_msec() / 260.0)) if ready else 0.0)
 	play_btn.scale = Vector2(k, k)
 	_tick_acc += delta
 	if _tick_acc < 0.5 or not _has_app():
@@ -1503,6 +1756,7 @@ func _save_draft_layout() -> void:
 
 
 func _exit_tree() -> void:
+	get_viewport().canvas_transform = Transform2D.IDENTITY  # the next screen (map, sandbox) is unscrolled
 	if mode == "edit" and has_node("/root/App"):
 		_save_draft_layout()
 
@@ -1600,7 +1854,11 @@ func _draw_run_icon(n: Control) -> void:
 
 ## Celebration burst from the top of the screen when a run reaches the goal. HUD layer only:
 ## it cannot touch the simulation. CPUParticles2D so it works in the web (Compatibility) build.
+var confetti_left := 0.0  # seconds of full-rate animation left for the confetti
+
+
 func _confetti() -> void:
+	confetti_left = 3.0
 	var vs := get_viewport_rect().size
 	var colors := [C_ACCENT, C_GO, Color("6ec6ff"), Color("ffd43b"), Color("b35fd1"), Color("e8833a")]
 	for i in 2:
@@ -1692,6 +1950,9 @@ func _submit_daily() -> void:
 	submit_btn.text = "Checking…"
 	var r: Dictionary = await App.submit_daily(placements, _solve_ms)
 	if r["ok"] or r["status"] == 409:
+		# The Daily reward is granted by the server with the verified score (POST /score).
+		if int(r["body"].get("coins_added", 0)) > 0 if r["body"] is Dictionary else false:
+			App.wallet.sync()
 		App.open_board(daily["date"])
 		return
 	submit_btn.disabled = false
@@ -1707,10 +1968,35 @@ func _draw_dashed(on: CanvasItem, a: Vector2, b: Vector2, c: Color) -> void:
 	on.draw_circle(b, 7.0, c)
 
 
-func _toast(msg: String) -> void:
+## Messages over the board: a dark pill (always readable on the light sheet). warn = a red pill, the
+## "nope" sound, a vibration and a little shake (no parts / no slots left; Bassel 2026-11-03).
+func _toast(msg: String, warn: bool = false) -> void:
 	toast_lbl.text = msg
 	toast_lbl.visible = true
-	var t := get_tree().create_timer(2.2)
+	var st := StyleBoxFlat.new()
+	st.bg_color = C_ACCENT if warn else C_PANEL
+	st.border_color = C_INK
+	st.set_border_width_all(5)
+	st.set_corner_radius_all(28)
+	st.content_margin_left = 32
+	st.content_margin_right = 32
+	st.content_margin_top = 16
+	st.content_margin_bottom = 16
+	st.shadow_color = Color(0, 0, 0, 0.3)
+	st.shadow_size = 10
+	st.shadow_offset = Vector2(0, 6)
+	toast_lbl.add_theme_stylebox_override("normal", st)
+	toast_lbl.add_theme_color_override("font_color", Color.WHITE if warn else C_PANEL_TXT)
+	if warn:
+		_snd("deny")
+		if has_node("/root/App"):
+			App.audio.buzz(60)
+		toast_lbl.pivot_offset = toast_lbl.size / 2.0
+		var sh := create_tween()
+		for dx in [18.0, -14.0, 10.0, -6.0, 0.0]:
+			sh.tween_property(toast_lbl, "rotation", deg_to_rad(dx * 0.12), 0.05)
+		FramePacer.busy(400)
+	var t := get_tree().create_timer(2.6 if warn else 2.2)
 	t.timeout.connect(func() -> void:
 		if toast_lbl.text == msg:
 			toast_lbl.visible = false)
@@ -1734,6 +2020,9 @@ var _smoke_ok := true
 ## Drives the real input path: drag the first tray part to the reference cell, rotate it with the
 ## ring, undo/redo, PLAY, wait for the result, screenshot every step. Returns the outcome.
 func run_smoke_steps() -> Dictionary:
+	if _has_app():
+		App.tries.reset()  # each smoke run starts with full tries (runs share one save dir in CI)
+		tries_badge.queue_redraw()
 	_smoke_ok = true
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -1780,8 +2069,11 @@ func run_smoke_steps() -> Dictionary:
 		_assert(placements[0].rot == target.rot, "redo restored rotation")
 	var outcome_box := {}
 	sim.finished.connect(func(o: Dictionary) -> void: outcome_box["o"] = o, CONNECT_ONE_SHOT)
+	var tries_before := App.tries.left(_now()) if _has_app() else 0
 	await _tap_button(play_btn)
 	_assert(sim.running, "simulation running after PLAY")
+	if _has_app():
+		_assert(App.tries.left(_now()) == tries_before - 1, "pressing RUN spent one try (%d -> %d)" % [tries_before, App.tries.left(_now())])
 	await get_tree().create_timer(1.0).timeout
 	_shot(shots_dir + "/04_running.png")
 	while not outcome_box.has("o"):

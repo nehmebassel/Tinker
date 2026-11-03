@@ -65,6 +65,12 @@ jobs:
             timeout 120 xvfb-run -a -s "-screen 0 1200x2100x24" godot --path game --rendering-driver opengl3 --resolution 540x960 --quit-after 1800 res://scenes/level.tscn -- --smoke --level=$L 2>&1 | tee -a build/smoke.log
           done
           [ "$(grep -c 'SMOKE PASS' build/smoke.log)" = "4" ]
+      - name: Power check (idle screens must not render every frame; phones heated up before)
+        run: |
+          for W in map level:1 level:34; do
+            timeout 60 xvfb-run -a -s "-screen 0 1200x2100x24" godot --path game --rendering-driver opengl3 --resolution 540x960 -- --perf-probe=$W 2>&1 | grep PERF | tee -a build/perf.log
+          done
+          python3 -c "import re,sys; v=[float(x) for x in re.findall(r'rendered_per_s=([0-9.]+)', open('build/perf.log').read())]; print(v); sys.exit(0 if len(v)==3 and max(v)<=20 else 1)"
       - name: Campaign flow test (world select -> level 1 -> Next -> back, save persisted)
         run: |
           timeout 180 xvfb-run -a -s "-screen 0 1200x2100x24" godot --path game --rendering-driver opengl3 --resolution 540x960 --quit-after 3000 -- --flow 2>&1 | tee build/flow.log
@@ -119,7 +125,7 @@ jobs:
           java-version: "17"
       - uses: android-actions/setup-android@v3
         with:
-          packages: "platform-tools build-tools;35.0.0 platforms;android-35"
+          packages: "platform-tools build-tools;36.0.0 platforms;android-36"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.14.3"

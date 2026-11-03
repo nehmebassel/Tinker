@@ -53,7 +53,8 @@ func set_ghost(p_on: bool) -> void:
 func _process(delta: float) -> void:
 	if running_visual() and on:
 		_spin += delta * speed * float(direction)
-		queue_redraw()
+		if FramePacer.anim():
+			queue_redraw()
 
 
 ## Motors have no running flag of their own: they turn while their simulation runs.

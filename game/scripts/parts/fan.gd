@@ -84,7 +84,8 @@ func set_ghost(p_on: bool) -> void:
 func _process(delta: float) -> void:
 	if running and on:
 		_spin += delta * 22.0
-		queue_redraw()
+		if FramePacer.anim():
+			queue_redraw()
 
 
 func _draw() -> void:

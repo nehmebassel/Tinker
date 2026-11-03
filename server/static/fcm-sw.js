@@ -4,11 +4,19 @@
 importScripts("https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/11.10.0/firebase-messaging-compat.js");
 const cfg = JSON.parse(new URL(self.location).searchParams.get("config") || "{}");
+// Delivery tracking (admin console): report "received" for every campaign push, before Firebase shows it.
+self.addEventListener("push", (e) => {
+  let rcpt = "";
+  try { rcpt = (e.data && e.data.json().data || {}).rcpt || ""; } catch (_) {}
+  if (rcpt) e.waitUntil(fetch(new URL("../../push/event", self.location).href, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ rcpt, event: "received" }) }).catch(() => {}));
+});
 firebase.initializeApp(cfg);
 firebase.messaging();  // displays notification-payload messages while the game is in the background
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
-  const url = new URL("../", self.location).href;  // /play/
+  const d = (e.notification.data && (e.notification.data.FCM_MSG || {}).data) || {};
+  const url = new URL("../", self.location).href + (d.rcpt ? "?push=" + encodeURIComponent(d.rcpt) : "");  // /play/
+  if (d.rcpt) fetch(new URL("../../push/event", self.location).href, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ rcpt: d.rcpt, event: "opened" }) }).catch(() => {});
   e.waitUntil(clients.matchAll({ type: "window", includeUncontrolled: true }).then((ws) => {
     for (const w of ws) if (w.url.startsWith(url) && "focus" in w) return w.focus();
     return clients.openWindow(url);

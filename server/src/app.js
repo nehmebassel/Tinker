@@ -8,6 +8,8 @@ import { config, todayUtc, addDays, dayNumber } from "./config.js";
 import { fcm as realFcm, isFcmToken, dailyMessage } from "./push.js";
 import { col, db } from "./db.js";
 import { replay, generateDaily } from "./godot.js";
+import { mountEconomy, getEconomy, publicEconomy, adminGate } from "./economy.js";
+import { mountOps } from "./ops.js";
 import { isDate, isDeviceId, isCountry, isShortId, validSolution, validLevel, solutionFits, publicLevel } from "./validate.js";
 
 // ------------------------------------------------------------------ rate limit (per device / ip, per minute)
@@ -35,16 +37,21 @@ function shortId() {
   return s;
 }
 
-export function createApp({ replayFn = replay, generateFn = generateDaily, fcm = realFcm } = {}) {
+export function createApp({ replayFn = replay, generateFn = generateDaily, fcm = realFcm, playVerify, fetchFn } = {}) {
   const app = express();
-  app.use(express.json({ limit: config.maxLevelBytes }));
+  // rawBody: the Stripe webhook signature is over the exact bytes received.
+  app.use(express.json({ limit: config.maxLevelBytes, verify: (req, _res, buf) => { if (req.originalUrl === "/stripe/webhook") req.rawBody = buf; } }));
   app.disable("x-powered-by");
 
   app.get("/health", (_req, res) => res.json({ ok: true, today: todayUtc(), emulator: config.emulator }));
   // Game rules for clients (cached by the game; it falls back to its own defaults offline).
-  app.get("/config", (_req, res) => {
-    res.set("Cache-Control", "public, max-age=300");
-    res.json({ tries_limit: config.triesLimit, tries_window_hours: config.triesWindowHours });
+  // economy: features on/off, prices, rewards, ads and products, all set in the admin console.
+  app.get("/config", async (_req, res, next) => {
+    try {
+      const eco = publicEconomy(await getEconomy());
+      res.set("Cache-Control", "public, max-age=60");
+      res.json({ tries_limit: config.triesLimit, tries_window_hours: config.triesWindowHours, economy: eco });
+    } catch (e) { next(e); }
   });
 
   // ---------------------------------------------------------------- the game itself
@@ -139,7 +146,11 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     if (!solutionFits(level, solution)) return res.status(400).json({ error: "solution does not fit tray/slots" });
     const scoreId = `${date}_${device_id}`;
     const existing = await col.scores().doc(scoreId).get();
-    if (existing.exists) return res.status(409).json({ error: "already submitted", entry: existing.data() });
+    if (existing.exists) {
+      // A resubmission (e.g. the first response was lost): make sure the Daily reward was granted.
+      const reward = await app.locals.earnDaily?.(device_id, date).catch(() => null);
+      return res.status(409).json({ error: "already submitted", entry: existing.data(), coins_added: reward?.coins_added || 0 });
+    }
     // The proof: replay on the server with the same simulation.
     const r = await replayFn(level, solution);
     if (!r.ok) return res.status(400).json({ error: "replay failed: " + r.error });
@@ -161,7 +172,8 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     }
     await col.devices().doc(device_id).set({ country: ctry, last_seen: entry.created_at, name: entry.name }, { merge: true });
     const rank = await rankOf(date, "global", entry);
-    res.status(201).json({ ok: true, parts: entry.parts, ms: entry.ms, rank });
+    const reward = await app.locals.earnDaily?.(device_id, date).catch((e) => { console.error("daily reward", e); return null; });
+    res.status(201).json({ ok: true, parts: entry.parts, ms: entry.ms, rank, coins_added: reward?.coins_added || 0 });
   });
 
   // ---------------------------------------------------------------- board
@@ -290,11 +302,7 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
 
   // ---------------------------------------------------------------- admin (curation)
   const admin = express.Router();
-  admin.use((req, res, next) => {
-    if (!config.adminToken) return res.status(404).end();
-    if (req.get("x-admin-token") !== config.adminToken) return res.status(401).json({ error: "unauthorized" });
-    next();
-  });
+  admin.use(adminGate);
   // Pre-generate missing dailies for today .. today+daysAhead. Idempotent; safe for Cloud Scheduler.
   admin.post("/generate", async (req, res) => {
     const days = Math.min(Number(req.query.days || config.daysAhead), 30);
@@ -375,7 +383,25 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     if (!snap.exists) return res.status(404).json({ error: "not found" });
     res.json(snap.data());
   });
+  // Privacy policy (Google Play requires a public URL). Company / contact / website come from the
+  // admin console (settings/economy.legal), so nothing about the publisher is hard-coded.
+  app.get("/privacy", async (_req, res, next) => {
+    try {
+      const { legal } = await getEconomy();
+      const esc = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      const tpl = await import("node:fs/promises").then((fs) => fs.readFile(staticDir + "privacy.html", "utf8"));
+      const contact = legal.contact_email ? `<a href="mailto:${esc(legal.contact_email)}">${esc(legal.contact_email)}</a>` : "the contact address in the store listing";
+      res.set("Cache-Control", "public, max-age=600").type("html").send(tpl
+        .replaceAll("{{COMPANY}}", esc(legal.company)).replaceAll("{{CONTACT}}", contact)
+        .replaceAll("{{WEBSITE}}", esc(legal.website)).replaceAll("{{UPDATED}}", esc(legal.updated)));
+    } catch (e) { next(e); }
+  });
+  // Admin console page (static, holds no secrets; every call it makes needs the admin token).
+  app.get("/admin/ui", (_req, res) => res.set({ "Cache-Control": "no-cache", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer" }).sendFile(staticDir + "admin.html"));
+  const ecoAdmin = mountEconomy(app, { rateLimited, publicId, replayFn, ...(playVerify ? { playVerify } : {}), ...(fetchFn ? { fetchFn } : {}) });
+  mountOps(app, ecoAdmin, { fcm, rateLimited, publicId });
   app.use("/admin", admin);
+  app.use("/admin", ecoAdmin);
 
   app.use((err, _req, res, _next) => {
     if (err?.type === "entity.too.large") return res.status(413).json({ error: "payload too large" });

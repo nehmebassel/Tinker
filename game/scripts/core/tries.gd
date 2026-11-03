@@ -1,8 +1,9 @@
 class_name Tries
 extends RefCounted
-## Tries — limited failed runs (M6): `limit` failures per window of `window_hours`, the window
-## starting at the first failure after a refill. A failed run (stalled / timeout) costs one try;
-## a solve costs nothing. When none are left, RUN waits until the window ends, then all refill.
+## Tries — limited runs (M6, changed 2026-11-03): `limit` runs per window of `window_hours`, the window
+## starting at the first run after a refill. Pressing RUN costs one try (stopping early used to be
+## free); solving a level refills them when the economy switch refill_tries_on_new_level is on.
+## When none are left, RUN waits until the window ends (or the player gets tries with an ad / coins).
 ##
 ## Rules come from the backend (GET /config: TRIES_LIMIT, TRIES_WINDOW_HOURS, set in Cloud Run) and
 ## are cached here; offline the project settings tinker/tries_limit and tinker/tries_window_hours
@@ -58,7 +59,7 @@ func left(now: int) -> int:
 	return maxi(0, limit - used)
 
 
-## Record one failed run. Returns tries left.
+## Record one run (RUN pressed). Returns tries left.
 func use(now: int) -> int:
 	_refresh(now)
 	if window_start == 0:
@@ -81,6 +82,20 @@ static func fmt_wait(secs: int) -> String:
 	var m := (secs % 3600) / 60
 	var s := secs % 60
 	return "%d:%02d:%02d" % [h, m, s] if h > 0 else "%d:%02d" % [m, s]
+
+
+## Bought / earned extra tries (coins, a rewarded ad): give back `n` used tries.
+func add(n: int, now: int) -> void:
+	_refresh(now)
+	used = maxi(0, used - n)
+	if used == 0:
+		window_start = 0
+	save()
+
+
+## A new level was reached (economy feature refill_tries_on_new_level): start it with full tries.
+func refill() -> void:
+	reset()
 
 
 func reset() -> void:

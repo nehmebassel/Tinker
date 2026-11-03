@@ -27,3 +27,4 @@ game/addons/tinker_push/bin/
 android/tinker_push/build/
 android/tinker_push/.gradle/
 local.properties
+android/tinker_push/.kotlin/

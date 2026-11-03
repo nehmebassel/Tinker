@@ -27,4 +27,5 @@ class TinkerPushExport extends EditorExportPlugin:
 		return PackedStringArray(["tinker_push/bin/tinker_push-release.aar"])
 
 	func _get_android_dependencies(_platform: EditorExportPlatform, _debug: bool) -> PackedStringArray:
-		return PackedStringArray(["com.google.firebase:firebase-messaging:24.1.0", "androidx.core:core-ktx:1.13.1"])
+		return PackedStringArray(["com.google.firebase:firebase-messaging:24.1.0", "androidx.core:core-ktx:1.13.1",
+			"com.android.billingclient:billing-ktx:8.3.0"])

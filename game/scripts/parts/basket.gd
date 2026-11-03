@@ -119,7 +119,8 @@ func _process(delta: float) -> void:
 	# Latched once the run ended on the goal; the node is rebuilt on rewind, which clears it.
 	if _won_t >= 0.0 or _goal_met():
 		_won_t = maxf(_won_t, 0.0) + delta
-	_marker.queue_redraw()
+	if FramePacer.anim():
+		_marker.queue_redraw()
 
 
 func _draw_back() -> void:

@@ -56,7 +56,8 @@ func best(number: int) -> Dictionary:
 func record_solve(number: int, parts_used: int, elapsed_ms: int, solution: Array) -> bool:
 	var key := str(number)
 	var cur: Dictionary = levels.get(key, {})
-	var better: bool = not cur.get("solved", false) \
+	# A skipped level (bought with coins) has no real score: the first real solve always replaces it.
+	var better: bool = not cur.get("solved", false) or cur.get("skipped", false) \
 		or parts_used < int(cur.get("best_parts", 1 << 30)) \
 		or (parts_used == int(cur.get("best_parts", 1 << 30)) and elapsed_ms < int(cur.get("best_ms", 1 << 30)))
 	if better:
@@ -64,11 +65,49 @@ func record_solve(number: int, parts_used: int, elapsed_ms: int, solution: Array
 		for p in solution:
 			sol.append(p.to_dict() if p is Placement else p)
 		levels[key] = {"solved": true, "best_parts": parts_used, "best_ms": elapsed_ms, "solution": sol}
+		if cur.get("hint", false):
+			levels[key]["hint"] = true  # a bought hint stays bought
 	else:
 		cur["solved"] = true
 		levels[key] = cur
 	save()
 	return better
+
+
+## A hint bought for this level (shown again whenever the level opens).
+func record_hint(number: int) -> void:
+	var key := str(number)
+	var e: Dictionary = levels.get(key, {})
+	e["hint"] = true
+	levels[key] = e
+	save()
+
+
+func has_hint(number: int) -> bool:
+	return bool(levels.get(str(number), {}).get("hint", false))
+
+
+## Skipped with coins (economy "skip"): counts as solved so the next level unlocks; no best score.
+func record_skip(number: int) -> void:
+	var key := str(number)
+	var cur: Dictionary = levels.get(key, {})
+	if not cur.get("solved", false):
+		levels[key] = {"solved": true, "skipped": true, "best_parts": 0, "best_ms": 0, "solution": []}
+		if cur.get("hint", false):
+			levels[key]["hint"] = true
+		save()
+
+
+## Campaign leaderboard numbers: levels solved (skips excluded) and the sum of best part counts.
+func board_progress() -> Dictionary:
+	var solved := 0
+	var parts := 0
+	for k in levels:
+		var e: Dictionary = levels[k]
+		if e.get("solved", false) and not e.get("skipped", false):
+			solved += 1
+			parts += int(e.get("best_parts", 0))
+	return {"solved": solved, "parts": parts}
 
 
 func reset() -> void:

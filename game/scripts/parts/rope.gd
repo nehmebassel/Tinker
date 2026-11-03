@@ -177,7 +177,8 @@ func set_ghost(on: bool) -> void:
 # ---------------------------------------------------------------- drawing
 
 func _process(_delta: float) -> void:
-	queue_redraw()
+	if FramePacer.anim():
+		queue_redraw()
 
 
 ## Where the rope meets an end: the snap point, or the top tangent point of a pulley wheel as seen

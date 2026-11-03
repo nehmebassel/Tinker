@@ -16,6 +16,15 @@ var push: Push
 var audio: Audio
 var tries: Tries
 var sandbox_store: SandboxStore
+var modal_open: int = 0  # shop / ad overlays open: the level screen ignores touches meanwhile
+var economy := Economy.new()  # admin-console rules from GET /config (empty = everything paid off)
+var wallet: Wallet
+var ads: Ads
+var store: Store
+
+signal economy_changed
+
+const PRESENCE_S := 60.0  # heartbeat while the game is open: "online now" in the admin console
 ## Sandbox context for the level screen: {} for campaign/daily, else
 ## {"mode": "edit"|"verify", "index": draft} or {"mode": "shared", "code", "level", "author_parts"}.
 var sandbox: Dictionary = {}
@@ -27,12 +36,19 @@ var board_date: String = ""
 var _nav_gen := 0  # bumped by every navigation; a slow async navigation checks it before switching
 var flow_test: bool = false
 var daily_test: String = ""
+var economy_test: bool = false  # --economy-flow (CI, against a staging server)
 var sandbox_test: String = ""  # "publish:<file to write the code>" or "play:<code>" (CI, two installs)  # --daily-flow=<solution.json>: CI test of the whole daily loop
+
+
+## Any touch / click / scroll: animate at full rate for a moment (FramePacer), so dragging stays smooth.
+func _input(_event: InputEvent) -> void:
+	FramePacer.busy(600)
 
 
 func _ready() -> void:
 	save = SaveData.load_or_new()
 	settings = Settings.load_or_new()
+	settings.apply_battery_saver()
 	daily_store = DailyStore.load_or_new()
 	api = Api.new(settings)
 	add_child(api)
@@ -43,7 +59,17 @@ func _ready() -> void:
 	add_child(audio)
 	tries = Tries.load_or_new()
 	sandbox_store = SandboxStore.load_or_new()
+	wallet = Wallet.new()
+	wallet.name = "Wallet"
+	add_child(wallet)
+	ads = Ads.new()
+	ads.name = "Ads"
+	add_child(ads)
+	store = Store.new()
+	store.name = "Store"
+	add_child(store)
 	_fetch_rules.call_deferred()
+	_start_presence.call_deferred()
 	for a in OS.get_cmdline_user_args():
 		if a == "--reset-save":
 			save.reset()
@@ -61,14 +87,22 @@ func _ready() -> void:
 			sandbox_test = "play:" + a.trim_prefix("--sandbox-play=")
 		elif a.begins_with("--shot-ws="):
 			_shot_ws(a.trim_prefix("--shot-ws="))
+		elif a == "--economy-flow":
+			economy_test = true
+		elif a.begins_with("--perf-probe="):
+			_perf_probe(a.trim_prefix("--perf-probe="))
 	if OS.has_feature("web") and not flow_test and daily_test == "" and sandbox_test == "":
 		_open_link_level.call_deferred()
+		_web_link_extras.call_deferred()
+	_report_push_open.call_deferred()
 	if flow_test:
 		save.reset()
 		tries.reset()
 		_run_flow()
 	elif sandbox_test != "":
 		_run_sandbox_flow.call_deferred()
+	elif economy_test:
+		_run_economy_flow.call_deferred()
 	elif daily_test != "":
 		_run_daily_flow.call_deferred()
 
@@ -84,13 +118,85 @@ func _open_link_level() -> void:
 		push_warning(err)
 
 
-## Tries rules from the backend (GET /config); offline the cached / project-setting values stay.
+## Rules from the backend (GET /config): tries, and the economy (features, prices, ads, products) set
+## in the admin console. Offline the cached tries rules stay and every paid feature stays off.
 func _fetch_rules() -> void:
 	if settings.base_url() == "":
 		return
 	var r: Dictionary = await api.get_json("/config")
 	if r.get("ok", false) and r["body"] is Dictionary and r["body"].has("tries_limit"):
 		tries.set_rules(int(r["body"]["tries_limit"]), float(r["body"].get("tries_window_hours", 6.0)))
+		economy.set_config(r["body"].get("economy", {}))
+		economy_changed.emit()
+		if economy.on("coins"):
+			await wallet.sync()
+
+
+## Heartbeat: who is online, on which platform / OS, and who used the app on which days (admin).
+func _start_presence() -> void:
+	if settings.base_url() == "" or flow_test or daily_test != "" or sandbox_test != "":
+		return
+	while is_inside_tree():
+		await api.post_json("/presence", {"device_id": settings.device_id, "name": settings.name,
+			"country": Settings.country(), "platform": platform(), "os": OS.get_name() + " " + OS.get_version(),
+			"model": OS.get_model_name(), "browser": _browser(), "app_version": str(ProjectSettings.get_setting("application/config/version", ""))})
+		await get_tree().create_timer(PRESENCE_S).timeout
+		_fetch_rules()  # prices / switches changed in the admin console reach open games within a minute
+
+
+static func platform() -> String:
+	if OS.has_feature("web"):
+		return "web"
+	if OS.has_feature("android"):
+		return "android"
+	if OS.has_feature("ios"):
+		return "ios"
+	return OS.get_name().to_lower()
+
+
+static func _browser() -> String:
+	if not OS.has_feature("web"):
+		return ""
+	return str(JavaScriptBridge.eval("navigator.userAgent", true)).substr(0, 300)
+
+
+## Web links: ?ref=CODE (invite: claim it for this new player), ?paid=1 (back from Stripe checkout).
+func _web_link_extras() -> void:
+	var ref := str(JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('ref') || ''", true))
+	var paid := str(JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('paid') || ''", true))
+	if ref != "" and ref != "null":
+		await get_tree().create_timer(3.0).timeout  # after the wallet exists
+		var r: Dictionary = await wallet.claim_referral(ref.to_upper())
+		_toast_any(("Invite accepted: +%d coins" % int(r.get("coins_added", 0))) if r["ok"] else "")
+	if paid == "1":
+		await get_tree().create_timer(3.0).timeout
+		await wallet.sync()
+		_toast_any("Thanks! Your purchase is in your wallet.")
+
+
+## A notification was tapped: tell the server (open rate per campaign in the admin console).
+## Web: /play/?push=<recipient id> (set by the service worker). Android: the plugin's launch data.
+func _report_push_open() -> void:
+	var rcpt := ""
+	if OS.has_feature("web"):
+		rcpt = str(JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('push') || ''", true))
+	elif Engine.has_singleton("TinkerPush") and Engine.get_singleton("TinkerPush").has_method("launchData"):
+		rcpt = str(Engine.get_singleton("TinkerPush").launchData())
+	if rcpt != "" and rcpt != "null" and settings.base_url() != "":
+		await api.post_json("/push/event", {"rcpt": rcpt, "event": "opened", "device_id": settings.device_id})
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_RESUMED:
+		_report_push_open()  # Android: the app was brought back by tapping a notification
+
+
+func _toast_any(t: String) -> void:
+	if t == "":
+		return
+	var s := get_tree().current_scene
+	if s and s.has_method("_toast"):
+		s._toast(t)
 
 
 ## Scene changes are deferred so the input event that triggered them (a button release) finishes
@@ -217,8 +323,82 @@ func submit_daily(placements: Array, solve_ms: int) -> Dictionary:
 	return r
 
 
+## Settings → Delete my data: the server deletes this device's records, then the local saves go and a
+## new device id is made (a fresh start). Returns the server's answer.
+func delete_my_data() -> Dictionary:
+	var r: Dictionary = await api.post_json("/me/delete", {"device_id": settings.device_id})
+	if not r["ok"]:
+		return r
+	for f in ["user://save.json", "user://wallet.json", "user://tries.json", "user://daily.json", "user://sandbox.json"]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(f))
+	save.reset()
+	tries.reset()
+	# Fresh in-memory stores too, or their next write would put the deleted data back (Codex PR #9).
+	daily_store = DailyStore.load_or_new()
+	sandbox_store = SandboxStore.load_or_new()
+	settings.device_id = Settings._new_device_id()
+	settings.name = ""
+	settings.save()
+	wallet.coins = 0
+	wallet.changed.emit()
+	return r
+
+
+## Tries for coins / an ad, fulfilled here (persistent) so leaving the level mid-request can't lose them.
+## item: extra_try | refill. Returns the server's answer; on success the tries are already added.
+func buy_tries(item: String, ref: String) -> Dictionary:
+	var r: Dictionary = await wallet.spend(item, ref)
+	if r["ok"]:
+		tries.add(tries.limit if item == "refill" else 1, int(Time.get_unix_time_from_system()))
+	return r
+
+
+func ad_for_try() -> Dictionary:
+	var r: Dictionary = await wallet.ad_reward("try", ads.last_provider)
+	if r["ok"]:
+		tries.add(int(r.get("tries_added", 1)), int(Time.get_unix_time_from_system()))
+	return r
+
+
+## A hint for a campaign level, remembered in the save: shown again (free) whenever the level opens.
+func buy_hint(number: int) -> Dictionary:
+	var r: Dictionary = await wallet.spend("hint", "c%d" % number)
+	if r["ok"]:
+		save.record_hint(number)
+	return r
+
+
+## Skip a campaign level for coins. Lives in App (persistent), not the level screen: if the player
+## leaves the level while the request is in flight, the paid skip is still recorded (Codex PR #9).
+func buy_skip(number: int) -> Dictionary:
+	var r: Dictionary = await wallet.spend("skip", "c%d" % number)
+	if r["ok"]:
+		save.record_skip(number)
+		if economy.on("refill_tries_on_new_level"):
+			tries.refill()
+	return r
+
+
 func has_next(number: int) -> bool:
 	return not Campaign.entry(number + 1).is_empty()
+
+
+## Power check (CI): with nobody touching the screen, how many frames does the current screen render
+## per second? Prints "PERF rendered_per_s=… process_per_s=…" and quits. Arg: "<scene>" or "level:<file>".
+func _perf_probe(what: String) -> void:
+	await get_tree().process_frame
+	if what.begins_with("level:"):
+		open_level(int(what.trim_prefix("level:")))
+	await get_tree().create_timer(4.0).timeout  # settle (map roll, music start)
+	var drawn := [0]
+	var cb := func() -> void: drawn[0] += 1
+	RenderingServer.frame_post_draw.connect(cb)
+	var f0 := Engine.get_process_frames()
+	var t0 := Time.get_ticks_msec()
+	await get_tree().create_timer(5.0).timeout
+	var secs := (Time.get_ticks_msec() - t0) / 1000.0
+	print("PERF %s rendered_per_s=%.1f process_per_s=%.1f" % [what, drawn[0] / secs, (Engine.get_process_frames() - f0) / secs])
+	get_tree().quit(0)
 
 
 func _shot_ws(path: String) -> void:
@@ -409,3 +589,107 @@ func _run_sandbox_flow() -> void:
 		_flow_assert(ed != null and ed != ls and ed.mode == "edit" and ed.placements.size() == ref.fixed.size(), "Remix opens the editor with the layout")
 	print("SANDBOX %s" % ("PASS" if _flow_ok else "FAIL"))
 	get_tree().quit(0 if _flow_ok else 1)
+
+
+# ------------------------------------------------------------------ economy flow test (CI)
+## Against a staging server with test users seeded: daily bonus on the map, the board drawer, a TEST
+## purchase in the shop, out of tries -> rewarded (house) ad -> a try back, a try bought with coins,
+## a hint. Screenshots in build/shots/econ_*.png. Prints ECON PASS / ECON FAIL.
+func _run_economy_flow() -> void:
+	_flow_ok = true
+	save.reset()
+	tries.reset()
+	await get_tree().create_timer(0.5).timeout
+	if not economy.cfg.has("features"):
+		await economy_changed
+	_flow_assert(economy.on("coins") and economy.on("rewarded_ads") and economy.on("hints"), "economy config from the server")
+	# The game starts on the map, which claims the daily login bonus by itself.
+	var ws := await _wait_scene("WorldSelect", 300)
+	_flow_assert(ws != null, "map open")
+	for i in 900:
+		if wallet.bonus_today:
+			break
+		await get_tree().process_frame
+	await get_tree().create_timer(0.5).timeout
+	var expect := economy.num("start_coins") + economy.num("daily_bonus")
+	_flow_assert(wallet.bonus_today and wallet.coins == expect, "new wallet %d + daily bonus %d on the map = %d coins (got %d)" % [economy.num("start_coins"), economy.num("daily_bonus"), expect, wallet.coins])
+	var chip: Control = ws.find_child("CoinChip", true, false)
+	_flow_assert(chip != null and chip.visible, "coin chip visible")
+	var drawer: BoardDrawer = ws.find_child("BoardDrawer", true, false)
+	drawer.open("campaign")
+	for i in 600:
+		if drawer.view.loaded:
+			break
+		await get_tree().process_frame
+	await get_tree().create_timer(0.6).timeout
+	_flow_assert(drawer.view._list.get_child_count() >= 12, "campaign board lists the test users (%d rows)" % drawer.view._list.get_child_count())
+	await _shot_econ("econ_1_board.png")
+	drawer.close()
+	await get_tree().create_timer(0.5).timeout
+	var shop := ShopPanel.open(get_tree().current_scene)
+	await get_tree().create_timer(0.8).timeout
+	await _shot_econ("econ_2_shop.png")
+	var c0 := wallet.coins
+	var buy: Button = shop.find_child("Buy_coins_200", true, false)
+	_flow_assert(buy != null, "shop offers coins_200")
+	if buy:
+		buy.pressed.emit()
+		for i in 600:
+			if wallet.coins != c0:
+				break
+			await get_tree().process_frame
+	_flow_assert(wallet.coins == c0 + 200, "TEST purchase credited 200 coins (%d)" % wallet.coins)
+	shop.close()
+	open_level(1)
+	var ls := await _wait_scene("LevelScreen", 300)
+	_flow_assert(ls != null, "level 1 open")
+	await get_tree().create_timer(0.5).timeout
+	for i in tries.limit:
+		tries.use(int(Time.get_unix_time_from_system()))
+	ls._show_out_of_tries()
+	await get_tree().create_timer(0.4).timeout
+	await _shot_econ("econ_3_offers.png")
+	var ad: Button = ls.find_child("OfferAd", true, false)
+	_flow_assert(ad != null, "out of tries offers a rewarded ad")
+	if ad:
+		ad.pressed.emit()
+		await get_tree().create_timer(1.0).timeout
+		await _shot_econ("econ_4_ad.png")
+		await get_tree().create_timer(5.0).timeout
+		var close: Button = get_tree().root.find_child("AdClose", true, false)
+		_flow_assert(close != null, "house ad shows a close button")
+		if close:
+			close.pressed.emit()
+		await get_tree().create_timer(2.0).timeout
+	_flow_assert(tries.left(int(Time.get_unix_time_from_system())) == 1, "watching the ad gave a try back")
+	for i in 1:
+		tries.use(int(Time.get_unix_time_from_system()))
+	ls._show_out_of_tries()
+	await get_tree().create_timer(0.3).timeout
+	var c1 := wallet.coins
+	var buytry: Button = ls.find_child("OfferTry", true, false)
+	if buytry:
+		buytry.pressed.emit()
+		await get_tree().create_timer(2.0).timeout
+	_flow_assert(tries.left(int(Time.get_unix_time_from_system())) == 1 and wallet.coins == c1 - economy.num("extra_try_cost"), "bought a try with coins (tries %d, coins %d -> %d, button %s)" % [tries.left(int(Time.get_unix_time_from_system())), c1, wallet.coins, buytry != null])
+	var c2 := wallet.coins
+	await ls._buy_hint()
+	await get_tree().create_timer(0.6).timeout
+	_flow_assert(ls.find_child("HintGhost", true, false) != null and wallet.coins == c2 - economy.num("hint_cost"), "hint shows a part for coins")
+	await _shot_econ("econ_5_hint.png")
+	# Delete my data: server records gone, local stores fresh, a new device id.
+	sandbox_store.add(SandboxStore.new_draft("to be deleted"))
+	var old_id := settings.device_id
+	var del: Dictionary = await delete_my_data()
+	var w2: Dictionary = await api.post_json("/wallet", {"device_id": old_id})
+	_flow_assert(del["ok"] and settings.device_id != old_id and sandbox_store.drafts.is_empty() and not save.is_solved(1),
+		"delete my data: local stores reset, new device id")
+	_flow_assert(w2["ok"] and int(w2["body"]["wallet"]["coins"]) == economy.num("start_coins"), "delete my data: the old wallet is gone on the server (a request makes a fresh one)")
+	print("ECON %s" % ("PASS" if _flow_ok else "FAIL"))
+	get_tree().quit(0 if _flow_ok else 1)
+
+
+func _shot_econ(file: String) -> void:
+	await get_tree().process_frame
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://").path_join("../build/shots"))
+	get_viewport().get_texture().get_image().save_png(ProjectSettings.globalize_path("res://").path_join("../build/shots/" + file))

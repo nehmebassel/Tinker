@@ -18,7 +18,7 @@ extends Node
 const DIR := "res://assets/audio/"
 const MUSIC := {"menu": "music_menu.ogg", "map": "music_map.ogg", "build": "music_build.ogg", "run": "music_run.ogg"}
 const SFX := ["ui_tap", "pick", "place", "rotate", "play", "rewind", "impact_wood", "impact_metal",
-	"spring", "pop", "switch", "candle", "mouse", "cat", "goal", "fail", "basket", "pulley"]
+	"spring", "pop", "switch", "candle", "mouse", "cat", "goal", "fail", "basket", "pulley", "deny"]
 const LOOPS := {"fan": "fan_loop", "motor": "motor_loop"}
 const POOL := 10
 const FADE_S := 0.8

@@ -7,6 +7,14 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.android.billingclient.api.BillingClient
+import com.android.billingclient.api.BillingClientStateListener
+import com.android.billingclient.api.BillingFlowParams
+import com.android.billingclient.api.BillingResult
+import com.android.billingclient.api.PendingPurchasesParams
+import com.android.billingclient.api.Purchase
+import com.android.billingclient.api.QueryProductDetailsParams
+import com.android.billingclient.api.QueryPurchasesParams
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import org.godotengine.godot.Godot
@@ -30,6 +38,10 @@ class TinkerPushPlugin(godot: Godot) : GodotPlugin(godot) {
         SignalInfo("token_received", String::class.java),
         SignalInfo("push_error", String::class.java),
         SignalInfo("permission_result", java.lang.Boolean::class.java),
+        SignalInfo("billing_connected"),
+        SignalInfo("billing_disconnected"),
+        SignalInfo("billing_purchase", String::class.java, String::class.java),
+        SignalInfo("billing_error", Integer::class.java, String::class.java),
     )
 
     private fun ensureChannel() {
@@ -71,6 +83,77 @@ class TinkerPushPlugin(godot: Godot) : GodotPlugin(godot) {
                 .addOnFailureListener { e -> emitSignal("push_error", e.message ?: "token failed") }
         } catch (e: Exception) {
             emitSignal("push_error", e.message ?: e.toString())
+        }
+    }
+
+    /**
+     * The recipient id ("rcpt") of the notification that opened the app, once (then cleared), or "".
+     * FCM puts a tapped notification's data payload into the launch intent's extras.
+     */
+    @UsedByGodot
+    fun launchData(): String {
+        val i = activity?.intent ?: return ""
+        val r = i.getStringExtra("rcpt") ?: return ""
+        i.removeExtra("rcpt")
+        return r
+    }
+
+    // ------------------------------------------------------------------ Google Play Billing
+    // The game never trusts the client: a purchase token goes to the server (POST /purchase/google),
+    // which verifies it with the Play Developer API, consumes it and credits the wallet. Purchases not
+    // yet verified (app closed mid-way) are re-sent on the next connect via queryPurchasesAsync.
+    private var billing: BillingClient? = null
+
+    private fun emitPurchases(purchases: List<Purchase>?) {
+        for (p in purchases ?: emptyList()) {
+            if (p.purchaseState == Purchase.PurchaseState.PURCHASED && p.products.isNotEmpty()) {
+                emitSignal("billing_purchase", p.products[0], p.purchaseToken)
+            }
+        }
+    }
+
+    @UsedByGodot
+    fun billingConnect() {
+        val act = activity ?: return
+        val c = billing ?: BillingClient.newBuilder(act)
+            .setListener { r, purchases ->
+                when (r.responseCode) {
+                    BillingClient.BillingResponseCode.OK -> emitPurchases(purchases)
+                    BillingClient.BillingResponseCode.USER_CANCELED -> emitSignal("billing_error", r.responseCode, "cancelled")
+                    else -> emitSignal("billing_error", r.responseCode, r.debugMessage)
+                }
+            }
+            .enablePendingPurchases(PendingPurchasesParams.newBuilder().enableOneTimeProducts().build())
+            .build().also { billing = it }
+        if (c.isReady) { emitSignal("billing_connected"); return }
+        c.startConnection(object : BillingClientStateListener {
+            override fun onBillingSetupFinished(r: BillingResult) {
+                if (r.responseCode == BillingClient.BillingResponseCode.OK) {
+                    emitSignal("billing_connected")
+                    c.queryPurchasesAsync(QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP).build()) { _, list -> emitPurchases(list) }
+                } else emitSignal("billing_error", r.responseCode, r.debugMessage)
+            }
+            override fun onBillingServiceDisconnected() { emitSignal("billing_disconnected") }
+        })
+    }
+
+    @UsedByGodot
+    fun billingReady(): Boolean = billing?.isReady == true
+
+    /** Starts the Play purchase sheet for an in-app product (id as created in Play Console). */
+    @UsedByGodot
+    fun billingBuy(productId: String) {
+        val c = billing
+        if (c == null || !c.isReady) { emitSignal("billing_error", -1, "Google Play is not connected"); return }
+        val q = QueryProductDetailsParams.newBuilder().setProductList(listOf(
+            QueryProductDetailsParams.Product.newBuilder().setProductId(productId).setProductType(BillingClient.ProductType.INAPP).build())).build()
+        c.queryProductDetailsAsync(q) { r, result ->
+            val pd = result.productDetailsList.firstOrNull()
+            if (pd == null) { emitSignal("billing_error", r.responseCode, "product $productId is not set up in Play Console"); return@queryProductDetailsAsync }
+            val params = BillingFlowParams.newBuilder().setProductDetailsParamsList(listOf(
+                BillingFlowParams.ProductDetailsParams.newBuilder().setProductDetails(pd).build())).build()
+            val act = activity ?: return@queryProductDetailsAsync
+            act.runOnUiThread { c.launchBillingFlow(act, params) }
         }
     }
 
