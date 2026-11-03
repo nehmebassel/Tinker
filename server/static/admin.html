@@ -36,6 +36,13 @@ th{color:var(--muted);font-weight:600}td.num,th.num{text-align:right;font-varian
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:9}
 #login{max-width:380px;margin:12vh auto}#login input{width:100%;margin:10px 0}
 .savebar{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:12px 16px;display:flex;gap:10px;justify-content:flex-end;margin:0 -16px}
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;background:var(--line);font-size:12px;margin:2px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#bbb;margin-right:6px}.dot.on{background:var(--go);box-shadow:0 0 0 3px #3fb37f33}
+.bars{display:flex;align-items:flex-end;gap:4px;height:120px;padding-top:8px}.bars div{flex:1;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px;position:relative}
+.bars div span{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted)}
+.cards{display:none}.player{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start}
+@media (max-width:700px){.tablewrap{display:none}.cards{display:block}}
+textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
 .warn{background:#e8833a1a;border:1px solid #e8833a55;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px}
 @media (max-width:600px){input[type=number],input[type=text],select{width:110px}input.wide{width:100%}label.row{flex-wrap:wrap}}
 </style>
@@ -56,7 +63,7 @@ th{color:var(--muted);font-weight:600}td.num,th.num{text-align:right;font-varian
 <div id="toast"></div>
 <script>
 "use strict";
-const TABS = [["overview","Overview"],["features","Features"],["economy","Prices & rewards"],["ads","Ads"],["store","Store"],["ledger","Ledger"],["players","Players"]];
+const TABS = [["overview","Overview"],["players","Players"],["push","Push"],["ledger","Ledger"],["features","Features"],["economy","Prices & rewards"],["ads","Ads"],["store","Store"],["tools","Test users"]];
 const FEAT = {coins:"Coins (master switch for the whole economy)",daily_bonus:"Daily login bonus + streak",refill_tries_on_new_level:"Refill tries when a new level is reached",extra_tries:"Buy a try / a full refill with coins",hints:"Hints: show where one part goes (campaign)",skip:"Skip a level with coins (campaign)",rewarded_ads:"Rewarded ads (watch an ad → a try or coins)",interstitial_ads:"Interstitial ads between levels",purchases:"Shop: coin packs and no-ads passes",referrals:"Invite friends (both get coins)"};
 const ECO = {start_coins:"Coins a new player starts with",level_reward:"Coins for a campaign level's first solve",daily_reward:"Coins for solving the Daily",daily_bonus:"Daily login bonus",streak_step:"Extra bonus per consecutive day",streak_max:"Streak cap (days)",extra_try_cost:"Cost: one extra try",refill_cost:"Cost: refill all tries",hint_cost:"Cost: a hint",skip_cost:"Cost: skip a level",ad_reward_coins:"Coins for a rewarded ad",ad_reward_tries:"Tries for a rewarded ad",ads_per_day_cap:"Rewarded ads per player per day",referral_inviter:"Coins to the inviter (when the friend solves a level)",referral_invitee:"Coins to the invited friend"};
 let token = sessionStorage.getItem("tinker_admin") || "", data = null, tab = location.hash.slice(1) || "overview";
@@ -76,7 +83,7 @@ function logout(){ sessionStorage.removeItem("tinker_admin"); token=""; $("#app"
 $("#tok").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
 async function start(){ $("#login").style.display="none"; $("#app").style.display="block"; data = await api("GET","/economy"); renderTabs(); show(tab); }
 function renderTabs(){ $("#tabs").innerHTML = TABS.map(([k,v]) => `<button data-k="${k}" class="${k===tab?"on":""}">${v}</button>`).join(""); $("#tabs").onclick = (e) => { const k = e.target.dataset.k; if (k) show(k); }; }
-function show(k){ tab = k; location.hash = k; renderTabs(); ({overview,features,economy,ads,store,ledger,players})[k](); }
+function show(k){ tab = k; location.hash = k; renderTabs(); ({overview,features,economy,ads,store,ledger,players,push,tools})[k](); }
 function sw(path, on){ return `<span class="switch"><input type="checkbox" data-p="${path}" ${on?"checked":""}><i></i></span>`; }
 function collect(){ document.querySelectorAll("[data-p]").forEach((el) => { const [a,b] = el.dataset.p.split("."); let v = el.type==="checkbox" ? el.checked : el.type==="number" ? Number(el.value) : el.value; data.config[a][b] = v; }); }
 const saveBar = `<div class="savebar"><button class="sec" onclick="start()">Discard</button><button class="main" onclick="save()">Save changes</button></div>`;
@@ -161,17 +168,91 @@ async function ledger(){
   <div class="card"><h2>Latest entries</h2><div class="scroll"><table><tr><th>Time (UTC)</th><th>Type</th><th>Source</th><th>Product</th><th>Player</th><th class="num">Amount</th><th>Kind</th></tr>
   ${l.entries.map((e) => `<tr><td>${esc(e.ts.slice(0,16).replace("T"," "))}</td><td>${esc(e.type)}</td><td>${esc(e.source)}</td><td>${esc(e.product)}</td><td>${esc(e.device)}</td><td class="num">${usd(e.amount_usd)}</td><td>${kind(e)}</td></tr>`).join("") || `<tr><td colspan="7">Nothing yet</td></tr>`}</table></div></div>`;
 }
+let pl = { filter: "today", from: "", to: "", q: "", rows: [], sel: new Set() };
 async function players(){
-  const s = await api("GET","/stats");
-  $("#view").innerHTML = `<div class="card"><h2>Test users</h2><p class="hint">Twelve demo players with names, flags, Daily scores (today and yesterday) and campaign progress, so the leaderboards look alive while testing. Currently: <b>${s.test_users}</b>. Remove them before launch.</p>
-  <button class="sec" onclick="seed()">Add / refresh test users</button> <button class="sec danger" onclick="unseed()">Remove test users</button></div>
-  <div class="card"><h2>Give coins</h2><p class="hint">Support tool: credit (or debit with a negative number) a player's wallet. Needs the player's device id (Settings → About in the game).</p>
-  <label class="row"><span>Device id</span><input class="wide" type="text" id="gdev"></label><label class="row"><span>Coins</span><input type="number" id="gcoins" value="100"></label>
-  <div style="text-align:right"><button class="sec" onclick="grant()">Grant</button></div></div>`;
+  $("#view").innerHTML = `<div class="card"><h2>Loading…</h2></div>`;
+  const qs = new URLSearchParams({ filter: pl.filter, from: pl.from, to: pl.to, q: pl.q });
+  const [r, act] = await Promise.all([api("GET", "/players?" + qs), api("GET", "/activity")]);
+  pl.rows = r.players;
+  const max = Math.max(1, ...act.days.map((d) => d.players));
+  const ago = (t) => { if (!t) return "never"; const s = (Date.now() - Date.parse(t)) / 1000; return s < 120 ? "now" : s < 3600 ? Math.round(s/60) + " min ago" : s < 86400 ? Math.round(s/3600) + " h ago" : Math.round(s/86400) + " d ago"; };
+  $("#view").innerHTML = `
+  <div class="grid"><div class="kpi"><span><i class="dot on"></i>Online now</span><b>${act.online_now}</b></div>
+  <div class="kpi"><span>Players today</span><b>${act.days.at(-1).players}</b></div>
+  <div class="kpi"><span>In this list</span><b>${r.count}</b></div></div>
+  <div class="card" style="margin-top:16px"><h2>Daily active players (14 days)</h2>
+  <div class="bars">${act.days.map((d) => `<div title="${d.date}: ${d.players} (android ${d.android}, web ${d.web}, ios ${d.ios})" style="height:${Math.round(100 * d.players / max)}%"><span>${d.players || ""}</span></div>`).join("")}</div>
+  <p class="hint">${act.days[0].date} → ${act.days.at(-1).date}</p></div>
+  <div class="card"><h2>Players</h2>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+    <select id="pf">${[["online","Online now"],["today","Used today"],["range","Date range"],["all","Everyone"]].map(([k,t]) => `<option value="${k}" ${pl.filter===k?"selected":""}>${t}</option>`).join("")}</select>
+    <span id="rng" style="display:${pl.filter==="range"?"inline":"none"}"><input type="date" id="pfrom" value="${pl.from}"> → <input type="date" id="pto" value="${pl.to}"></span>
+    <input type="text" id="pq" placeholder="Search name" value="${esc(pl.q)}">
+    <button class="sec" onclick="plApply()">Show</button></div>
+  <p class="hint">OS: ${Object.entries(r.by_os).map(([k,v]) => `<span class="pill">${esc(k)} ${v}</span>`).join("")}</p>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+    <button class="sec" onclick="plAll(true)">Select all</button><button class="sec" onclick="plAll(false)">Clear</button>
+    <span id="selc" class="hint" style="align-self:center"></span></div>
+  <div class="tablewrap scroll"><table><tr><th></th><th>Name</th><th>Country</th><th>Platform / OS</th><th>Device</th><th class="num">Coins</th><th>Push</th><th>Last seen</th><th>First seen</th></tr>
+  ${r.players.map((x) => `<tr><td><input type="checkbox" class="ps" data-id="${esc(x.device_id)}" ${pl.sel.has(x.device_id)?"checked":""}></td><td><i class="dot ${x.online?"on":""}"></i>${esc(x.name || "Player " + x.player.slice(0,4))}</td><td>${esc(x.country)}</td><td>${esc(x.os_family)}<br><small style="color:var(--muted)">${esc(x.os)}</small></td><td>${esc(x.model)}</td><td class="num">${x.coins ?? "–"}</td><td>${x.push?"yes":"–"}</td><td>${ago(x.last_seen)}</td><td>${esc((x.first_seen||"").slice(0,10))}</td></tr>`).join("") || `<tr><td colspan="9">Nobody here</td></tr>`}</table></div>
+  <div class="cards">${r.players.map((x) => `<label class="player"><input type="checkbox" class="ps" data-id="${esc(x.device_id)}" ${pl.sel.has(x.device_id)?"checked":""}><div style="flex:1"><b><i class="dot ${x.online?"on":""}"></i>${esc(x.name || "Player " + x.player.slice(0,4))}</b> <span class="pill">${esc(x.country)}</span><br><small>${esc(x.os_family)} · ${esc(x.model || x.os)} · ${x.coins ?? "–"} coins · push ${x.push?"yes":"no"} · ${ago(x.last_seen)}</small></div></label>`).join("") || "Nobody here"}</div>
+  </div>
+  <div class="card"><h2>Act on the selected players</h2>
+  <label class="row"><span>Give coins<small>negative to take back; logged in the ledger</small></span><span><input type="number" id="gc" value="100" style="width:110px"> <button class="sec" onclick="plGrant()">Give</button></span></label>
+  <label class="row"><span>Send a notification<small>only players with push on are reached</small></span><button class="sec" onclick="sessionStorage.setItem('pushsel','1');show('push')">Write message →</button></label>
+  </div>`;
+  $("#pf").onchange = (e) => { $("#rng").style.display = e.target.value === "range" ? "inline" : "none"; };
+  document.querySelectorAll(".ps").forEach((c) => c.onchange = () => { c.checked ? pl.sel.add(c.dataset.id) : pl.sel.delete(c.dataset.id); document.querySelectorAll(`.ps[data-id="${c.dataset.id}"]`).forEach((o) => o.checked = c.checked); plCount(); });
+  plCount();
 }
-async function seed(){ try { const r = await api("POST","/test-users"); toast("Test users ready: " + r.made.length); players(); } catch(e){ toast(e.message); } }
-async function unseed(){ try { const r = await api("DELETE","/test-users"); toast("Removed " + r.removed + " records"); players(); } catch(e){ toast(e.message); } }
-async function grant(){ try { const r = await api("POST","/grant",{device_id:$("#gdev").value.trim(), coins:Number($("#gcoins").value)}); toast("Wallet now " + r.wallet.coins + " coins"); } catch(e){ toast(e.message); } }
+function plCount(){ const e = $("#selc"); if (e) e.textContent = pl.sel.size + " selected"; }
+function plApply(){ pl.filter = $("#pf").value; pl.from = $("#pfrom").value; pl.to = $("#pto").value; pl.q = $("#pq").value.trim(); players(); }
+function plAll(on){ pl.rows.forEach((x) => on ? pl.sel.add(x.device_id) : pl.sel.delete(x.device_id)); document.querySelectorAll(".ps").forEach((c) => c.checked = on); plCount(); }
+async function plGrant(){ if (!pl.sel.size) return toast("Select players first"); const coins = Number($("#gc").value); try { const r = await api("POST","/grant-many",{device_ids:[...pl.sel], coins, note:"admin"}); toast(`Gave ${coins} coins to ${r.granted} player(s)`); players(); } catch(e){ toast(e.message); } }
+
+async function push(){
+  const useSel = sessionStorage.getItem("pushsel") === "1" && pl.sel.size > 0;
+  sessionStorage.removeItem("pushsel");
+  const list = await api("GET","/campaigns");
+  const pct = (a,b) => b ? Math.round(100*a/b) + "%" : "–";
+  $("#view").innerHTML = `<div class="card"><h2>New notification</h2>
+  <label class="row"><span>Title</span><input class="wide" type="text" id="pt" maxlength="80" placeholder="New levels are here!"></label>
+  <div style="padding:8px 0"><textarea id="pb" rows="3" maxlength="240" placeholder="World 4 has ropes, pulleys and winches. Come build!"></textarea></div>
+  <label class="row"><span>Send to</span><select id="ptg">
+    <option value="selected" ${useSel?"selected":""} ${pl.sel.size?"":"disabled"}>Selected players (${pl.sel.size})</option>
+    <option value="filter:online">Online now</option><option value="filter:today">Used the app today</option>
+    <option value="filter:range">Used the app in a date range…</option><option value="all" ${useSel?"":"selected"}>Everyone with push on</option></select></label>
+  <label class="row" id="prow" style="display:none"><span>Date range</span><span><input type="date" id="pfr"> → <input type="date" id="pto2"></span></label>
+  <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px"><button class="sec" onclick="sendPush(true)">Test (dry run)</button><button class="main" onclick="sendPush(false)">Send</button></div>
+  <p class="hint" id="pres"></p></div>
+  <div class="card"><h2>Sent notifications</h2><div class="scroll"><table><tr><th>When (UTC)</th><th>Title</th><th>Audience</th><th class="num">Sent</th><th class="num">Failed</th><th class="num">Received</th><th class="num">Opened</th><th class="num">Open rate</th><th></th></tr>
+  ${list.campaigns.map((c) => `<tr><td>${esc(c.created_at.slice(0,16).replace("T"," "))}${c.dry_run?' <span class="tag t-test">dry</span>':""}</td><td>${esc(c.title)}</td><td>${esc(c.target === "filter" ? c.filter.filter : c.target)} (${c.counts.reachable}/${c.counts.targeted})</td><td class="num">${c.counts.sent}</td><td class="num">${c.counts.failed}</td><td class="num">${c.counts.received}</td><td class="num">${c.counts.opened}</td><td class="num">${pct(c.counts.opened, c.counts.sent)}</td><td><button class="sec" onclick="campaign('${c.id}')">Who</button></td></tr>`).join("") || `<tr><td colspan="9">None yet</td></tr>`}</table></div>
+  <p class="hint">Received: web reports it when the phone gets it; Android only when the notification is opened. Sent and opened are exact.</p></div><div id="cdet"></div>`;
+  $("#ptg").onchange = (e) => $("#prow").style.display = e.target.value === "filter:range" ? "flex" : "none";
+}
+async function sendPush(dry){
+  const t = $("#ptg").value, b = { title: $("#pt").value, body: $("#pb").value, dry_run: dry };
+  if (t === "selected") { b.target = "selected"; b.device_ids = [...pl.sel]; }
+  else if (t.startsWith("filter:")) { b.target = "filter"; b.filter = t.slice(7); b.from = $("#pfr").value; b.to = $("#pto2").value; }
+  else b.target = "all";
+  if (!dry && !confirmSend(b)) return;
+  try { const r = await api("POST","/push",b); $("#pres").textContent = `${dry?"Dry run: ":""}${r.sent} sent, ${r.failed} failed, ${r.reachable} of ${r.targeted} players reachable (push on).`; if (!dry) setTimeout(push, 1500); } catch(e){ toast(e.message); }
+}
+function confirmSend(b){ const el = $("#pres"); if (el.dataset.ok === "1") { el.dataset.ok = ""; return true; } el.dataset.ok = "1"; el.innerHTML = "<b>Press Send again to confirm.</b>"; return false; }
+async function campaign(id){
+  const r = await api("GET","/campaigns/" + id);
+  $("#cdet").innerHTML = `<div class="card"><h2>${esc(r.campaign.title)}</h2><p class="hint">${esc(r.campaign.body)}</p><div class="scroll"><table><tr><th>Player</th><th>Sent</th><th>Received</th><th>Opened</th><th>Error</th></tr>
+  ${r.recipients.map((x) => `<tr><td>${esc(x.name || "Player " + x.player.slice(0,4))}</td><td>${x.sent?"yes":"no"}</td><td>${esc(x.received_at.slice(5,16).replace("T"," ")) || "–"}</td><td>${esc(x.opened_at.slice(5,16).replace("T"," ")) || "–"}</td><td>${esc(x.error)}</td></tr>`).join("")}</table></div></div>`;
+  $("#cdet").scrollIntoView({ behavior: "smooth" });
+}
+
+async function tools(){
+  const s = await api("GET","/stats");
+  $("#view").innerHTML = `<div class="card"><h2>Test users</h2><p class="hint">Twelve demo players with names, countries, Daily scores (today and yesterday) and campaign progress, so the leaderboards look alive while testing. Currently: <b>${s.test_users}</b>. Remove them before launch.</p>
+  <button class="sec" onclick="seed()">Add / refresh test users</button> <button class="sec danger" onclick="unseed()">Remove test users</button></div>`;
+}
+async function seed(){ try { const r = await api("POST","/test-users"); toast("Test users ready: " + r.made.length); tools(); } catch(e){ toast(e.message); } }
+async function unseed(){ try { const r = await api("DELETE","/test-users"); toast("Removed " + r.removed + " records"); tools(); } catch(e){ toast(e.message); } }
 if (token) start().catch(() => logout());
 </script>
 </body>

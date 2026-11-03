@@ -9,6 +9,7 @@ import { fcm as realFcm, isFcmToken, dailyMessage } from "./push.js";
 import { col, db } from "./db.js";
 import { replay, generateDaily } from "./godot.js";
 import { mountEconomy, getEconomy, publicEconomy, adminGate } from "./economy.js";
+import { mountOps } from "./ops.js";
 import { isDate, isDeviceId, isCountry, isShortId, validSolution, validLevel, solutionFits, publicLevel } from "./validate.js";
 
 // ------------------------------------------------------------------ rate limit (per device / ip, per minute)
@@ -380,6 +381,7 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
   // Admin console page (static, holds no secrets; every call it makes needs the admin token).
   app.get("/admin/ui", (_req, res) => res.set({ "Cache-Control": "no-cache", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer" }).sendFile(staticDir + "admin.html"));
   const ecoAdmin = mountEconomy(app, { rateLimited, publicId, ...(playVerify ? { playVerify } : {}), ...(fetchFn ? { fetchFn } : {}) });
+  mountOps(app, ecoAdmin, { fcm, rateLimited, publicId });
   app.use("/admin", admin);
   app.use("/admin", ecoAdmin);
 

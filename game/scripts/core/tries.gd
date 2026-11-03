@@ -83,6 +83,20 @@ static func fmt_wait(secs: int) -> String:
 	return "%d:%02d:%02d" % [h, m, s] if h > 0 else "%d:%02d" % [m, s]
 
 
+## Bought / earned extra tries (coins, a rewarded ad): give back `n` used tries.
+func add(n: int, now: int) -> void:
+	_refresh(now)
+	used = maxi(0, used - n)
+	if used == 0:
+		window_start = 0
+	save()
+
+
+## A new level was reached (economy feature refill_tries_on_new_level): start it with full tries.
+func refill() -> void:
+	reset()
+
+
 func reset() -> void:
 	used = 0
 	window_start = 0

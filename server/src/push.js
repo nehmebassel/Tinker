@@ -15,7 +15,7 @@ async function messaging() {
   return _messaging;
 }
 
-// The real sender. Tests inject a fake with the same three methods.
+// The real sender. Tests inject a fake with the same methods.
 export const fcm = {
   async subscribe(token, topic) {
     const r = await (await messaging()).subscribeToTopic([token], topic);
@@ -24,6 +24,12 @@ export const fcm = {
   async unsubscribe(token, topic) {
     const r = await (await messaging()).unsubscribeFromTopic([token], topic);
     return { ok: r.failureCount === 0, error: r.errors?.[0]?.error?.code };
+  },
+  // Campaigns: one message per device token, up to 500 per call. Returns [{ok, error}] in order.
+  async sendEach(messages, dryRun = false) {
+    if (!messages.length) return [];
+    const r = await (await messaging()).sendEach(messages, dryRun);
+    return r.responses.map((x) => ({ ok: x.success, error: x.error?.code || "" }));
   },
   async sendTopic(topic, { title, body, data }, dryRun = false) {
     const id = await (await messaging()).send({

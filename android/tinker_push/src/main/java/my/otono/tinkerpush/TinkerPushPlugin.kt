@@ -74,6 +74,18 @@ class TinkerPushPlugin(godot: Godot) : GodotPlugin(godot) {
         }
     }
 
+    /**
+     * The recipient id ("rcpt") of the notification that opened the app, once (then cleared), or "".
+     * FCM puts a tapped notification's data payload into the launch intent's extras.
+     */
+    @UsedByGodot
+    fun launchData(): String {
+        val i = activity?.intent ?: return ""
+        val r = i.getStringExtra("rcpt") ?: return ""
+        i.removeExtra("rcpt")
+        return r
+    }
+
     override fun onMainRequestPermissionsResult(requestCode: Int, permissions: Array<out String>?, grantResults: IntArray?) {
         super.onMainRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode != permissionRequest) return

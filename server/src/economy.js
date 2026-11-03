@@ -563,6 +563,12 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
   });
 
   // ---------------------------------------------------------------- admin console
+  // Used by the admin console (grant to one or many players).
+  app.locals.grantCoins = async (deviceId, coins, note = "") => {
+    const cfg = await getEconomy();
+    const w = await mutate(deviceId, cfg, async () => ({ coins, ledger: [{ kind: "coins", type: "admin_grant", ref: note, coins }] }));
+    return { coins: w.coins };
+  };
   const admin = express.Router();
   admin.use(adminGate);
   admin.get("/economy", async (_req, res) => {

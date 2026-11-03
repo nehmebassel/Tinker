@@ -18,15 +18,22 @@ const fakePlay = async (pkg, product, token) => {
   if (token === "bad-token-123") return { ok: false, error: "purchase not completed" };
   return { ok: true, orderId: "GPA." + token, test: false };
 };
+const sentPush = [];
+const fakeFcm = {
+  async subscribe() { return { ok: true }; },
+  async unsubscribe() { return { ok: true }; },
+  async sendTopic() { return { ok: true, id: "x" }; },
+  async sendEach(msgs) { sentPush.push(...msgs); return msgs.map((m) => (m.token.endsWith("dead") ? { ok: false, error: "messaging/registration-token-not-registered" } : { ok: true })); },
+};
 const stripeCalls = [];
 const fakeFetch = async (url, opts) => { stripeCalls.push([url, String(opts.body)]); return { ok: true, json: async () => ({ url: "https://checkout.stripe.test/s1" }) }; };
 
 before(async () => {
-  for (const c of ["settings", "wallets", "ledger", "referrals", "progress", "scores", "devices", "daily"]) {
+  for (const c of ["settings", "wallets", "ledger", "referrals", "progress", "scores", "devices", "daily", "activity", "campaigns", "push_rcpt"]) {
     const snap = await db.collection(c).get();
     await Promise.all(snap.docs.map((d) => d.ref.delete()));
   }
-  server = createApp({ playVerify: fakePlay, fetchFn: fakeFetch }).listen(0);
+  server = createApp({ playVerify: fakePlay, fetchFn: fakeFetch, fcm: fakeFcm }).listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
 });
 after(() => server.close());
@@ -176,4 +183,54 @@ test("admin ui page is served without the token and holds no secrets", async () 
   const html = await r.text();
   assert.ok(html.includes("Tinker admin"));
   assert.equal(/(sk_live|sk_test|whsec)_[A-Za-z0-9]{8,}/.test(html), false);
+});
+
+test("presence -> players list (online, today, OS) and activity", async () => {
+  await j("POST", "/presence", { device_id: A, name: "Ann", country: "LB", platform: "web", os: "Web", browser: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)" });
+  await j("POST", "/presence", { device_id: B, name: "Bob", country: "US", platform: "android", os: "Android 15", model: "Pixel 8" });
+  const on = await j("GET", "/admin/players?filter=online", null, ADMIN);
+  assert.equal(on.status, 200);
+  assert.equal(on.body.online, 2);
+  const ann = on.body.players.find((p) => p.name === "Ann");
+  assert.equal(ann.os_family, "iOS (web)");
+  assert.equal(on.body.by_os["Android"], 1);
+  const today = await j("GET", "/admin/players?filter=today", null, ADMIN);
+  assert.equal(today.body.count, 2);
+  const act = await j("GET", "/admin/activity", null, ADMIN);
+  assert.equal(act.body.days.at(-1).players, 2);
+  assert.equal(act.body.online_now, 2);
+});
+
+test("grant coins to many players", async () => {
+  const before = (await j("POST", "/wallet", { device_id: B })).body.wallet.coins;
+  const r = await j("POST", "/admin/grant-many", { device_ids: [A, B], coins: 250, note: "launch gift" }, ADMIN);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.granted, 2);
+  assert.equal((await j("POST", "/wallet", { device_id: B })).body.wallet.coins - before, 250);
+  assert.equal((await j("POST", "/admin/grant-many", { device_ids: [A], coins: 0 }, ADMIN)).status, 400);
+});
+
+test("push campaign to selected players: sent / received / opened tracked", async () => {
+  await j("POST", "/push/register", { device_id: A, token: "tokA-xxxxxxxxxxxxxxxxxxxxxxxxx", enabled: true });
+  await j("POST", "/push/register", { device_id: B, token: "tokB-xxxxxxxxxxxxxxxxxxxxxxxdead", enabled: true });
+  const r = await j("POST", "/admin/push", { title: "New levels!", body: "World 4 is out", target: "selected", device_ids: [A, B, C] }, ADMIN);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.targeted, 2, "C never opened the app: no device to target");
+  assert.equal(r.body.reachable, 2);
+  assert.equal(r.body.sent, 1);
+  assert.equal(r.body.failed, 1);
+  const msgA = sentPush.find((m) => m.token.startsWith("tokA"));
+  assert.match(msgA.data.rcpt, /^[a-f0-9]{24}$/);
+  assert.equal((await j("POST", "/push/event", { rcpt: msgA.data.rcpt, event: "received" })).body.counted, true);
+  assert.equal((await j("POST", "/push/event", { rcpt: msgA.data.rcpt, event: "opened" })).body.counted, true);
+  assert.equal((await j("POST", "/push/event", { rcpt: msgA.data.rcpt, event: "opened" })).body.counted, false, "counted once");
+  const list = await j("GET", "/admin/campaigns", null, ADMIN);
+  const c = list.body.campaigns.find((x) => x.id === r.body.id);
+  assert.deepEqual([c.counts.sent, c.counts.failed, c.counts.received, c.counts.opened], [1, 1, 1, 1]);
+  const det = await j("GET", "/admin/campaigns/" + r.body.id, null, ADMIN);
+  assert.equal(det.body.recipients.length, 2);
+  assert.ok(det.body.recipients.find((x) => x.name === "Ann").opened_at);
+  const dead = await db.collection("devices").doc(B).get();
+  assert.equal(dead.data().push_enabled, false, "dead token switched off");
+  assert.equal((await j("POST", "/admin/push", { title: "", body: "x", target: "all" }, ADMIN)).status, 400);
 });

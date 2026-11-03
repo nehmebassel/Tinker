@@ -16,6 +16,14 @@ var push: Push
 var audio: Audio
 var tries: Tries
 var sandbox_store: SandboxStore
+var economy := Economy.new()  # admin-console rules from GET /config (empty = everything paid off)
+var wallet: Wallet
+var ads: Ads
+var store: Store
+
+signal economy_changed
+
+const PRESENCE_S := 60.0  # heartbeat while the game is open: "online now" in the admin console
 ## Sandbox context for the level screen: {} for campaign/daily, else
 ## {"mode": "edit"|"verify", "index": draft} or {"mode": "shared", "code", "level", "author_parts"}.
 var sandbox: Dictionary = {}
@@ -49,7 +57,17 @@ func _ready() -> void:
 	add_child(audio)
 	tries = Tries.load_or_new()
 	sandbox_store = SandboxStore.load_or_new()
+	wallet = Wallet.new()
+	wallet.name = "Wallet"
+	add_child(wallet)
+	ads = Ads.new()
+	ads.name = "Ads"
+	add_child(ads)
+	store = Store.new()
+	store.name = "Store"
+	add_child(store)
 	_fetch_rules.call_deferred()
+	_start_presence.call_deferred()
 	for a in OS.get_cmdline_user_args():
 		if a == "--reset-save":
 			save.reset()
@@ -71,6 +89,8 @@ func _ready() -> void:
 			_perf_probe(a.trim_prefix("--perf-probe="))
 	if OS.has_feature("web") and not flow_test and daily_test == "" and sandbox_test == "":
 		_open_link_level.call_deferred()
+		_web_link_extras.call_deferred()
+	_report_push_open.call_deferred()
 	if flow_test:
 		save.reset()
 		tries.reset()
@@ -92,13 +112,84 @@ func _open_link_level() -> void:
 		push_warning(err)
 
 
-## Tries rules from the backend (GET /config); offline the cached / project-setting values stay.
+## Rules from the backend (GET /config): tries, and the economy (features, prices, ads, products) set
+## in the admin console. Offline the cached tries rules stay and every paid feature stays off.
 func _fetch_rules() -> void:
 	if settings.base_url() == "":
 		return
 	var r: Dictionary = await api.get_json("/config")
 	if r.get("ok", false) and r["body"] is Dictionary and r["body"].has("tries_limit"):
 		tries.set_rules(int(r["body"]["tries_limit"]), float(r["body"].get("tries_window_hours", 6.0)))
+		economy.set_config(r["body"].get("economy", {}))
+		economy_changed.emit()
+		if economy.on("coins"):
+			await wallet.sync()
+
+
+## Heartbeat: who is online, on which platform / OS, and who used the app on which days (admin).
+func _start_presence() -> void:
+	if settings.base_url() == "" or flow_test or daily_test != "" or sandbox_test != "":
+		return
+	while is_inside_tree():
+		await api.post_json("/presence", {"device_id": settings.device_id, "name": settings.name,
+			"country": Settings.country(), "platform": platform(), "os": OS.get_name() + " " + OS.get_version(),
+			"model": OS.get_model_name(), "browser": _browser(), "app_version": str(ProjectSettings.get_setting("application/config/version", ""))})
+		await get_tree().create_timer(PRESENCE_S).timeout
+
+
+static func platform() -> String:
+	if OS.has_feature("web"):
+		return "web"
+	if OS.has_feature("android"):
+		return "android"
+	if OS.has_feature("ios"):
+		return "ios"
+	return OS.get_name().to_lower()
+
+
+static func _browser() -> String:
+	if not OS.has_feature("web"):
+		return ""
+	return str(JavaScriptBridge.eval("navigator.userAgent", true)).substr(0, 300)
+
+
+## Web links: ?ref=CODE (invite: claim it for this new player), ?paid=1 (back from Stripe checkout).
+func _web_link_extras() -> void:
+	var ref := str(JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('ref') || ''", true))
+	var paid := str(JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('paid') || ''", true))
+	if ref != "" and ref != "null":
+		await get_tree().create_timer(3.0).timeout  # after the wallet exists
+		var r: Dictionary = await wallet.claim_referral(ref.to_upper())
+		_toast_any(("Invite accepted: +%d coins" % int(r.get("coins_added", 0))) if r["ok"] else "")
+	if paid == "1":
+		await get_tree().create_timer(3.0).timeout
+		await wallet.sync()
+		_toast_any("Thanks! Your purchase is in your wallet.")
+
+
+## A notification was tapped: tell the server (open rate per campaign in the admin console).
+## Web: /play/?push=<recipient id> (set by the service worker). Android: the plugin's launch data.
+func _report_push_open() -> void:
+	var rcpt := ""
+	if OS.has_feature("web"):
+		rcpt = str(JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('push') || ''", true))
+	elif Engine.has_singleton("TinkerPush") and Engine.get_singleton("TinkerPush").has_method("launchData"):
+		rcpt = str(Engine.get_singleton("TinkerPush").launchData())
+	if rcpt != "" and rcpt != "null" and settings.base_url() != "":
+		await api.post_json("/push/event", {"rcpt": rcpt, "event": "opened", "device_id": settings.device_id})
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_RESUMED:
+		_report_push_open()  # Android: the app was brought back by tapping a notification
+
+
+func _toast_any(t: String) -> void:
+	if t == "":
+		return
+	var s := get_tree().current_scene
+	if s and s.has_method("_toast"):
+		s._toast(t)
 
 
 ## Scene changes are deferred so the input event that triggered them (a button release) finishes

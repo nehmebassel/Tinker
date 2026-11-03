@@ -12,6 +12,7 @@ run/main_scene="res://scenes/world_select.tscn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://assets/icons/icon.svg"
 run/low_processor_mode=true
+config/version="0.2.0"
 
 [autoload]
 
