@@ -78,7 +78,15 @@ func earn_daily(date: String) -> Dictionary:
 
 ## item: extra_try | refill | hint | skip. ok=false with status 402 when the balance is short.
 func spend(item: String, ref: String = "") -> Dictionary:
-	return await _call("/wallet/spend", {"item": item, "ref": ref})
+	var key: String = {"extra_try": "extra_try_cost", "refill": "refill_cost", "hint": "hint_cost", "skip": "skip_cost"}.get(item, "")
+	var body := {"item": item, "ref": ref}
+	if key != "" and App.economy.cfg.has("economy"):
+		body["expected_cost"] = App.economy.num(key)  # the price the player saw; the server refuses another one
+	var r: Dictionary = await _call("/wallet/spend", body)
+	if int(r.get("status", 0)) == 409 and r.has("cost"):
+		await App._fetch_rules()
+		r["error"] = "The price changed to %d coins. Tap again to buy." % int(r["cost"])
+	return r
 
 
 func ad_reward(reward: String, provider: String) -> Dictionary:

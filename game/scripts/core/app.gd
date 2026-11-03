@@ -141,6 +141,7 @@ func _start_presence() -> void:
 			"country": Settings.country(), "platform": platform(), "os": OS.get_name() + " " + OS.get_version(),
 			"model": OS.get_model_name(), "browser": _browser(), "app_version": str(ProjectSettings.get_setting("application/config/version", ""))})
 		await get_tree().create_timer(PRESENCE_S).timeout
+		_fetch_rules()  # prices / switches changed in the admin console reach open games within a minute
 
 
 static func platform() -> String:

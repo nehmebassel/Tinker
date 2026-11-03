@@ -229,11 +229,14 @@ async function creditPurchase(deviceId, cfg, product, { source, orderId, amountU
   const g = grantFor(product);
   const w = await mutate(deviceId, cfg, async (w, tx) => {
     if ((await tx.get(L().doc(id))).exists) throw { status: 409, error: "already credited" };
-    if (product.once && (w.bought || []).includes(product.id)) throw { status: 409, error: "already bought" };
+    // A one-time product paid for a second time (two checkouts opened in parallel) is still fulfilled:
+    // the player paid, so they get it (flagged in the ledger for a refund decision). Codex PR #9.
+    const again = Boolean(product.once && (w.bought || []).includes(product.id));
+    if (again && source === "test") throw { status: 409, error: "already bought" };
     return {
       coins: g.coins,
       set: { no_ads_until: extendNoAds(w.no_ads_until, g.no_ads_days), bought: [...new Set([...(w.bought || []), product.id])] },
-      ledger: [{ id, kind: "money", type: "purchase", source, product: product.id, ref: String(orderId), amount_usd: amountUsd, coins: g.coins, test: Boolean(test) }],
+      ledger: [{ id, kind: "money", type: "purchase", source, product: product.id, ref: String(orderId), amount_usd: amountUsd, coins: g.coins, test: Boolean(test), ...(again ? { duplicate_once: true } : {}) }],
     };
   });
   return { wallet: w };
@@ -393,6 +396,9 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
       if (!SPEND_ITEMS[item]) return bad(res, 400, "bad item");
       if (!cfg.features.coins || !cfg.features[SPEND_FEATURE[item]]) return bad(res, 403, item + " is off");
       const cost = cfg.economy[SPEND_ITEMS[item]];
+      // The client sends the price it showed; a price changed meanwhile in the console is not charged
+      // silently: 409 with the new price, the client refreshes its rules (Codex PR #9).
+      if (req.body.expected_cost !== undefined && Number(req.body.expected_cost) !== cost) return res.status(409).json({ error: "price changed", cost });
       const ref = typeof req.body.ref === "string" ? req.body.ref.slice(0, 40) : "";
       const w = await mutate(d, cfg, async () => ({ coins: -cost, ledger: [{ kind: "coins", type: "spend_" + item, ref, coins: -cost }] }));
       res.json({ ok: true, item, cost, wallet: walletView(w, cfg) });
@@ -481,8 +487,11 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
       const cfg = await getEconomy();
       if (!cfg.features.purchases || !cfg.payments.google_play) return bad(res, 403, "Google Play purchases are off");
       const { product, token } = req.body;
-      const p = findProduct(cfg, product);
-      if (!p || !PRODUCT_ID_RE.test(product)) return bad(res, 404, "unknown product");
+      // Any product of the catalog, active or not: a purchase opened (or left outstanding) before an
+      // admin switched the product off must still be fulfilled. New purchases are offered from the
+      // active list only (client shop). Codex PR #9.
+      const p = PRODUCT_ID_RE.test(String(product)) ? cfg.products.find((x) => x.id === product) : null;
+      if (!p) return bad(res, 404, "unknown product");
       if (typeof token !== "string" || token.length < 10 || token.length > 4096) return bad(res, 400, "bad token");
       const v = await playVerify(config.androidPackage, product, token);
       if (!v.ok) return bad(res, 402, v.error);
@@ -505,6 +514,7 @@ export function mountEconomy(app, { rateLimited, playVerify = verifyGooglePlay, 
       if (!cfg.features.purchases || !cfg.payments.stripe) return bad(res, 403, "card payments are off");
       const p = findProduct(cfg, req.body.product);
       if (!p) return bad(res, 404, "unknown product");
+      if (p.once && ((await ensureWallet(d, cfg)).bought || []).includes(p.id)) return bad(res, 409, "already bought");
       const sec = await getSecrets();
       if (!sec.stripe_secret_key) return bad(res, 503, "Stripe is not configured");
       const origin = `${req.protocol}://${req.get("host")}`;

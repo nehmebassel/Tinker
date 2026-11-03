@@ -92,6 +92,9 @@ test("spend: prices from config, not enough coins is refused", async () => {
   assert.equal(r.body.wallet.coins, 40);
   assert.equal((await j("POST", "/wallet/spend", { device_id: A, item: "skip" })).status, 402);
   assert.equal((await j("POST", "/wallet/spend", { device_id: A, item: "nope" })).status, 400);
+  const changed = await j("POST", "/wallet/spend", { device_id: A, item: "hint", expected_cost: 999 });
+  assert.equal(changed.status, 409, "a price the player did not see is not charged");
+  assert.equal(changed.body.cost, 30);
 });
 
 test("rewarded ads: reward + daily cap", async () => {
@@ -130,6 +133,17 @@ test("purchases: test mode grants and books as TEST; google play verified + idem
   assert.ok(consumed.includes("tok-abcdef-1"), "consumed only after the credit");
   assert.ok(!consumed.includes("bad-token-123"), "a failed purchase is not consumed");
   assert.equal((await j("POST", "/purchase/apple", { device_id: B })).status, 501);
+  // Switched off after the purchase sheet opened: the paid Play purchase is still fulfilled.
+  const cfgX = (await j("GET", "/admin/economy", null, ADMIN)).body.config;
+  cfgX.products = cfgX.products.map((x) => (x.id === "coins_1200" ? { ...x, active: false } : x));
+  await j("PUT", "/admin/economy", { config: cfgX }, ADMIN);
+  const late = await j("POST", "/purchase/google", { device_id: B, product: "coins_1200", token: "tok-late-0001" });
+  assert.equal(late.status, 200, "inactive product still fulfilled for a paid purchase");
+  cfgX.products = cfgX.products.map((x) => (x.id === "coins_1200" ? { ...x, active: true } : x));
+  await j("PUT", "/admin/economy", { config: cfgX }, ADMIN);
+  // A one-time product paid twice through a real store is fulfilled again (flagged), never lost.
+  assert.equal((await j("POST", "/purchase/google", { device_id: B, product: "starter_pack", token: "tok-once-0001" })).status, 200);
+  assert.equal((await j("POST", "/purchase/google", { device_id: B, product: "starter_pack", token: "tok-once-0002" })).status, 200);
 });
 
 test("admin: token required, toggles change /config, ledger shows real vs test", async () => {
@@ -146,7 +160,7 @@ test("admin: token required, toggles change /config, ledger shows real vs test",
   assert.equal((await j("POST", "/wallet/spend", { device_id: A, item: "hint" })).status, 403);
   const l = await j("GET", "/admin/ledger?days=7", null, ADMIN);
   assert.equal(l.status, 200);
-  assert.ok(Math.abs(l.body.totals.real - 0.99) < 1e-9, "google play coins_200 is real revenue");
+  assert.ok(Math.abs(l.body.totals.real - (0.99 + 4.99 + 2.99 * 2)) < 1e-9, "verified Google Play purchases are real revenue (" + l.body.totals.real + ")");
   assert.ok(l.body.totals.test >= 1.99, "test purchase booked as test");
   assert.equal((await j("PUT", "/admin/economy", { config: { ...cfg, payments: { ...cfg.payments, mode: "free" } } }, ADMIN)).status, 400);
 });
