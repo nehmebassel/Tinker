@@ -166,7 +166,11 @@ Google Play (now) and the App Store (later); publish to Google Play on the perso
 - [x] Play Console: service account `tinker-api@…` invited to Tinker (view app info, financial data, manage orders, release to testing tracks), approved by Bassel; `tools/play_upload.py` (API upload as that account) written but blocked: the deploy identity needs Service Account Token Creator on `tinker-api` (IAM grant needs Bassel's OK). First AAB sent to Bassel to upload by hand.
 - [x] Codex PR #9 round 2: Stripe purchase lost if the product was edited / switched off mid-checkout → entitlement snapshot in the session metadata; taps went through the shop / ad overlays into the level → `App.modal_open`; a fast "received" could beat the recipient record → records reserved before sending; double-tap Hint paid twice → in-flight guard
 - [x] First AAB uploaded to Play Console by Bassel (1441799)
-- [ ] Play Console: forms, closed test, R8 (red items), token creator grant (approved 21:43), listing, app content, in-app products, service account access, closed test (12 testers × 14 days)
+- [x] Codex PR #9 round 3: doubly-paid one-time product fulfilled (flagged), Play purchases of switched-off products fulfilled, rules refreshed every minute + `expected_cost` (no charge at a price the player didn't see)
+- [x] Settings → "Delete my data" (`POST /me/delete`: wallet, scores, progress, presence, push records, coin ledger lines; money lines anonymised), privacy page updated; Server field shown in debug builds only
+- [x] Token creator on `tinker-api` for the deploy identity (approved by Bassel 21:43) → `tools/play_upload.py` can upload releases
+- [x] Play Console by me: privacy policy URL, sign-in details (No), ads (Yes), government apps (No). The safety layer blocks me from ticking the other declarations on Bassel's behalf → answers sent to him (financial features, health, target audience 13+, content rating, data safety, category / contact)
+- [ ] Play Console: Bassel ticks the declarations; store listing (waiting for "fill the listing"); closed test track + tester group; R8 variant via internal testing + pre-launch report, listing, app content, in-app products, service account access, closed test (12 testers × 14 days)
 - [ ] Regression, PR, deploy
 
 ### M7 Store (not started)

@@ -60,6 +60,29 @@ export function mountOps(app, admin, { fcm, rateLimited, publicId }) {
     res.json({ ok: true });
   });
 
+  // ---------------------------------------------------------------- delete my data (Settings button)
+  // Google Play's Data safety form asks for a deletion path. The device id is the only credential, so
+  // the device that owns the data can delete it. Money ledger lines are kept for accounting but
+  // anonymised; everything else about the device goes.
+  app.post("/me/delete", async (req, res) => {
+    const d = req.body?.device_id;
+    if (!isDeviceId(d)) return res.status(400).json({ error: "bad device_id" });
+    if (rateLimited("delete:" + d)) return res.status(429).json({ error: "slow down" });
+    let n = 0;
+    const del = async (q) => { const s = await q.get(); const b = db.batch(); s.docs.forEach((x) => b.delete(x.ref)); if (s.size) await b.commit(); n += s.size; };
+    const w = await db.collection("wallets").doc(d).get();
+    if (w.exists && w.data().ref_code) await db.collection("referrals").doc(w.data().ref_code).delete().catch(() => {});
+    for (const c of ["wallets", "devices", "progress"]) { const r = db.collection(c).doc(d); if ((await r.get()).exists) { await r.delete(); n++; } }
+    await del(db.collection("scores").where("device_id", "==", d));
+    await del(A().where("device_id", "==", d));
+    await del(R().where("device_id", "==", d));
+    await del(db.collection("ledger").where("device_id", "==", d).where("kind", "==", "coins"));
+    const money = await db.collection("ledger").where("device_id", "==", d).get();
+    for (const x of money.docs) await x.ref.update({ device_id: "deleted" });
+    console.log(`data deleted for a device: ${n} records, ${money.size} ledger lines anonymised`);
+    res.json({ ok: true, deleted: n, anonymised: money.size });
+  });
+
   // ---------------------------------------------------------------- push events (received / opened)
   app.post("/push/event", async (req, res) => {
     const { rcpt, event } = req.body || {};

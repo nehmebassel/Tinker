@@ -279,3 +279,19 @@ test("privacy policy page uses the publisher set in the console", async () => {
   assert.ok(html.includes("OTONOMY"));
   assert.equal(html.includes("{{"), false);
 });
+
+test("delete my data: removes the device's records, keeps money lines anonymised", async () => {
+  const D = "eco-device-dddd";
+  await j("POST", "/presence", { device_id: D, name: "Dee", platform: "android" });
+  await j("POST", "/wallet", { device_id: D });
+  await j("POST", "/progress", { device_id: D, solved: 2, parts: 3 });
+  await j("POST", "/purchase/google", { device_id: D, product: "coins_200", token: "tok-del-00001" });
+  const r = await j("POST", "/me/delete", { device_id: D });
+  assert.equal(r.status, 200);
+  assert.ok(r.body.deleted >= 4);
+  assert.equal((await db.collection("wallets").doc(D).get()).exists, false);
+  assert.equal((await db.collection("devices").doc(D).get()).exists, false);
+  assert.equal((await db.collection("progress").doc(D).get()).exists, false);
+  assert.equal((await db.collection("ledger").where("device_id", "==", D).get()).size, 0);
+  assert.ok(r.body.anonymised >= 1, "purchase kept for accounting, anonymised");
+});

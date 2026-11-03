@@ -22,12 +22,14 @@ func _ready() -> void:
 	v.add_theme_constant_override("separation", 20)
 	add_child(v)
 
-	v.add_child(UiKit.label("Server", 36))
+	# The server field is a developer / tester tool: shown in debug builds only (store builds are release).
+	var server_lbl := UiKit.label("Server", 36)
 	_url = _edit(App.settings.server_url, "https://…")
-	v.add_child(_url)
 	var test := UiKit.button("Test connection", UiKit.MUTED, UiKit.PANEL_TXT, 100)
 	test.pressed.connect(_test)
-	v.add_child(test)
+	for c in [server_lbl, _url, test]:
+		c.visible = OS.is_debug_build()
+		v.add_child(c)
 
 	v.add_child(UiKit.label("Name on boards", 36))
 	_name = _edit(App.settings.name, "optional")
@@ -106,6 +108,20 @@ func _ready() -> void:
 		DisplayServer.clipboard_set(App.settings.device_id)
 		_status.text = "Device id copied.")
 	v.add_child(dev)
+	# Delete my data (Google Play Data safety): server records for this device, then the local files.
+	var delb := UiKit.button("Delete my data", Color("efe7d6"), UiKit.ACCENT, 80)
+	delb.name = "DeleteData"
+	delb.add_theme_font_size_override("font_size", 24)
+	delb.pressed.connect(func() -> void:
+		if not delb.has_meta("armed"):
+			delb.set_meta("armed", true)
+			delb.text = "Tap again: deletes coins, scores and progress for good"
+			return
+		delb.disabled = true
+		_status.text = "Deleting…"
+		var r: Dictionary = await App.delete_my_data()
+		_status.text = "Your data was deleted. The game starts fresh." if r["ok"] else "Couldn't delete: " + str(r["error"]))
+	v.add_child(delb)
 
 
 func _volume_row(title: String, key: String, node_name: String) -> Control:

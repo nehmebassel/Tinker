@@ -323,6 +323,24 @@ func submit_daily(placements: Array, solve_ms: int) -> Dictionary:
 	return r
 
 
+## Settings → Delete my data: the server deletes this device's records, then the local saves go and a
+## new device id is made (a fresh start). Returns the server's answer.
+func delete_my_data() -> Dictionary:
+	var r: Dictionary = await api.post_json("/me/delete", {"device_id": settings.device_id})
+	if not r["ok"]:
+		return r
+	for f in ["user://save.json", "user://wallet.json", "user://tries.json", "user://daily.json", "user://sandbox.json"]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(f))
+	save.reset()
+	tries.reset()
+	settings.device_id = Settings._new_device_id()
+	settings.name = ""
+	settings.save()
+	wallet.coins = 0
+	wallet.changed.emit()
+	return r
+
+
 func has_next(number: int) -> bool:
 	return not Campaign.entry(number + 1).is_empty()
 
