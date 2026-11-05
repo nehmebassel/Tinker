@@ -72,6 +72,21 @@ func _ready() -> void:
 	get_tree().node_added.connect(_on_node_added)
 
 
+## Bug (Bassel 2026-11-05): music kept playing with the app closed. The app mutes the Master bus
+## while it is in the background (Android/iOS app: PAUSED/RESUMED). The web build cannot rely on
+## this (iOS stops running the page's code when it is hidden), so the page itself suspends Web Audio
+## on visibilitychange/pagehide (export_presets.cfg head_include, checked by tools/web_audio_check.js).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_PAUSED:
+		set_backgrounded(true)
+	elif what == NOTIFICATION_APPLICATION_RESUMED:
+		set_backgrounded(false)
+
+
+func set_backgrounded(on: bool) -> void:
+	AudioServer.set_bus_mute(0, on)  # Master; the Settings sliders use Music / SFX, never Master
+
+
 func _make_bus(bus: String) -> void:
 	if AudioServer.get_bus_index(bus) >= 0:
 		return

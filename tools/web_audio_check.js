@@ -39,8 +39,37 @@ const MIN_PEAK = 0.01;
     await p.waitForTimeout(1000);
     peak = await p.evaluate(() => window.__peak);
   }
+  // Background (Bassel 2026-11-05: music kept playing with the app closed). Hide the page the way a
+  // phone does when the app is left; every game AudioContext must be suspended and its clock stopped.
+  // Then show it again and sound must come back.
+  let bg = { ok: true, why: '' };
+  if (peak >= MIN_PEAK) {
+    const setHidden = (h) => p.evaluate((h) => {
+      Object.defineProperty(document, 'hidden', { get: () => h, configurable: true });
+      Object.defineProperty(document, 'visibilityState', { get: () => (h ? 'hidden' : 'visible'), configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, h);
+    await setHidden(true);
+    await p.waitForTimeout(800);
+    const hidden = await p.evaluate(async () => {
+      const L = window.__tinkerAudio || [];
+      const t0 = L.map(c => c.currentTime);
+      await new Promise(r => setTimeout(r, 1000));
+      return { n: L.length, states: L.map(c => c.state), adv: L.map((c, i) => c.currentTime - t0[i]) };
+    });
+    if (hidden.n === 0) bg = { ok: false, why: 'no AudioContext was tracked by the page guard' };
+    else if (hidden.states.some(s => s === 'running') || hidden.adv.some(a => a > 0.05))
+      bg = { ok: false, why: `still playing while hidden: ${JSON.stringify(hidden)}` };
+    await setHidden(false);
+    await p.evaluate(() => { window.__peak = 0; });
+    let back = 0;
+    for (let i = 0; i < 10 && back < MIN_PEAK; i++) { await p.waitForTimeout(500); back = await p.evaluate(() => window.__peak); }
+    if (bg.ok && back < MIN_PEAK) bg = { ok: false, why: `no sound after coming back (peak ${back.toFixed(4)})` };
+    console.log(`background: hidden=${JSON.stringify(hidden)} back peak=${back.toFixed(4)}`);
+  }
   await b.close();
   console.log(`web audio peak: ${peak.toFixed(4)} (need >= ${MIN_PEAK})` + (errors.length ? ` page errors: ${errors.join(' | ')}` : ''));
   if (peak < MIN_PEAK) { console.log('WEB AUDIO FAIL'); process.exit(1); }
-  console.log('WEB AUDIO PASS');
+  if (!bg.ok) { console.log('WEB AUDIO FAIL (background): ' + bg.why); process.exit(1); }
+  console.log('WEB AUDIO PASS (audible, silent in the background, back on return)');
 })();

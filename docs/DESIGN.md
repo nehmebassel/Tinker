@@ -154,6 +154,7 @@ Design rules learned the hard way (all enforced by tests now):
 ## Touch controls (M1)
 
 - Drag from the tray: the part floats 1.25 tiles above the finger; a translucent ghost sits on the snapped landing cell with a crosshair; ghost turns red when the drop is invalid (off-stage or overlapping another part, checked with a physics shape query).
+- **Hit testing (2026-11-05)**: a tap selects the placed part exactly under the finger; else a fixed part exactly under it opens its card; else the placed part whose outline is nearest, within `TOUCH_R` = 60 screen px (~46 pt) at any zoom (`_part_near`, `shape_distance`). Thin parts (a plank is ~9 pt tall at fit zoom on a phone) were unselectable without zooming before this. Smoke test `_smoke_reselect` guards it.
 - Tap a placed part: rotation ring (radius 150 px) with a handle; drag the handle for 15° steps; double-tap the ring for 90°. Buttons "Turn" (+15°) and "90°" do the same.
 - Drag a placed part to move it; drop it on the tray to remove it.
 - Pinch to zoom (fit..3×fit), two-finger drag to pan, double-tap empty space or "Fit" to refit.
@@ -315,6 +316,7 @@ as Web Audio samples through a bus graph built at boot, and buses added at run t
 the output (this made the browser build completely silent until 2026-11-02). `tools/web_audio_check.js`
 (CI, android job) fails unless real signal reaches the speakers in headless Chromium. On iPhone the page
 sets `navigator.audioSession.type = "playback"` (export head include) so the silent switch does not mute it.
+**Background (2026-11-05)**: the web page head records every AudioContext (`window.__tinkerAudio`) and suspends it on `visibilitychange`/`pagehide`, resuming on return or the next tap; it must stay in the head include because iOS stops running the game's code in a hidden page and the `playback` audio session would otherwise keep the music going. The app mutes Master on APPLICATION_PAUSED. `tools/web_audio_check.js` checks both directions.
 Music crossfades between `menu` (menus), `build` (editing) and `run` (machine running).
 `SoundWatcher` (`scripts/ui/sound_watcher.gd`) reads the running simulation after each physics tick and
 plays effects for state changes (popped, lit, caught_count, spring launches, switch pressed, cat awake,
@@ -349,6 +351,7 @@ level screen only; finishes on the first solve or Skip; Settings → "Show tutor
 ## Backend (M4)
 
 See `server/README.md` (endpoints, configuration table, deploy, curation). Key decisions:
+- **Board ranks (2026-11-05)**: a rank is counted with the board's own query shape (`orderBy(parts, ms).endBefore(mine)`), never with a new filter combination: the emulator does not enforce composite indexes, and a query without one is a 500 in production. A rank failure may drop the caller's pinned row, never the board, and never the Daily reward on /score.
 - **Server replay is the proof.** `/score` spawns the same Godot build headless (`verify.gd`) on the
   submitted integers; an entry exists only if that replay reaches the goal. Parts are counted by the
   server. Time is the client's clock (from first touch, persisted per day) — it can be lied about, but
