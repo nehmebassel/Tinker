@@ -172,9 +172,10 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     }
     await col.devices().doc(device_id).set({ country: ctry, last_seen: entry.created_at, name: entry.name }, { merge: true });
     // The reward first: the entry is already stored, so nothing after this point may cost the player
-    // their Daily coins. A failing rank count returns rank null instead of a 500 (Bassel 2026-11-05).
+    // their Daily coins. A failing rank count answers rank 0 ("unknown" for every client; never null:
+    // installed clients do int(rank) and GDScript cannot convert null; Codex PR #10) instead of a 500.
     const reward = await app.locals.earnDaily?.(device_id, date).catch((e) => { console.error("daily reward", e); return null; });
-    const rank = await rankOf(date, "global", entry).catch((e) => { console.error("score rank", date, e?.message || e); return null; });
+    const rank = await rankOf(date, "global", entry).catch((e) => { console.error("score rank", date, e?.message || e); return 0; });
     res.status(201).json({ ok: true, parts: entry.parts, ms: entry.ms, rank, coins_added: reward?.coins_added || 0 });
   });
 
