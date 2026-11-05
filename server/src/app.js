@@ -37,7 +37,7 @@ function shortId() {
   return s;
 }
 
-export function createApp({ replayFn = replay, generateFn = generateDaily, fcm = realFcm, playVerify, fetchFn } = {}) {
+export function createApp({ replayFn = replay, generateFn = generateDaily, fcm = realFcm, playVerify, fetchFn, boardSize = config.boardSize } = {}) {
   const app = express();
   // rawBody: the Stripe webhook signature is over the exact bytes received.
   app.use(express.json({ limit: config.maxLevelBytes, verify: (req, _res, buf) => { if (req.originalUrl === "/stripe/webhook") req.rawBody = buf; } }));
@@ -171,8 +171,10 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
       throw err;
     }
     await col.devices().doc(device_id).set({ country: ctry, last_seen: entry.created_at, name: entry.name }, { merge: true });
-    const rank = await rankOf(date, "global", entry);
+    // The reward first: the entry is already stored, so nothing after this point may cost the player
+    // their Daily coins. A failing rank count returns rank null instead of a 500 (Bassel 2026-11-05).
     const reward = await app.locals.earnDaily?.(device_id, date).catch((e) => { console.error("daily reward", e); return null; });
+    const rank = await rankOf(date, "global", entry).catch((e) => { console.error("score rank", date, e?.message || e); return null; });
     res.status(201).json({ ok: true, parts: entry.parts, ms: entry.ms, rank, coins_added: reward?.coins_added || 0 });
   });
 
@@ -194,7 +196,7 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
     if (scope === "country" && mine && mine.country !== country) mine = null;
     let q = col.scores().where("date", "==", date);
     if (scope === "country") q = q.where("country", "==", country);
-    q = q.orderBy("parts", "asc").orderBy("ms", "asc").limit(config.boardSize);
+    q = q.orderBy("parts", "asc").orderBy("ms", "asc").limit(boardSize);
     const snap = await q.get();
     // Competition ranking ("1, 1, 3"), the same policy as rankOf: a row's rank is 1 + the number of
     // entries strictly better (fewer parts, or same parts and faster). Ties share a rank.
@@ -206,8 +208,13 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
       rows.push({ ...row(e, rank, deviceId), _parts: e.parts, _ms: e.ms });
     });
     for (const r of rows) { delete r._parts; delete r._ms; }
-    let own = null;
-    if (mine) own = row(mine, await rankOf(date, scope, mine), deviceId);
+    // My row: straight from the top N when I am in it, otherwise counted. A failing count must never
+    // take the whole board down (Bassel 2026-11-05: "Board unavailable: Internal").
+    let own = rows.find((r) => r.is_me) || null;
+    if (mine && !own) {
+      try { own = row(mine, await rankOf(date, scope, mine), deviceId); }
+      catch (e) { console.error("board rank", date, scope, e?.message || e); }
+    }
     res.set("Cache-Control", "public, max-age=30");
     res.json({ date, scope, country: scope === "country" ? country : null, rows, me: own });
   });
@@ -219,12 +226,15 @@ export function createApp({ replayFn = replay, generateFn = generateDaily, fcm =
   }
 
   async function rankOf(date, scope, entry) {
-    // rank = 1 + entries strictly better (fewer parts, or same parts and faster).
-    let base = col.scores().where("date", "==", date);
-    if (scope === "country") base = base.where("country", "==", entry.country);
-    const fewer = await base.where("parts", "<", entry.parts).count().get();
-    const faster = await base.where("parts", "==", entry.parts).where("ms", "<", entry.ms).count().get();
-    return 1 + fewer.data().count + faster.data().count;
+    // rank = 1 + entries strictly better (fewer parts, or same parts and faster) = the entries that sort
+    // before mine in the board's own order. Counted with the board query itself (same composite index,
+    // firestore.indexes.json). The old "parts < N" count needed a (date, parts) index that production
+    // never had: every board with a "me" row and every /score answered 500 (2026-11-05). The emulator
+    // does not enforce indexes: keep every composite query in the shape of a declared index.
+    let q = col.scores().where("date", "==", date);
+    if (scope === "country") q = q.where("country", "==", entry.country);
+    q = q.orderBy("parts", "asc").orderBy("ms", "asc").endBefore(entry.parts, entry.ms);
+    return 1 + (await q.count().get()).data().count;
   }
 
   // ---------------------------------------------------------------- push

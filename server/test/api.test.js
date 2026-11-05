@@ -239,6 +239,32 @@ test("ties share a rank on the board and in the submission response (1, 1, 3)", 
   assert.equal(b.body.rows.find((r) => r.is_me).rank, b.body.me.rank, "my row and me agree");
 });
 
+test("my row outside the top N is ranked by counting (1, 1, 3, 4 with ties) and the board never 500s", async () => {
+  // Regression 2026-11-05: production answered 500 "internal" to every board request from a device with
+  // a score (the old rank count needed an index production never had). Board size 2 forces the count.
+  const D = "2026-10-29";
+  const docs = [["rk-dev-0001", 1, 5000], ["rk-dev-0002", 1, 5000], ["rk-dev-0003", 2, 1000], ["rk-dev-0004", 2, 2000], ["rk-dev-0005", 2, 2000]];
+  for (const [id, parts, ms] of docs) {
+    await db.collection("scores").doc(`${D}_${id}`).set({ date: D, device_id: id, country: id.endsWith("4") ? "FR" : "LB", parts, ms, name: "" });
+  }
+  const s2 = createApp({ fcm: fakeFcm, boardSize: 2 }).listen(0);
+  const b2 = `http://127.0.0.1:${s2.address().port}`;
+  const get = async (q) => { const r = await fetch(b2 + q); return { status: r.status, body: await r.json() }; };
+  try {
+    const want = { "rk-dev-0003": 3, "rk-dev-0004": 4, "rk-dev-0005": 4 };
+    for (const [id, rank] of Object.entries(want)) {
+      const r = await get(`/board/${D}?device_id=${id}`);
+      assert.equal(r.status, 200);
+      assert.equal(r.body.rows.length, 2);
+      assert.ok(!r.body.rows.some((x) => x.is_me), "outside the top 2");
+      assert.equal(r.body.me.rank, rank, `${id} ranked by counting`);
+    }
+    const c = await get(`/board/${D}?scope=country&country=LB&device_id=rk-dev-0005`);
+    assert.equal(c.status, 200);
+    assert.equal(c.body.me.rank, 4, "country rank counts LB entries only (0004 is FR)");
+  } finally { s2.close(); }
+});
+
 test("notify: two overlapping calls send exactly once", async () => {
   const D = "2026-12-01";
   await db.collection("daily").doc(D).set({ date: D, level: { ...level1, id: "d-" + D } });

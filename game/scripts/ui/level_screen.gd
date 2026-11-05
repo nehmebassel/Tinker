@@ -808,14 +808,16 @@ func _touch_down(index: int, pos: Vector2, double_tap: bool) -> void:
 		if double_tap and absf(d - RING_R) <= RING_GRAB:
 			_rotate_selected(6)
 			return
-	# A placed, movable part?
+	# A placed, movable part exactly under the finger?
 	var hit := _part_at(wp)
+	# A fixed part exactly under the finger: show what it does (beats a near miss on a placed part).
+	var fixed_id := _fixed_part_at(wp) if hit < 0 else ""
+	if hit < 0 and fixed_id == "":
+		hit = _part_near(wp)  # finger-sized near miss (thin planks are ~9 pt tall on a phone)
 	if hit >= 0:
 		_note_first_touch()
 		drag = {"kind": "part", "index": index, "start": pos, "pidx": hit, "moved": false}
 		return
-	# A fixed part: show what it does.
-	var fixed_id := _fixed_part_at(wp)
 	if fixed_id != "" and not double_tap:
 		open_info(fixed_id)
 		return
@@ -911,17 +913,45 @@ func _part_at(wp: Vector2) -> int:
 			var idx: int = int(node.get_meta("part_index")) - level.fixed.size()
 			if idx >= 0 and idx < placements.size():
 				best = idx
-	if best >= 0:
-		return best
-	# Generous hit area for thin parts: nearest player part centre within half a tile.
-	var nearest := -1
-	var nd := Grid.TILE * 0.6
+	return best
+
+
+## Bug (Bassel 2026-11-05, video): a placed plank could not be selected again until he zoomed in.
+## At fit zoom a plank is 24 px thick = ~9 pt on an iPhone, and the old fallback only caught taps
+## within ~22 pt of the plank's CENTRE, so taps on the plank's body missed and deselected instead.
+## Now: the placed part whose outline is nearest the finger, within TOUCH_R screen px at any zoom.
+const TOUCH_R := 60.0  # design px on screen = ~46 pt finger diameter on a phone
+
+func _part_near(wp: Vector2) -> int:
+	var r := TOUCH_R / camera.zoom.x
+	var best := -1
+	var best_d := INF
 	for i in placements.size():
-		var d := wp.distance_to(Grid.cell_to_world(placements[i].cell))
-		if d < nd:
-			nd = d
-			nearest = i
-	return nearest
+		var pl: Placement = placements[i]
+		var shape: Dictionary = PartRegistry.get_def(pl.part).get("shape", {})
+		var c := Grid.cell_to_world(pl.cell)
+		var d := shape_distance(shape, c, Grid.steps_to_radians(pl.rot), wp)
+		# Ties (finger inside two parts' reach): the closer centre wins.
+		d += wp.distance_to(c) * 0.001
+		if d <= r and d < best_d:
+			best_d = d
+			best = i
+	return best
+
+
+## Distance from p to a part's outline (0 inside). rect/basket = rotated box, circle = disc,
+## shapeless parts (rope) = their placement point.
+static func shape_distance(shape: Dictionary, center: Vector2, rot: float, p: Vector2) -> float:
+	var local := (p - center).rotated(-rot)
+	match str(shape.get("type", "")):
+		"rect", "basket":
+			var half := Vector2(float(shape.get("w", 0)), float(shape.get("h", 0))) / 2.0
+			var q := Vector2(maxf(absf(local.x) - half.x, 0.0), maxf(absf(local.y) - half.y, 0.0))
+			return q.length()
+		"circle":
+			return maxf(local.length() - float(shape.get("radius", 0)), 0.0)
+		_:
+			return local.length()
 
 
 func _fixed_part_at(wp: Vector2) -> String:
@@ -2067,6 +2097,7 @@ func run_smoke_steps() -> Dictionary:
 		_assert(placements[0].rot != target.rot, "undo reverted rotation")
 		_redo()
 		_assert(placements[0].rot == target.rot, "redo restored rotation")
+	await _smoke_reselect()
 	var outcome_box := {}
 	sim.finished.connect(func(o: Dictionary) -> void: outcome_box["o"] = o, CONNECT_ONE_SHOT)
 	var tries_before := App.tries.left(_now()) if _has_app() else 0
@@ -2084,6 +2115,56 @@ func run_smoke_steps() -> Dictionary:
 	_assert(outcome["result"] == "goal", "level solved through the UI (result=%s)" % outcome["result"])
 	_assert(result_panel.visible, "result panel shown")
 	return outcome
+
+
+## Regression (Bassel's video 2026-11-05): at fit zoom, deselect the placed part, then tap 30 px off
+## its edge and away from its centre (a normal finger miss). It must be selected again.
+func _smoke_reselect() -> void:
+	_fit_camera()
+	await get_tree().process_frame
+	var empty := _smoke_empty_point()
+	_assert(empty.x >= 0.0, "found an empty stage point to tap")
+	if empty.x < 0.0:
+		return
+	await _synthetic_drag(0, empty, empty, 0)
+	_assert(selected == -1, "tap on empty stage deselects")
+	var pl: Placement = placements[0]
+	var shape: Dictionary = PartRegistry.get_def(pl.part).get("shape", {})
+	var c := Grid.cell_to_world(pl.cell)
+	var ang := Grid.steps_to_radians(pl.rot)
+	var tap_w := Vector2.INF
+	for side in [1.0, -1.0]:
+		var local := Vector2(30.0 * side, 0.0)
+		match str(shape.get("type", "")):
+			"rect", "basket":
+				local = Vector2(float(shape.get("w", 0)) * 0.35 * side, (float(shape.get("h", 0)) / 2.0 + 30.0) * side)
+			"circle":
+				local = Vector2((float(shape.get("radius", 0)) + 30.0) * side, 0.0)
+		var w := c + local.rotated(ang)
+		var s := _world_to_screen(w)
+		if _part_at(w) < 0 and _fixed_part_at(w) == "" and not _on_hud_button(s) and _stage_viewport_rect().has_point(s):
+			tap_w = w
+			break
+	_assert(tap_w != Vector2.INF, "found a near-miss point beside the placed part")
+	if tap_w == Vector2.INF:
+		return
+	var tap_s := _world_to_screen(tap_w)
+	await _synthetic_drag(0, tap_s, tap_s, 0)
+	_assert(selected == 0, "a finger-sized near miss re-selects the placed part at fit zoom (%.0f px from its centre)" % tap_w.distance_to(c))
+	_shot("res://../build/shots/03b_reselected.png")
+
+
+func _smoke_empty_point() -> Vector2:
+	var r := _stage_viewport_rect().grow(-40)
+	for gy in range(8):
+		for gx in range(6):
+			var s := r.position + r.size * Vector2((gx + 0.5) / 6.0, (gy + 0.5) / 8.0)
+			var w := _screen_to_world(s)
+			if ring_visible and w.distance_to(ring_pos) < RING_R + RING_GRAB * 2.0:
+				continue  # keep clear of the rotation ring's handle
+			if _part_at(w) < 0 and _fixed_part_at(w) == "" and _part_near(w) < 0 and not _on_hud_button(s):
+				return s
+	return Vector2(-1, -1)
 
 
 func _run_shot() -> void:
